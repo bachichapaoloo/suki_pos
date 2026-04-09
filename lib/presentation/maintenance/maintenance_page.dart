@@ -2,9 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:suki_pos/core/utils/responsive_layout.dart';
 
-/// A module that can be navigated to from the dashboard.
-class _ModuleItem {
-  const _ModuleItem({
+class _MaintenanceModule {
+  const _MaintenanceModule({
     required this.title,
     required this.icon,
     required this.color,
@@ -17,53 +16,29 @@ class _ModuleItem {
   final String route;
 }
 
-/// The main dashboard for the POS system.
-class PosDashboardPage extends StatelessWidget {
-  /// Creates a [PosDashboardPage].
-  const PosDashboardPage({super.key});
+/// A central landing page for all maintenance modules.
+class MaintenancePage extends StatelessWidget {
+  /// Creates a [MaintenancePage].
+  const MaintenancePage({super.key});
 
-  static const List<_ModuleItem> _modules = [
-    _ModuleItem(
-      title: 'Sales Entry',
-      icon: Icons.point_of_sale_rounded,
-      color: Colors.blue,
-      route: '/sales/entry',
-    ),
-    _ModuleItem(
-      title: 'Sales Order',
-      icon: Icons.receipt_long_rounded,
-      color: Colors.orange,
-      route: '/sales/order',
-    ),
-    _ModuleItem(
-      title: 'Sales Reading',
-      icon: Icons.query_stats_rounded,
-      color: Colors.teal,
-      route: '/sales/reading',
-    ),
-    _ModuleItem(
-      title: 'Sales Inquiry',
-      icon: Icons.search_rounded,
-      color: Colors.indigo,
-      route: '/sales/inquiry',
-    ),
-    _ModuleItem(
-      title: 'Maintenance',
-      icon: Icons.settings_suggest_rounded,
-      color: Colors.blueGrey,
-      route: '/maintenance',
-    ),
-    _ModuleItem(
-      title: 'Admin Maintenance',
-      icon: Icons.admin_panel_settings_rounded,
-      color: Colors.red,
-      route: '/admin',
-    ),
-    _ModuleItem(
-      title: 'Inventory',
+  static const List<_MaintenanceModule> _modules = [
+    _MaintenanceModule(
+      title: 'Product Maintenance',
       icon: Icons.inventory_2_rounded,
+      color: Colors.blue,
+      route: '/maintenance/products',
+    ),
+    _MaintenanceModule(
+      title: 'Category Maintenance',
+      icon: Icons.category_rounded,
+      color: Colors.purple,
+      route: '/maintenance/categories',
+    ),
+    _MaintenanceModule(
+      title: 'Department Maintenance',
+      icon: Icons.business_rounded,
       color: Colors.green,
-      route: '/inventory',
+      route: '/maintenance/departments',
     ),
   ];
 
@@ -74,16 +49,9 @@ class PosDashboardPage extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          'SukiPOS Dashboard',
+          'Maintenance',
           style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout_rounded),
-            onPressed: () => Navigator.of(context).pushReplacementNamed('/'),
-          ),
-          const SizedBox(width: 8),
-        ],
       ),
       body: Container(
         decoration: BoxDecoration(
@@ -105,7 +73,7 @@ class PosDashboardPage extends StatelessWidget {
                 _buildHeader(context),
                 const SizedBox(height: 32),
                 Expanded(
-                  child: _buildModuleGrid(context),
+                  child: _buildGrid(context),
                 ),
               ],
             ),
@@ -120,7 +88,7 @@ class PosDashboardPage extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Welcome, Superuser',
+          'System Maintenance',
           style: GoogleFonts.poppins(
             fontSize: context.responsiveValue(
               mobile: 24,
@@ -131,7 +99,7 @@ class PosDashboardPage extends StatelessWidget {
           ),
         ),
         Text(
-          'What would you like to do today?',
+          'Manage your products, categories, and organizational structure.',
           style: GoogleFonts.poppins(
             fontSize: 16,
             color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -141,11 +109,11 @@ class PosDashboardPage extends StatelessWidget {
     );
   }
 
-  Widget _buildModuleGrid(BuildContext context) {
+  Widget _buildGrid(BuildContext context) {
     final crossAxisCount = context.responsiveValue(
-      mobile: 2,
-      tablet: 3,
-      desktop: 4,
+      mobile: 1,
+      tablet: 2,
+      desktop: 3,
     );
 
     return GridView.builder(
@@ -153,7 +121,7 @@ class PosDashboardPage extends StatelessWidget {
         crossAxisCount: crossAxisCount,
         crossAxisSpacing: 24,
         mainAxisSpacing: 24,
-        childAspectRatio: 1.1,
+        childAspectRatio: 1.5,
       ),
       itemCount: _modules.length,
       itemBuilder: (context, index) => _ModuleCard(module: _modules[index]),
@@ -164,7 +132,7 @@ class PosDashboardPage extends StatelessWidget {
 class _ModuleCard extends StatelessWidget {
   const _ModuleCard({required this.module});
 
-  final _ModuleItem module;
+  final _MaintenanceModule module;
 
   @override
   Widget build(BuildContext context) {
@@ -173,9 +141,7 @@ class _ModuleCard extends StatelessWidget {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: () {
-          Navigator.of(context).pushNamed(module.route);
-        },
+        onTap: () => Navigator.of(context).pushNamed(module.route),
         borderRadius: BorderRadius.circular(24),
         child: Container(
           decoration: BoxDecoration(
@@ -192,32 +158,40 @@ class _ModuleCard extends StatelessWidget {
               ),
             ],
           ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: module.color.withValues(alpha: 0.1),
-                  shape: BoxShape.circle,
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: module.color.withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    module.icon,
+                    size: 32,
+                    color: module.color,
+                  ),
                 ),
-                child: Icon(
-                  module.icon,
-                  size: 32,
-                  color: module.color,
+                const SizedBox(width: 24),
+                Expanded(
+                  child: Text(
+                    module.title,
+                    style: GoogleFonts.poppins(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: colorScheme.onSurface,
+                    ),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                module.title,
-                textAlign: TextAlign.center,
-                style: GoogleFonts.poppins(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: colorScheme.onSurface,
+                Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  size: 16,
+                  color: colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
