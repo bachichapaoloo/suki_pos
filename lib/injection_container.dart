@@ -15,56 +15,60 @@ import 'package:suki_pos/presentation/maintenance/category/bloc/category_bloc.da
 import 'package:suki_pos/presentation/maintenance/department/bloc/department_bloc.dart';
 import 'package:suki_pos/presentation/maintenance/product/bloc/product_bloc.dart';
 
-final sl = GetIt.instance;
+final GetIt sl = GetIt.instance;
 
 Future<void> init() async {
   //! Presentation - BLoCs
-  sl.registerFactory(
+  sl..registerFactory(
     () => DepartmentBloc(
       getDepartments: sl(),
       saveDepartment: sl(),
       deleteDepartment: sl(),
     ),
-  );
-  sl.registerFactory(
+  )
+  ..registerFactory(
     () => CategoryBloc(
       getCategories: sl(),
       saveCategory: sl(),
       deleteCategory: sl(),
     ),
-  );
-  sl.registerFactory(
+  )
+  ..registerFactory(
     () => ProductBloc(
       getProducts: sl(),
       saveProduct: sl(),
       deleteProduct: sl(),
     ),
-  );
+  )
 
   //! Domain - Use Cases
-  sl.registerLazySingleton(() => GetDepartments(sl()));
-  sl.registerLazySingleton(() => SaveDepartment(sl()));
-  sl.registerLazySingleton(() => DeleteDepartment(sl()));
+  ..registerLazySingleton(() => GetDepartments(sl()))
+  ..registerLazySingleton(() => SaveDepartment(sl()))
+  ..registerLazySingleton(() => DeleteDepartment(sl()))
 
-  sl.registerLazySingleton(() => GetCategories(sl()));
-  sl.registerLazySingleton(() => SaveCategory(sl()));
-  sl.registerLazySingleton(() => DeleteCategory(sl()));
+  ..registerLazySingleton(() => GetCategories(sl()))
+  ..registerLazySingleton(() => SaveCategory(sl()))
+  ..registerLazySingleton(() => DeleteCategory(sl()))
 
-  sl.registerLazySingleton(() => GetProducts(sl()));
-  sl.registerLazySingleton(() => SaveProduct(sl()));
-  sl.registerLazySingleton(() => DeleteProduct(sl()));
+  ..registerLazySingleton(() => GetProducts(sl()))
+  ..registerLazySingleton(() => SaveProduct(sl()))
+  ..registerLazySingleton(() => DeleteProduct(sl()))
 
   //! Data - Repositories
-  sl.registerLazySingleton<DepartmentRepository>(
+  ..registerLazySingleton<DepartmentRepository>(
     () => DepartmentRepositoryImpl(sl()),
-  );
-  sl.registerLazySingleton<CategoryRepository>(
+  )
+  ..registerLazySingleton<CategoryRepository>(
     () => CategoryRepositoryImpl(sl()),
-  );
-  sl.registerLazySingleton<ProductRepository>(
+  )
+  ..registerLazySingleton<ProductRepository>(
     () => ProductRepositoryImpl(sl()),
   );
 
   //! Core
-  sl.registerLazySingleton(() => DatabaseHelper());
+  final dbHelper = DatabaseHelper();
+  sl.registerLazySingleton(() => dbHelper);
+  
+  // Trigger eager database initialization
+  await dbHelper.database;
 }

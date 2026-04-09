@@ -1,8 +1,11 @@
+import 'dart:io';
+
 import 'package:device_preview/device_preview.dart';
 import 'package:flex_color_scheme/flex_color_scheme.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:suki_pos/injection_container.dart' as di;
 import 'package:suki_pos/presentation/auth/login_page.dart';
 import 'package:suki_pos/presentation/maintenance/category/bloc/category_bloc.dart';
@@ -16,6 +19,12 @@ import 'package:suki_pos/presentation/pos/pos_dashboard_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  if (Platform.isWindows || Platform.isLinux) {
+    sqfliteFfiInit();
+    databaseFactory = databaseFactoryFfi;
+  }
+
   await di.init();
   runApp(
     DevicePreview(
