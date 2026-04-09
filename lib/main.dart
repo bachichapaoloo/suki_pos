@@ -7,6 +7,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:suki_pos/injection_container.dart' as di;
+import 'package:suki_pos/presentation/admin/admin_page.dart';
+import 'package:suki_pos/presentation/admin/role/bloc/role_bloc.dart';
+import 'package:suki_pos/presentation/admin/role/pages/role_list_page.dart';
+import 'package:suki_pos/presentation/admin/user/bloc/user_bloc.dart';
+import 'package:suki_pos/presentation/admin/user/pages/user_list_page.dart';
 import 'package:suki_pos/presentation/auth/login_page.dart';
 import 'package:suki_pos/presentation/maintenance/category/bloc/category_bloc.dart';
 import 'package:suki_pos/presentation/maintenance/category/pages/category_list_page.dart';
@@ -44,6 +49,8 @@ class MainApp extends StatelessWidget {
         BlocProvider(create: (_) => di.sl<DepartmentBloc>()),
         BlocProvider(create: (_) => di.sl<CategoryBloc>()),
         BlocProvider(create: (_) => di.sl<ProductBloc>()),
+        BlocProvider(create: (_) => di.sl<RoleBloc>()),
+        BlocProvider(create: (_) => di.sl<UserBloc>()),
       ],
       child: MaterialApp(
         title: 'Suki POS',
@@ -59,6 +66,9 @@ class MainApp extends StatelessWidget {
           '/maintenance/departments': (context) => const DepartmentListPage(),
           '/maintenance/categories': (context) => const CategoryListPage(),
           '/maintenance/products': (context) => const ProductListPage(),
+          '/admin': (context) => const AdminPage(),
+          '/admin/users': (context) => const UserListPage(),
+          '/admin/roles': (context) => const RoleListPage(),
         },
       ),
     );
