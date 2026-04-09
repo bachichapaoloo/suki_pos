@@ -7,27 +7,36 @@ environment:
   sdk: ^3.9.0
 
 dependencies:
-  flutter_bloc: ^8.1.6       # state management
-  get_it: ^7.7.0             # dependency injection
-  sqflite: ^2.3.3            # SQLite (your normalized schema)
-  path: ^1.9.0               # DB path helper
-  dartz: ^0.10.1             # Either / Option for error handling
-  equatable: ^2.0.5          # value equality on entities
-  intl: ^0.19.0              # currency / date formatting
-  go_router: ^14.2.7         # Play Store-grade navigation
-  flutter_secure_storage: ^9.2.2  # PIN / password storage
-  printing: ^5.13.2          # ESC/POS receipt printing
+  flutter:
+    sdk: flutter
   blue_thermal_printer: ^1.1.3   # Bluetooth printer
-  web_socket_channel: ^3.0.1 # KDS real-time channel
+  dartz: ^0.10.1             # Either / Option for error handling
+  device_preview: ^1.3.1
+  equatable: ^2.0.5          # value equality on entities
+  firebase_core: ^4.2.1
+  firebase_crashlytics: ^5.1.0   # required for Play Store quality
+  flex_color_scheme: ^8.3.1
+  flutter_animate: ^4.5.2
+  flutter_bloc: ^9.1.1       # state management
+  flutter_secure_storage: ^10.0.0  # PIN / password storage
+  get_it: ^9.2.1             # dependency injection
+  go_router: ^17.2.0         # Play Store-grade navigation
+  google_fonts: ^8.0.2
+  intl: ^0.20.2              # currency / date formatting
+  path: ^1.9.0               # DB path helper
+  printing: ^5.13.2          # ESC/POS receipt printing
+  sqflite: ^2.3.3            # SQLite (your normalized schema)
   supabase_flutter: ^2.5.6   # cloud sync backend
-  firebase_crashlytics: ^4.1.3   # required for Play Store quality
+  web_socket_channel: ^3.0.1 # KDS real-time channel
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  bloc_test: ^9.1.7
+  bloc_test: ^10.0.0
   mocktail: ^1.0.4
-  very_good_analysis: ^6.0.0  # strict lint rules
+  very_good_analysis: ^10.0.0  # strict lint rules
   
 flutter:
   uses-material-design: true
+  assets:
+    - assets/images/
