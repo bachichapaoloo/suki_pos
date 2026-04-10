@@ -3,8 +3,10 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:suki_pos/core/utils/responsive_layout.dart';
+import 'package:suki_pos/presentation/auth/bloc/auth_bloc.dart';
 
 /// The login page of the application where users enter their PIN.
 class LoginPage extends StatefulWidget {
@@ -17,25 +19,17 @@ class LoginPage extends StatefulWidget {
 
 class _LoginPageState extends State<LoginPage> {
   String _pin = '';
-  final String _superuserPin = '050724';
-  bool _isVerifying = false;
-  bool _isSuccess = false;
 
   void _onDigitPressed(String digit) {
-    if (_isVerifying || _isSuccess) return;
-    if (_pin.length < 6) {
+    if (_pin.length < 12) {
       unawaited(HapticFeedback.lightImpact());
       setState(() {
         _pin += digit;
       });
-      if (_pin.length == 6) {
-        unawaited(_verifyPin());
-      }
     }
   }
 
   void _onDeletePressed() {
-    if (_isVerifying || _isSuccess) return;
     if (_pin.isNotEmpty) {
       unawaited(HapticFeedback.lightImpact());
       setState(() {
@@ -44,48 +38,9 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
-  Future<void> _verifyPin() async {
-    setState(() => _isVerifying = true);
-
-    await Future<void>.delayed(const Duration(milliseconds: 800));
-
-    if (_pin == _superuserPin) {
-      setState(() {
-        _isSuccess = true;
-        _isVerifying = false;
-      });
-
-      unawaited(HapticFeedback.mediumImpact());
-
-      await Future<void>.delayed(const Duration(seconds: 2));
-
-      if (mounted) {
-        unawaited(Navigator.of(context).pushReplacementNamed('/pos'));
-      }
-    } else {
-      unawaited(HapticFeedback.vibrate());
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Incorrect PIN. Please try again.',
-              style: GoogleFonts.poppins(),
-            ),
-            backgroundColor: Theme.of(context).colorScheme.error,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            margin: const EdgeInsets.all(16),
-          ),
-        );
-
-        setState(() {
-          _pin = '';
-          _isVerifying = false;
-        });
-      }
+  void _onEnterPressed() {
+    if (_pin.isNotEmpty) {
+      context.read<AuthBloc>().add(LoginEvent(_pin));
     }
   }
 
@@ -93,28 +48,44 @@ class _LoginPageState extends State<LoginPage> {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    if (_isSuccess) {
-      return _buildSuccessView(colorScheme);
-    }
-
-    return Scaffold(
-      backgroundColor: colorScheme.surface,
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              colorScheme.primaryContainer.withValues(alpha: 0.1),
-              colorScheme.surface,
-            ],
+    return BlocListener<AuthBloc, AuthState>(
+      listener: (context, state) {
+        if (state is AuthAuthenticated) {
+          unawaited(HapticFeedback.mediumImpact());
+          unawaited(Navigator.of(context).pushReplacementNamed('/pos'));
+        } else if (state is AuthError) {
+          unawaited(HapticFeedback.vibrate());
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(state.message),
+              backgroundColor: colorScheme.error,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+          setState(() {
+            _pin = '';
+          });
+        }
+      },
+      child: Scaffold(
+        backgroundColor: colorScheme.surface,
+        body: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                colorScheme.primaryContainer.withValues(alpha: 0.1),
+                colorScheme.surface,
+              ],
+            ),
           ),
-        ),
-        child: SafeArea(
-          child: ResponsiveLayout(
-            mobile: _buildMobileLayout(colorScheme),
-            tablet: _buildTabletLayout(colorScheme),
-            desktop: _buildDesktopLayout(colorScheme),
+          child: SafeArea(
+            child: ResponsiveLayout(
+              mobile: _buildMobileLayout(colorScheme),
+              tablet: _buildTabletLayout(colorScheme),
+              desktop: _buildDesktopLayout(colorScheme),
+            ),
           ),
         ),
       ),
@@ -126,8 +97,7 @@ class _LoginPageState extends State<LoginPage> {
   Widget _buildMobileLayout(ColorScheme colorScheme) {
     return SingleChildScrollView(
       child: Container(
-        height:
-            MediaQuery.sizeOf(context).height -
+        height: MediaQuery.sizeOf(context).height -
             MediaQuery.paddingOf(context).top -
             MediaQuery.paddingOf(context).bottom,
         padding: const EdgeInsets.symmetric(vertical: 24),
@@ -137,7 +107,7 @@ class _LoginPageState extends State<LoginPage> {
               flex: 2,
               child: _buildHeader(colorScheme, isCompact: true),
             ),
-            _buildPinIndicators(colorScheme),
+            _buildPinDisplay(colorScheme),
             const SizedBox(height: 32),
             _buildNumberPad(colorScheme, buttonSize: 72),
             const SizedBox(height: 24),
@@ -179,7 +149,7 @@ class _LoginPageState extends State<LoginPage> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      _buildPinIndicators(colorScheme),
+                      _buildPinDisplay(colorScheme),
                       const SizedBox(height: 48),
                       _buildNumberPad(colorScheme, buttonSize: 64),
                     ],
@@ -232,7 +202,7 @@ class _LoginPageState extends State<LoginPage> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      _buildPinIndicators(colorScheme),
+                      _buildPinDisplay(colorScheme),
                       const SizedBox(height: 56),
                       _buildNumberPad(colorScheme, buttonSize: 80),
                     ],
@@ -271,69 +241,51 @@ class _LoginPageState extends State<LoginPage> {
           ).animate().fadeIn(delay: 400.ms).slideY(begin: 0.2),
           const SizedBox(height: 8),
           Text(
-            'Enter your 6-digit PIN to access SukiPOS',
+            'Enter your PIN to access SukiPOS',
             textAlign: TextAlign.center,
             style: GoogleFonts.poppins(
               fontSize: 14,
               color: colorScheme.onSurfaceVariant,
             ),
           ).animate().fadeIn(delay: 600.ms),
-          if (_isVerifying)
-            Padding(
-              padding: const EdgeInsets.only(top: 24),
-              child: SizedBox(
-                width: 32,
-                height: 32,
-                child: CircularProgressIndicator(
-                  strokeWidth: 3,
-                  color: colorScheme.primary,
-                ),
-              ),
-            ).animate().fadeIn(),
+          context.watch<AuthBloc>().state is AuthLoading
+              ? Padding(
+                  padding: const EdgeInsets.only(top: 24),
+                  child: SizedBox(
+                    width: 32,
+                    height: 32,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 3,
+                      color: colorScheme.primary,
+                    ),
+                  ),
+                ).animate().fadeIn()
+              : const SizedBox(height: 56),
         ],
       ),
     );
   }
 
-  // ================= PIN DOTS =================
-  Widget _buildPinIndicators(ColorScheme colorScheme) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: List.generate(6, (index) {
-        final isFilled = index < _pin.length;
-        return AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              margin: const EdgeInsets.symmetric(horizontal: 8),
-              width: 14,
-              height: 14,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: isFilled ? colorScheme.primary : Colors.transparent,
-                border: Border.all(
-                  color: isFilled
-                      ? colorScheme.primary
-                      : colorScheme.outlineVariant,
-                  width: 2,
-                ),
-                boxShadow: isFilled
-                    ? [
-                        BoxShadow(
-                          color: colorScheme.primary.withValues(alpha: 0.3),
-                          blurRadius: 8,
-                          spreadRadius: 2,
-                        ),
-                      ]
-                    : [],
-              ),
-            )
-            .animate(target: isFilled ? 1 : 0)
-            .scale(
-              begin: const Offset(0.8, 0.8),
-              end: const Offset(1.1, 1.1),
-              curve: Curves.elasticOut,
-            );
-      }),
-    ).animate().fadeIn(delay: 800.ms);
+  // ================= PIN DISPLAY =================
+  Widget _buildPinDisplay(ColorScheme colorScheme) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Text(
+        _pin.isEmpty ? 'Enter PIN' : '• ' * _pin.length,
+        style: GoogleFonts.poppins(
+          fontSize: 24,
+          letterSpacing: 8,
+          fontWeight: FontWeight.bold,
+          color: _pin.isEmpty
+              ? colorScheme.onSurfaceVariant.withValues(alpha: 0.5)
+              : colorScheme.primary,
+        ),
+      ),
+    ).animate(target: _pin.isNotEmpty ? 1 : 0).shimmer();
   }
 
   // ================= NUMBER PAD =================
@@ -349,9 +301,9 @@ class _LoginPageState extends State<LoginPage> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
-              SizedBox(width: buttonSize, height: buttonSize),
-              _buildNumberButton('0', colorScheme, buttonSize),
               _buildDeleteButton(colorScheme, buttonSize),
+              _buildNumberButton('0', colorScheme, buttonSize),
+              _buildEnterButton(colorScheme, buttonSize),
             ],
           ),
         ),
@@ -429,8 +381,8 @@ class _LoginPageState extends State<LoginPage> {
           child: Center(
             child: Icon(
               Icons.backspace_outlined,
-              color: colorScheme.primary,
-              size: buttonSize * 0.35,
+              color: colorScheme.error.withValues(alpha: 0.7),
+              size: buttonSize * 0.3,
             ),
           ),
         ),
@@ -438,49 +390,35 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 
-  // ================= SUCCESS VIEW =================
-  Widget _buildSuccessView(ColorScheme colorScheme) {
-    return Scaffold(
-      backgroundColor: colorScheme.primary,
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-                  width: 120,
-                  height: 120,
-                  decoration: const BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.white,
-                  ),
-                  child: Icon(
-                    Icons.check_rounded,
-                    color: colorScheme.primary,
-                    size: 80,
-                  ),
-                )
-                .animate()
-                .scale(duration: 600.ms, curve: Curves.elasticOut)
-                .then()
-                .shake(duration: 400.ms),
-            const SizedBox(height: 40),
-            Text(
-              'Authorized',
-              style: GoogleFonts.poppins(
-                fontSize: 32,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
+  Widget _buildEnterButton(ColorScheme colorScheme, double buttonSize) {
+    final isLoading = context.watch<AuthBloc>().state is AuthLoading;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: isLoading ? null : _onEnterPressed,
+        borderRadius: BorderRadius.circular(buttonSize / 2),
+        child: Container(
+          width: buttonSize,
+          height: buttonSize,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: colorScheme.primary,
+            boxShadow: [
+              BoxShadow(
+                color: colorScheme.primary.withValues(alpha: 0.3),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
               ),
-            ).animate().fadeIn(delay: 300.ms).slideY(begin: 0.2),
-            const SizedBox(height: 12),
-            Text(
-              'Welcome to SukiPOS',
-              style: GoogleFonts.poppins(
-                fontSize: 18,
-                color: Colors.white.withValues(alpha: 0.8),
-              ),
-            ).animate().fadeIn(delay: 500.ms),
-          ],
+            ],
+          ),
+          child: const Center(
+            child: Icon(
+              Icons.login_rounded,
+              color: Colors.white,
+              size: 32,
+            ),
+          ),
         ),
       ),
     );

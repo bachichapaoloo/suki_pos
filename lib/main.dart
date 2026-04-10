@@ -12,6 +12,7 @@ import 'package:suki_pos/presentation/admin/role/bloc/role_bloc.dart';
 import 'package:suki_pos/presentation/admin/role/pages/role_list_page.dart';
 import 'package:suki_pos/presentation/admin/user/bloc/user_bloc.dart';
 import 'package:suki_pos/presentation/admin/user/pages/user_list_page.dart';
+import 'package:suki_pos/presentation/auth/bloc/auth_bloc.dart';
 import 'package:suki_pos/presentation/auth/login_page.dart';
 import 'package:suki_pos/presentation/maintenance/category/bloc/category_bloc.dart';
 import 'package:suki_pos/presentation/maintenance/category/pages/category_list_page.dart';
@@ -51,6 +52,7 @@ class MainApp extends StatelessWidget {
         BlocProvider(create: (_) => di.sl<ProductBloc>()),
         BlocProvider(create: (_) => di.sl<RoleBloc>()),
         BlocProvider(create: (_) => di.sl<UserBloc>()),
+        BlocProvider(create: (_) => di.sl<AuthBloc>()),
       ],
       child: MaterialApp(
         title: 'Suki POS',
