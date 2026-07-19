@@ -30,6 +30,8 @@ dependencies:
   web_socket_channel: ^3.0.1 # KDS real-time channel
   sqflite_common_ffi: ^2.3.7+1
   path_provider: ^2.1.5
+  image_picker: ^1.1.2
+  file_picker: ^8.0.0
 
 dev_dependencies:
   flutter_test:
@@ -43,3 +45,4 @@ flutter:
   assets:
     - assets/images/
     - assets/migrations/
+
