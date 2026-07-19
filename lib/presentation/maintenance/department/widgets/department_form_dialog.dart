@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:suki_pos/domain/entities/maintenance/department.dart';
 import 'package:suki_pos/presentation/widgets/custom_form_dialog.dart';
 import 'package:suki_pos/presentation/widgets/custom_text_field.dart';
@@ -56,6 +57,7 @@ class _DepartmentFormDialogState extends State<DepartmentFormDialog> {
       content: Form(
         key: _formKey,
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             CustomTextField(
               label: 'Department Code',
@@ -81,11 +83,27 @@ class _DepartmentFormDialogState extends State<DepartmentFormDialog> {
                 return null;
               },
             ),
-            SwitchListTile(
-              title: const Text('Active'),
-              value: _isActive,
-              onChanged: (value) => setState(() => _isActive = value),
-              contentPadding: EdgeInsets.zero,
+            Container(
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.grey[300]!),
+                borderRadius: BorderRadius.circular(12),
+                color: const Color(0xFFF7F8FA),
+              ),
+              child: SwitchListTile(
+                title: Text(
+                  'Active',
+                  style: GoogleFonts.inter(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: const Color(0xFF1E293B),
+                  ),
+                ),
+                value: _isActive,
+                activeColor: const Color(0xFF355C8F),
+                onChanged: (value) => setState(() => _isActive = value),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
             ),
           ],
         ),
@@ -93,3 +111,4 @@ class _DepartmentFormDialogState extends State<DepartmentFormDialog> {
     );
   }
 }
+

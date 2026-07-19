@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:suki_pos/domain/entities/maintenance/category.dart';
 import 'package:suki_pos/domain/entities/maintenance/department.dart';
 import 'package:suki_pos/presentation/maintenance/department/bloc/department_bloc.dart';
@@ -77,6 +78,7 @@ class _CategoryFormDialogState extends State<CategoryFormDialog> {
       content: Form(
         key: _formKey,
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             BlocBuilder<DepartmentBloc, DepartmentState>(
               builder: (context, state) {
@@ -85,26 +87,54 @@ class _CategoryFormDialogState extends State<CategoryFormDialog> {
                   departments = state.departments;
                 }
 
-                return DropdownButtonFormField<int>(
-                  value: _selectedDepartmentId,
-                  decoration: const InputDecoration(
-                    labelText: 'Department',
-                    border: OutlineInputBorder(),
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Department',
+                        style: GoogleFonts.inter(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: const Color(0xFF1E293B),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      DropdownButtonFormField<int>(
+                        value: _selectedDepartmentId,
+                        icon: const Icon(Icons.arrow_drop_down, color: Color(0xFF1E293B)),
+                        style: GoogleFonts.inter(fontSize: 15, color: const Color(0xFF1E293B)),
+                        decoration: InputDecoration(
+                          hintText: 'Select Department',
+                          hintStyle: GoogleFonts.inter(color: Colors.grey[500]),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: Colors.grey[300]!),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(color: Color(0xFF355C8F), width: 2),
+                          ),
+                          filled: true,
+                          fillColor: const Color(0xFFF7F8FA),
+                        ),
+                        items: departments.map((dept) {
+                          return DropdownMenuItem(
+                            value: dept.id,
+                            child: Text(dept.name),
+                          );
+                        }).toList(),
+                        onChanged: (value) => setState(() => _selectedDepartmentId = value),
+                        validator: (value) => value == null ? 'Department is required' : null,
+                      ),
+                    ],
                   ),
-                  items: departments.map((dept) {
-                    return DropdownMenuItem(
-                      value: dept.id,
-                      child: Text(dept.name),
-                    );
-                  }).toList(),
-                  onChanged: (value) =>
-                      setState(() => _selectedDepartmentId = value),
-                  validator: (value) =>
-                      value == null ? 'Department is required' : null,
                 );
               },
             ),
-            const SizedBox(height: 16),
             CustomTextField(
               label: 'Category Name',
               controller: _nameController,
@@ -123,17 +153,50 @@ class _CategoryFormDialogState extends State<CategoryFormDialog> {
               keyboardType: TextInputType.number,
               hintText: '0',
             ),
-            SwitchListTile(
-              title: const Text('Available Online'),
-              value: _isAvailableOnline,
-              onChanged: (value) => setState(() => _isAvailableOnline = value),
-              contentPadding: EdgeInsets.zero,
+            Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.grey[300]!),
+                borderRadius: BorderRadius.circular(12),
+                color: const Color(0xFFF7F8FA),
+              ),
+              child: SwitchListTile(
+                title: Text(
+                  'Available Online',
+                  style: GoogleFonts.inter(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: const Color(0xFF1E293B),
+                  ),
+                ),
+                value: _isAvailableOnline,
+                activeColor: const Color(0xFF355C8F),
+                onChanged: (value) => setState(() => _isAvailableOnline = value),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
             ),
-            SwitchListTile(
-              title: const Text('Active'),
-              value: _isActive,
-              onChanged: (value) => setState(() => _isActive = value),
-              contentPadding: EdgeInsets.zero,
+            Container(
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.grey[300]!),
+                borderRadius: BorderRadius.circular(12),
+                color: const Color(0xFFF7F8FA),
+              ),
+              child: SwitchListTile(
+                title: Text(
+                  'Active',
+                  style: GoogleFonts.inter(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: const Color(0xFF1E293B),
+                  ),
+                ),
+                value: _isActive,
+                activeColor: const Color(0xFF355C8F),
+                onChanged: (value) => setState(() => _isActive = value),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
             ),
           ],
         ),

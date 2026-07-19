@@ -1,184 +1,144 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-
-// Fallback responsive extension if your core/utils/responsive_layout.dart differs
-extension ResponsiveContext on BuildContext {
-  T responsiveValue<T>({required T mobile, required T tablet, required T desktop}) {
-    final width = MediaQuery.sizeOf(this).width;
-    if (width >= 1100) return desktop;
-    if (width >= 650) return tablet;
-    return mobile;
-  }
-}
-
-class _ModuleItem {
-  const _ModuleItem({
-    required this.title,
-    required this.icon,
-    required this.color,
-    required this.route,
-    this.badgeCount = 0,
-  });
-
-  final String title;
-  final IconData icon;
-  final Color color;
-  final String route;
-  final int badgeCount;
-}
+import 'package:suki_pos/presentation/widgets/main_layout.dart';
 
 class PosDashboardPage extends StatelessWidget {
   const PosDashboardPage({super.key});
 
-  static const List<_ModuleItem> _modules = [
-    _ModuleItem(
-      title: 'Sales Entry',
-      icon: Icons.point_of_sale_rounded,
-      color: Colors.blue,
-      route: '/sales/entry',
-    ),
-    _ModuleItem(
-      title: 'Sales Order',
-      icon: Icons.receipt_long_rounded,
-      color: Colors.orange,
-      route: '/sales/order',
-      badgeCount: 4, // Example: Pending orders needing attention
-    ),
-    _ModuleItem(
-      title: 'Sales Reading',
-      icon: Icons.query_stats_rounded,
-      color: Colors.teal,
-      route: '/sales/reading',
-    ),
-    _ModuleItem(
-      title: 'Sales Inquiry',
-      icon: Icons.search_rounded,
-      color: Colors.indigo,
-      route: '/sales/inquiry',
-    ),
-    _ModuleItem(
-      title: 'Inventory',
-      icon: Icons.inventory_2_rounded,
-      color: Colors.green,
-      route: '/inventory',
-      badgeCount: 2, // Example: Low stock alerts
-    ),
-    _ModuleItem(
-      title: 'Maintenance',
-      icon: Icons.settings_suggest_rounded,
-      color: Colors.blueGrey,
-      route: '/maintenance',
-    ),
-    _ModuleItem(
-      title: 'Admin Panel',
-      icon: Icons.admin_panel_settings_rounded,
-      color: Colors.red,
-      route: '/admin',
-    ),
-  ];
-
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final horizontalPadding = context.responsiveValue(mobile: 16.0, tablet: 24.0, desktop: 36.0);
-
-    return Scaffold(
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              colorScheme.primaryContainer.withValues(alpha: 0.08),
-              colorScheme.surface,
-            ],
-          ),
-        ),
-        child: SafeArea(
-          child: CustomScrollView(
-            physics: const BouncingScrollPhysics(),
-            slivers: [
-              _buildSliverAppBar(context),
-              SliverPadding(
-                padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 16),
-                sliver: SliverToBoxAdapter(
-                  child: _buildHeader(context),
-                ),
+    return MainLayout(
+      currentTab: MainTab.home,
+      mobileAppBar: AppBar(
+        backgroundColor: const Color(0xFFF7F8FA),
+        elevation: 0,
+        title: Row(
+          children: [
+            const Icon(Icons.storefront_outlined, color: Color(0xFF355C8F)),
+            const SizedBox(width: 8),
+            Text(
+              'SukiPOS',
+              style: GoogleFonts.inter(
+                color: const Color(0xFF355C8F),
+                fontWeight: FontWeight.bold,
+                fontSize: 18,
               ),
-              SliverPadding(
-                padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
-                sliver: SliverToBoxAdapter(
-                  child: _buildQuickStatsRow(context),
-                ),
-              ),
-              SliverPadding(
-                padding: EdgeInsets.all(horizontalPadding),
-                sliver: _buildModuleGrid(context),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSliverAppBar(BuildContext context) {
-    return SliverAppBar(
-      floating: true,
-      backgroundColor: Colors.transparent,
-      elevation: 0,
-      title: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.primary,
-              borderRadius: BorderRadius.circular(10),
             ),
-            child: const Icon(Icons.storefront_rounded, color: Colors.white, size: 20),
+          ],
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.access_time, color: Color(0xFF1E293B)),
+            onPressed: () {},
           ),
-          const SizedBox(width: 12),
-          Text(
-            'SukiPOS',
-            style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 20),
+          IconButton(
+            icon: const Icon(Icons.logout, color: Color(0xFF1E293B)),
+            onPressed: () => Navigator.of(context).pushReplacementNamed('/login'),
           ),
+          const SizedBox(width: 8),
         ],
       ),
-      actions: [
-        IconButton.filledTonal(
-          tooltip: 'Shift Settings',
-          icon: const Icon(Icons.access_time_filled_rounded),
-          onPressed: () {},
+      desktopHeader: Container(
+        height: 80,
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          border: Border(bottom: BorderSide(color: Colors.grey[200]!)),
         ),
-        const SizedBox(width: 8),
-        IconButton.filledTonal(
-          tooltip: 'Logout',
-          icon: const Icon(Icons.logout_rounded),
-          onPressed: () => Navigator.of(context).pushReplacementNamed('/'),
+        child: Row(
+          children: [
+            const Icon(Icons.storefront_outlined, color: Color(0xFF355C8F), size: 32),
+            const SizedBox(width: 8),
+            Text(
+              'SukiPOS',
+              style: GoogleFonts.inter(
+                color: const Color(0xFF355C8F),
+                fontWeight: FontWeight.bold,
+                fontSize: 24,
+              ),
+            ),
+            const Spacer(),
+            // Center Title or Empty space
+            const Spacer(),
+            const Icon(Icons.access_time, color: Colors.grey, size: 20),
+            const SizedBox(width: 8),
+            Text(
+              '1:10 AM',
+              style: GoogleFonts.inter(
+                fontWeight: FontWeight.w600,
+                color: Colors.grey[800],
+              ),
+            ),
+            const SizedBox(width: 24),
+            IconButton(
+              icon: const Icon(Icons.logout, color: Colors.grey),
+              onPressed: () {
+                Navigator.of(context).pushReplacementNamed('/login');
+              },
+            ),
+          ],
         ),
-        const SizedBox(width: 16),
-      ],
+      ),
+      mobileBody: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildMobileWelcomeSection(),
+            const SizedBox(height: 24),
+            _buildMobileSalesCard(),
+            const SizedBox(height: 16),
+            _buildMobileStatsRow(),
+            const SizedBox(height: 32),
+            _buildOperationsText(),
+            const SizedBox(height: 16),
+            _buildMobileOperationsGrid(context),
+            const SizedBox(height: 32),
+          ],
+        ),
+      ),
+      desktopBody: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 48.0, vertical: 32.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildDesktopWelcomeSection(),
+            const SizedBox(height: 32),
+            _buildSummaryCards(),
+            const SizedBox(height: 48),
+            _buildStoreOperationsHeader(),
+            const SizedBox(height: 24),
+            _buildDesktopOperationsGrid(context),
+          ],
+        ),
+      ),
     );
   }
 
-  Widget _buildHeader(BuildContext context) {
+  Widget _buildDesktopWelcomeSection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Welcome back, Superuser',
-          style: GoogleFonts.poppins(
-            fontSize: context.responsiveValue(mobile: 22.0, tablet: 26.0, desktop: 30.0),
-            fontWeight: FontWeight.bold,
-            height: 1.2,
-          ),
+        Row(
+          children: [
+            Text(
+              'Welcome back, Maria',
+              style: GoogleFonts.inter(
+                fontSize: 32,
+                fontWeight: FontWeight.bold,
+                color: const Color(0xFF1E293B),
+              ),
+            ),
+            const SizedBox(width: 12),
+            const Text('👋', style: TextStyle(fontSize: 32)),
+          ],
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: 8),
         Text(
-          'Register #01 is open • Terminal online',
-          style: GoogleFonts.poppins(
-            fontSize: 14,
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          'Shift started at 08:00 AM • Main Store Branch',
+          style: GoogleFonts.inter(
+            fontSize: 16,
+            color: Colors.grey[600],
             fontWeight: FontWeight.w500,
           ),
         ),
@@ -186,202 +146,804 @@ class PosDashboardPage extends StatelessWidget {
     );
   }
 
-  Widget _buildQuickStatsRow(BuildContext context) {
-    // Adapts from a single-column stack on small phones to a 3-column row on tablets/desktop
-    final isMobile = MediaQuery.sizeOf(context).width < 650;
-
-    final stats = [
-      const _StatCard(title: "Today's Sales", value: '₱ 45,230.00', icon: Icons.trending_up, color: Colors.green),
-      const _StatCard(title: 'Active Orders', value: '12 Pending', icon: Icons.pending_actions, color: Colors.orange),
-      const _StatCard(title: 'Shift Duration', value: '4h 15m', icon: Icons.timer, color: Colors.blue),
-    ];
-
-    if (isMobile) {
-      return Column(
-        children: stats.map((e) => Padding(padding: const EdgeInsets.only(bottom: 12), child: e)).toList(),
-      );
-    }
-
-    return Row(
-      children: stats
-          .expand(
-            (widget) => [
-              Expanded(child: widget),
-              const SizedBox(width: 16),
-            ],
-          )
-          .take(stats.length * 2 - 1)
-          .toList(),
-    );
-  }
-
-  Widget _buildModuleGrid(BuildContext context) {
-    // Restores strict, uniform column counts per device screen
-    final crossAxisCount = context.responsiveValue(
-      mobile: 2,
-      tablet: 3,
-      desktop: 4,
-    );
-
-    return SliverGrid(
-      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: crossAxisCount,
-        mainAxisSpacing: 20,
-        crossAxisSpacing: 20,
-        childAspectRatio: 1.05, // Slightly wider than tall for ergonomic touch targets
-      ),
-      delegate: SliverChildBuilderDelegate(
-        (context, index) => _ModuleCard(module: _modules[index]),
-        childCount: _modules.length,
-      ),
-    );
-  }
-}
-
-class _StatCard extends StatelessWidget {
-  const _StatCard({required this.title, required this.value, required this.icon, required this.color});
-
-  final String title;
-  final String value;
-  final IconData icon;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: colorScheme.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.4)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(icon, color: color, size: 24),
+  Widget _buildMobileWelcomeSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Welcome back, Maria',
+          style: GoogleFonts.inter(
+            fontSize: 16,
+            fontWeight: FontWeight.w500,
+            color: const Color(0xFF1E293B),
           ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: GoogleFonts.poppins(fontSize: 12, color: colorScheme.onSurfaceVariant),
+        ),
+        const SizedBox(height: 4),
+        Row(
+          children: [
+            Container(
+              width: 8,
+              height: 8,
+              decoration: const BoxDecoration(
+                color: Color(0xFF355C8F),
+                shape: BoxShape.circle,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              'Register #01 is open • Terminal online',
+              style: GoogleFonts.inter(
+                fontSize: 14,
+                color: Colors.grey[600],
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSummaryCards() {
+    return Row(
+      children: [
+        Expanded(
+          child: _buildSummaryCard(
+            icon: Icons.payments_outlined,
+            iconBg: const Color(0xFFE2E8F0),
+            iconColor: const Color(0xFF355C8F),
+            title: 'Total Sales (Today)',
+            value: '₱ 24,500.00',
+            badgeText: '+14% Today',
+            badgeBg: const Color(0xFFBAE6FD),
+            badgeColor: const Color(0xFF0369A1),
+          ),
+        ),
+        const SizedBox(width: 24),
+        Expanded(
+          child: _buildSummaryCard(
+            icon: Icons.list_alt_outlined,
+            iconBg: const Color(0xFFE2E8F0),
+            iconColor: const Color(0xFF355C8F),
+            title: 'Active Orders',
+            value: '128',
+            badgeText: '4 pending',
+            badgeBg: const Color(0xFFE2E8F0),
+            badgeColor: const Color(0xFF475569),
+          ),
+        ),
+        const SizedBox(width: 24),
+        Expanded(
+          child: _buildShiftDurationCard(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSummaryCard({
+    required IconData icon,
+    required Color iconBg,
+    required Color iconColor,
+    required String title,
+    required String value,
+    required String badgeText,
+    required Color badgeBg,
+    required Color badgeColor,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: iconBg,
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                Text(
-                  value,
-                  style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.bold),
+                child: Icon(icon, color: iconColor),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: badgeBg,
+                  borderRadius: BorderRadius.circular(16),
                 ),
-              ],
+                child: Text(
+                  badgeText,
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: badgeColor,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 32),
+          Text(
+            title,
+            style: GoogleFonts.inter(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: Colors.grey[600],
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            value,
+            style: GoogleFonts.inter(
+              fontSize: 28,
+              fontWeight: FontWeight.bold,
+              color: const Color(0xFF1E293B),
             ),
           ),
         ],
       ),
     );
   }
-}
 
-class _ModuleCard extends StatelessWidget {
-  const _ModuleCard({required this.module});
-
-  final _ModuleItem module;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Stack(
-      clipBehavior: Clip.none,
-      // CRITICAL FIX: Forces the Material card to expand and fill the entire
-      // grid cell identically, regardless of how much text is inside.
-      fit: StackFit.expand,
-      children: [
-        Material(
-          color: colorScheme.surface,
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(24),
-            side: BorderSide(
-              color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+  Widget _buildShiftDurationCard() {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE0F2FE),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.timer_outlined, color: Color(0xFF0369A1)),
+              ),
+              Container(
+                width: 60,
+                height: 60,
+                decoration: const BoxDecoration(
+                  color: Color(0xFFF1F5F9),
+                  shape: BoxShape.circle,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Shift Duration',
+            style: GoogleFonts.inter(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: Colors.grey[600],
             ),
           ),
-          child: InkWell(
-            onTap: () => Navigator.of(context).pushNamed(module.route),
-            borderRadius: BorderRadius.circular(24),
-            hoverColor: module.color.withValues(alpha: 0.05),
-            splashColor: module.color.withValues(alpha: 0.1),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
+          const SizedBox(height: 8),
+          Text(
+            '01:41:22',
+            style: GoogleFonts.inter(
+              fontSize: 28,
+              fontWeight: FontWeight.bold,
+              color: const Color(0xFF1E293B),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Stack(
+            children: [
+              Container(
+                height: 6,
+                decoration: BoxDecoration(
+                  color: Colors.grey[200],
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+              Container(
+                height: 6,
+                width: 80,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF355C8F),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStoreOperationsHeader() {
+    return Row(
+      children: [
+        const Icon(Icons.grid_view_rounded, color: Color(0xFF355C8F)),
+        const SizedBox(width: 12),
+        Text(
+          'Store Operations',
+          style: GoogleFonts.inter(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+            color: const Color(0xFF1E293B),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDesktopOperationsGrid(BuildContext context) {
+    const double cardHeight = 160;
+    const double spacing = 24;
+
+    return Column(
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: _buildSalesEntryCard(context, height: (cardHeight * 2) + spacing),
+            ),
+            const SizedBox(width: spacing),
+            Expanded(
               child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: module.color.withValues(alpha: 0.1),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      module.icon,
-                      size: 32,
-                      color: module.color,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  // CRITICAL FIX: Locking the text container height ensures
-                  // 1-line and 2-line titles don't push the icons up or down,
-                  // keeping all icons on the exact same horizontal axis.
-                  SizedBox(
-                    height: 42,
-                    child: Center(
-                      child: Text(
-                        module.title,
-                        textAlign: TextAlign.center,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.poppins(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                          color: colorScheme.onSurface,
-                          height: 1.2,
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildActionCard(
+                          context,
+                          title: 'Sales Order',
+                          icon: Icons.shopping_cart_outlined,
+                          iconBg: const Color(0xFF355C8F),
+                          iconColor: Colors.white,
+                          height: cardHeight,
                         ),
                       ),
+                      const SizedBox(width: spacing),
+                      Expanded(
+                        child: _buildActionCard(
+                          context,
+                          title: 'Sales Reading',
+                          icon: Icons.request_quote_outlined,
+                          iconBg: const Color(0xFFA5DDF1),
+                          iconColor: const Color(0xFF0369A1),
+                          height: cardHeight,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: spacing),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildActionCard(
+                          context,
+                          title: 'Sales Inquiry',
+                          icon: Icons.search,
+                          iconBg: const Color(0xFF355C8F),
+                          iconColor: Colors.white,
+                          height: cardHeight,
+                        ),
+                      ),
+                      const SizedBox(width: spacing),
+                      Expanded(
+                        child: _buildActionCard(
+                          context,
+                          title: 'Inventory',
+                          icon: Icons.inventory_2_outlined,
+                          iconBg: const Color(0xFFE2E8F0),
+                          iconColor: const Color(0xFF475569),
+                          height: cardHeight,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: spacing),
+        Row(
+          children: [
+            Expanded(
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _buildActionCard(
+                      context,
+                      title: 'Maintenance',
+                      icon: Icons.build_outlined,
+                      iconBg: const Color(0xFFE2E8F0),
+                      iconColor: const Color(0xFF475569),
+                      height: cardHeight,
+                      route: '/maintenance',
+                    ),
+                  ),
+                  const SizedBox(width: spacing),
+                  Expanded(
+                    child: _buildActionCard(
+                      context,
+                      title: 'Admin Panel',
+                      icon: Icons.admin_panel_settings_outlined,
+                      iconBg: const Color(0xFFFECACA),
+                      iconColor: const Color(0xFFB91C1C),
+                      height: cardHeight,
                     ),
                   ),
                 ],
               ),
             ),
-          ),
+            const SizedBox(width: spacing),
+            const Expanded(child: SizedBox()),
+          ],
         ),
-        if (module.badgeCount > 0)
-          Positioned(
-            top: 12,
-            right: 12,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      ],
+    );
+  }
+
+  Widget _buildSalesEntryCard(BuildContext context, {required double height}) {
+    return InkWell(
+      onTap: () {},
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        height: height,
+        padding: const EdgeInsets.all(32),
+        decoration: BoxDecoration(
+          color: const Color(0xFF355C8F),
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF355C8F).withOpacity(0.3),
+              blurRadius: 15,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: colorScheme.error,
-                borderRadius: BorderRadius.circular(12),
+                color: Colors.white.withOpacity(0.15),
+                shape: BoxShape.circle,
               ),
-              child: Text(
-                '${module.badgeCount}',
-                style: GoogleFonts.poppins(
-                  color: colorScheme.onError,
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                ),
+              child: const Icon(Icons.point_of_sale_rounded, color: Colors.white, size: 32),
+            ),
+            const Spacer(),
+            Text(
+              'Sales Entry',
+              style: GoogleFonts.inter(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
               ),
             ),
+            const SizedBox(height: 8),
+            Text(
+              'Start a new transaction or scan items.',
+              style: GoogleFonts.inter(
+                fontSize: 15,
+                color: Colors.white.withOpacity(0.8),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildActionCard(
+    BuildContext context, {
+    required String title,
+    required IconData icon,
+    required Color iconBg,
+    required Color iconColor,
+    required double height,
+    String? route,
+  }) {
+    return InkWell(
+      onTap: () {
+        if (route != null) {
+          Navigator.of(context).pushNamed(route);
+        }
+      },
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        height: height,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: Colors.grey[200]!),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.01),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: iconBg,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, color: iconColor, size: 28),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              title,
+              style: GoogleFonts.inter(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: const Color(0xFF1E293B),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMobileSalesCard() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: const Color(0xFF355C8F),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Today\'s Sales',
+                style: GoogleFonts.inter(
+                  color: Colors.white.withOpacity(0.8),
+                  fontSize: 14,
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.trending_up, color: Colors.white, size: 16),
+              ),
+            ],
           ),
+          const SizedBox(height: 8),
+          Text(
+            '₱14,520.00',
+            style: GoogleFonts.inter(
+              color: Colors.white,
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              const Icon(Icons.arrow_upward, color: Colors.white, size: 14),
+              const SizedBox(width: 4),
+              Text(
+                '12% higher than yesterday',
+                style: GoogleFonts.inter(
+                  color: Colors.white.withOpacity(0.9),
+                  fontSize: 13,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMobileStatsRow() {
+    return Row(
+      children: [
+        Expanded(
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.grey[200]!),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFBAE6FD),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.shopping_bag_outlined, color: Color(0xFF0369A1), size: 18),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'Active Orders',
+                        style: GoogleFonts.inter(
+                          color: const Color(0xFF1E293B),
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  '24',
+                  style: GoogleFonts.inter(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: const Color(0xFF1E293B),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.grey[200]!),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: const BoxDecoration(
+                        color: Color(0xFF355C8F),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.access_time, color: Colors.white, size: 18),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'Shift Time',
+                        style: GoogleFonts.inter(
+                          color: const Color(0xFF1E293B),
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  '4h 12m',
+                  style: GoogleFonts.inter(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: const Color(0xFF1E293B),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ],
+    );
+  }
+
+  Widget _buildOperationsText() {
+    return Text(
+      'Store Operations',
+      style: GoogleFonts.inter(
+        fontSize: 16,
+        fontWeight: FontWeight.w500,
+        color: const Color(0xFF1E293B),
+      ),
+    );
+  }
+
+  Widget _buildMobileOperationsGrid(BuildContext context) {
+    return Column(
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: _buildMobileActionCard(
+                context,
+                'Sales Entry',
+                Icons.point_of_sale_rounded,
+                const Color(0xFF355C8F),
+                Colors.white,
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: _buildMobileActionCard(
+                context,
+                'Sales Order',
+                Icons.list_alt_outlined,
+                const Color(0xFFA5DDF1),
+                const Color(0xFF0369A1),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Expanded(
+              child: _buildMobileActionCard(
+                context,
+                'Sales Reading',
+                Icons.receipt_long_outlined,
+                const Color(0xFF355C8F),
+                Colors.white,
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: _buildMobileActionCard(
+                context,
+                'Sales Inquiry',
+                Icons.search,
+                const Color(0xFF355C8F),
+                Colors.white,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Expanded(
+              child: _buildMobileActionCard(
+                context,
+                'Inventory',
+                Icons.inventory_2_outlined,
+                const Color(0xFFA5DDF1),
+                const Color(0xFF0369A1),
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: _buildMobileActionCard(
+                context,
+                'Maintenance',
+                Icons.build_outlined,
+                const Color(0xFF355C8F),
+                Colors.white,
+                route: '/maintenance',
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        // Admin Panel Row
+        InkWell(
+          onTap: () {},
+          borderRadius: BorderRadius.circular(16),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.grey[200]!),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFFECACA),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.admin_panel_settings_outlined, color: Color(0xFFB91C1C), size: 20),
+                ),
+                const SizedBox(width: 16),
+                Text(
+                  'Admin Panel',
+                  style: GoogleFonts.inter(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w500,
+                    color: const Color(0xFF1E293B),
+                  ),
+                ),
+                const Spacer(),
+                const Icon(Icons.chevron_right, color: Colors.grey),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMobileActionCard(
+    BuildContext context,
+    String title,
+    IconData icon,
+    Color iconBg,
+    Color iconColor, {
+    String? route,
+  }) {
+    return InkWell(
+      onTap: () {
+        if (route != null) {
+          Navigator.of(context).pushNamed(route);
+        }
+      },
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        height: 120,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.grey[200]!),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: iconBg,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, color: iconColor, size: 24),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              title,
+              style: GoogleFonts.inter(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: const Color(0xFF1E293B),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
