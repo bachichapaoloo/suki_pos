@@ -31,89 +31,83 @@ final sl = GetIt.instance;
 
 Future<void> init() async {
   //! Presentation - BLoCs
-  sl.registerFactory(
-    () => DepartmentBloc(
-      getDepartments: sl(),
-      saveDepartment: sl(),
-      deleteDepartment: sl(),
-    ),
-  );
-  sl.registerFactory(
-    () => CategoryBloc(
-      getCategories: sl(),
-      saveCategory: sl(),
-      deleteCategory: sl(),
-    ),
-  );
-  sl.registerFactory(
-    () => ProductBloc(
-      getProducts: sl(),
-      saveProduct: sl(),
-      deleteProduct: sl(),
-    ),
-  );
-  sl.registerFactory(
-    () => RoleBloc(
-      getRoles: sl(),
-      saveRole: sl(),
-      deleteRole: sl(),
-    ),
-  );
-  sl.registerFactory(
-    () => UserBloc(
-      getUsers: sl(),
-      saveUser: sl(),
-      deleteUser: sl(),
-    ),
-  );
-  sl.registerFactory(
-    () => AuthBloc(
-      loginUseCase: sl(),
-    ),
-  );
-
-  //! Domain - Use Cases
-  sl.registerLazySingleton(() => GetDepartments(sl()));
-  sl.registerLazySingleton(() => SaveDepartment(sl()));
-  sl.registerLazySingleton(() => DeleteDepartment(sl()));
-
-  sl.registerLazySingleton(() => GetCategories(sl()));
-  sl.registerLazySingleton(() => SaveCategory(sl()));
-  sl.registerLazySingleton(() => DeleteCategory(sl()));
-
-  sl.registerLazySingleton(() => GetProducts(sl()));
-  sl.registerLazySingleton(() => SaveProduct(sl()));
-  sl.registerLazySingleton(() => DeleteProduct(sl()));
-
-  sl.registerLazySingleton(() => GetRoles(sl()));
-  sl.registerLazySingleton(() => SaveRole(sl()));
-  sl.registerLazySingleton(() => DeleteRole(sl()));
-
-  sl.registerLazySingleton(() => GetUsers(sl()));
-  sl.registerLazySingleton(() => SaveUser(sl()));
-  sl.registerLazySingleton(() => DeleteUser(sl()));
-
-  sl.registerLazySingleton(() => Login(sl()));
-
-  //! Data - Repositories
-  sl.registerLazySingleton<DepartmentRepository>(
-    () => DepartmentRepositoryImpl(sl()),
-  );
-  sl.registerLazySingleton<CategoryRepository>(
-    () => CategoryRepositoryImpl(sl()),
-  );
-  sl.registerLazySingleton<ProductRepository>(
-    () => ProductRepositoryImpl(sl()),
-  );
-  sl.registerLazySingleton<RoleRepository>(
-    () => RoleRepositoryImpl(sl()),
-  );
-  sl.registerLazySingleton<UserRepository>(
-    () => UserRepositoryImpl(sl()),
-  );
-  sl.registerLazySingleton<AuthRepository>(
-    () => AuthRepositoryImpl(sl()),
-  );
+  sl
+    ..registerFactory(
+      () => DepartmentBloc(
+        getDepartments: sl(),
+        saveDepartment: sl(),
+        deleteDepartment: sl(),
+      ),
+    )
+    ..registerFactory(
+      () => CategoryBloc(
+        getCategories: sl(),
+        saveCategory: sl(),
+        deleteCategory: sl(),
+      ),
+    )
+    ..registerFactory(
+      () => ProductBloc(
+        getProducts: sl(),
+        saveProduct: sl(),
+        deleteProduct: sl(),
+      ),
+    )
+    ..registerFactory(
+      () => RoleBloc(
+        getRoles: sl(),
+        saveRole: sl(),
+        deleteRole: sl(),
+      ),
+    )
+    ..registerFactory(
+      () => UserBloc(
+        getUsers: sl(),
+        saveUser: sl(),
+        deleteUser: sl(),
+      ),
+    )
+    ..registerFactory(
+      () => AuthBloc(
+        loginUseCase: sl(),
+      ),
+    )
+    //! Domain - Use Cases
+    ..registerLazySingleton(() => GetDepartments(sl()))
+    ..registerLazySingleton(() => SaveDepartment(sl()))
+    ..registerLazySingleton(() => DeleteDepartment(sl()))
+    ..registerLazySingleton(() => GetCategories(sl()))
+    ..registerLazySingleton(() => SaveCategory(sl()))
+    ..registerLazySingleton(() => DeleteCategory(sl()))
+    ..registerLazySingleton(() => GetProducts(sl()))
+    ..registerLazySingleton(() => SaveProduct(sl()))
+    ..registerLazySingleton(() => DeleteProduct(sl()))
+    ..registerLazySingleton(() => GetRoles(sl()))
+    ..registerLazySingleton(() => SaveRole(sl()))
+    ..registerLazySingleton(() => DeleteRole(sl()))
+    ..registerLazySingleton(() => GetUsers(sl()))
+    ..registerLazySingleton(() => SaveUser(sl()))
+    ..registerLazySingleton(() => DeleteUser(sl()))
+    ..registerLazySingleton(() => Login(sl()))
+    //! Data - Repositories
+    ..registerLazySingleton<DepartmentRepository>(
+      () => DepartmentRepositoryImpl(departmentDao: sl()),
+    )
+    ..registerLazySingleton<CategoryRepository>(
+      () => CategoryRepositoryImpl(sl()),
+    )
+    ..registerLazySingleton<ProductRepository>(
+      () => ProductRepositoryImpl(sl()),
+    )
+    ..registerLazySingleton<RoleRepository>(
+      () => RoleRepositoryImpl(sl()),
+    )
+    ..registerLazySingleton<UserRepository>(
+      () => UserRepositoryImpl(sl()),
+    )
+    ..registerLazySingleton<AuthRepository>(
+      () => AuthRepositoryImpl(sl()),
+    );
 
   //! Core
   final dbHelper = DatabaseHelper();

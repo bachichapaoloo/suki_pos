@@ -1,50 +1,42 @@
 import 'package:dartz/dartz.dart';
-import 'package:suki_pos/core/database/database_helper.dart';
 import 'package:suki_pos/core/error/failures.dart';
+import 'package:suki_pos/data/dao/department_dao.dart';
 import 'package:suki_pos/data/models/maintenance/department_model.dart';
 import 'package:suki_pos/domain/entities/maintenance/department.dart';
 import 'package:suki_pos/domain/repositories/maintenance/department_repository.dart';
 
-/// Implementation of [DepartmentRepository] using sqflite.
 class DepartmentRepositoryImpl implements DepartmentRepository {
-  /// Creates a [DepartmentRepositoryImpl].
-  const DepartmentRepositoryImpl(this.databaseHelper);
+  final DepartmentDao departmentDao;
 
-  final DatabaseHelper databaseHelper;
+  DepartmentRepositoryImpl({required this.departmentDao});
 
   @override
   Future<Either<Failure, List<Department>>> getDepartments() async {
     try {
-      final db = await databaseHelper.database;
-      final List<Map<String, dynamic>> maps = await db.query(
-        'department',
-        orderBy: 'name ASC',
-      );
-      return Right(maps.map(DepartmentModel.fromMap).toList());
+      final departmentMaps = await departmentDao.getAllDepartments();
+      final departments = departmentMaps.map((map) => DepartmentModel.fromMap(map)).toList();
+      return Right(departments);
     } catch (e) {
       return Left(DatabaseFailure(e.toString()));
     }
   }
 
   @override
-  Future<Either<Failure, Department>> saveDepartment(
-    Department department,
-  ) async {
+  Future<Either<Failure, Department>> saveDepartment(Department department) async {
     try {
-      final db = await databaseHelper.database;
-      final model = DepartmentModel.fromEntity(department);
+      final departmentModel = DepartmentModel(
+        id: department.id ?? 0,
+        code: department.code,
+        name: department.name,
+        isActive: department.isActive,
+      );
 
-      if (model.id == 0) {
-        final id = await db.insert('department', model.toMap());
-        return Right(model.copyWith(id: id));
+      if (department.id == null || department.id == 0) {
+        final newId = await departmentDao.insertDepartment(departmentModel.toMap());
+        return Right(department.copyWith(id: newId));
       } else {
-        await db.update(
-          'department',
-          model.toMap(),
-          where: 'id = ?',
-          whereArgs: [model.id],
-        );
-        return Right(model);
+        await departmentDao.updateDepartment(department.id!, departmentModel.toMap());
+        return Right(department);
       }
     } catch (e) {
       return Left(DatabaseFailure(e.toString()));
@@ -54,12 +46,7 @@ class DepartmentRepositoryImpl implements DepartmentRepository {
   @override
   Future<Either<Failure, void>> deleteDepartment(int id) async {
     try {
-      final db = await databaseHelper.database;
-      await db.delete(
-        'department',
-        where: 'id = ?',
-        whereArgs: [id],
-      );
+      await departmentDao.deleteDepartment(id);
       return const Right(null);
     } catch (e) {
       return Left(DatabaseFailure(e.toString()));

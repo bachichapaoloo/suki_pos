@@ -1554,5 +1554,17 @@ CREATE TRIGGER IF NOT EXISTS trg_app_user_updated
 END;
 
 -- =============================================================================
+-- SEED DATA
+-- =============================================================================
+
+-- Create the Superuser Role with all permissions
+INSERT INTO role (id, name, can_sales_entry, can_sales_order, can_sales_reading, can_sales_inquiry, can_file_maintenance, can_admin_mode, can_dtr_menu, can_kiosk, can_inventory, is_active)
+VALUES (1, 'Superuser', 1, 1, 1, 1, 1, 1, 1, 1, 1, 1);
+
+-- Create the Superuser Account (PIN: 050724)
+INSERT INTO app_user (id, role_id, name, password_hash, is_active)
+VALUES (1, 1, 'Superuser', '050724', 1);
+
+-- =============================================================================
 -- END OF SCHEMA
 -- =============================================================================

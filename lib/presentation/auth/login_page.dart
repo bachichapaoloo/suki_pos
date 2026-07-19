@@ -19,6 +19,7 @@ class LoginPage extends StatefulWidget {
 
 class _LoginPageState extends State<LoginPage> {
   String _pin = '';
+  bool _isSuccess = false;
 
   void _onDigitPressed(String digit) {
     if (_pin.length < 12) {
@@ -48,11 +49,22 @@ class _LoginPageState extends State<LoginPage> {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
+    if (_isSuccess) {
+      return _buildSuccessView(colorScheme);
+    }
+
     return BlocListener<AuthBloc, AuthState>(
-      listener: (context, state) {
+      listener: (context, state) async {
         if (state is AuthAuthenticated) {
+          final navigator = Navigator.of(context);
           unawaited(HapticFeedback.mediumImpact());
-          unawaited(Navigator.of(context).pushReplacementNamed('/pos'));
+          setState(() {
+            _isSuccess = true;
+          });
+          await Future<void>.delayed(const Duration(seconds: 2));
+          if (mounted) {
+            unawaited(navigator.pushReplacementNamed('/pos'));
+          }
         } else if (state is AuthError) {
           unawaited(HapticFeedback.vibrate());
           ScaffoldMessenger.of(context).showSnackBar(
@@ -97,7 +109,8 @@ class _LoginPageState extends State<LoginPage> {
   Widget _buildMobileLayout(ColorScheme colorScheme) {
     return SingleChildScrollView(
       child: Container(
-        height: MediaQuery.sizeOf(context).height -
+        height:
+            MediaQuery.sizeOf(context).height -
             MediaQuery.paddingOf(context).top -
             MediaQuery.paddingOf(context).bottom,
         padding: const EdgeInsets.symmetric(vertical: 24),
@@ -280,9 +293,7 @@ class _LoginPageState extends State<LoginPage> {
           fontSize: 24,
           letterSpacing: 8,
           fontWeight: FontWeight.bold,
-          color: _pin.isEmpty
-              ? colorScheme.onSurfaceVariant.withValues(alpha: 0.5)
-              : colorScheme.primary,
+          color: _pin.isEmpty ? colorScheme.onSurfaceVariant.withValues(alpha: 0.5) : colorScheme.primary,
         ),
       ),
     ).animate(target: _pin.isNotEmpty ? 1 : 0).shimmer();
@@ -320,9 +331,7 @@ class _LoginPageState extends State<LoginPage> {
       padding: const EdgeInsets.only(bottom: 16, left: 16, right: 16),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: digits
-            .map((d) => _buildNumberButton(d, colorScheme, buttonSize))
-            .toList(),
+        children: digits.map((d) => _buildNumberButton(d, colorScheme, buttonSize)).toList(),
       ),
     );
   }
@@ -419,6 +428,50 @@ class _LoginPageState extends State<LoginPage> {
               size: 32,
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  // ================= SUCCESS VIEW =================
+  Widget _buildSuccessView(ColorScheme colorScheme) {
+    return Scaffold(
+      backgroundColor: colorScheme.primary,
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 120,
+              height: 120,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white,
+              ),
+              child: Icon(
+                Icons.check_rounded,
+                color: colorScheme.primary,
+                size: 80,
+              ),
+            ).animate().scale(duration: 600.ms, curve: Curves.elasticOut).then().shake(duration: 400.ms),
+            const SizedBox(height: 40),
+            Text(
+              'Authorized',
+              style: GoogleFonts.poppins(
+                fontSize: 32,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ).animate().fadeIn(delay: 300.ms).slideY(begin: 0.2),
+            const SizedBox(height: 12),
+            Text(
+              'Welcome to SukiPOS',
+              style: GoogleFonts.poppins(
+                fontSize: 18,
+                color: Colors.white.withValues(alpha: 0.8),
+              ),
+            ).animate().fadeIn(delay: 500.ms),
+          ],
         ),
       ),
     );

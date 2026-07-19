@@ -1,133 +1,92 @@
+import 'dart:async';
 import 'dart:developer' as developer;
-import 'dart:io';
-
-import 'package:flutter/services.dart';
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
+import 'package:suki_pos/core/database/schena_constants.dart';
 
 class DatabaseHelper {
-  static Database? _db;
+  // Singleton pattern
+  DatabaseHelper._internal();
+  static final DatabaseHelper _instance = DatabaseHelper._internal();
+  factory DatabaseHelper() => _instance;
+
+  static Database? _database;
+
+  // Update this to match whatever your old v1 database file was named
+  static const String _oldDatabaseName = 'kpl_pos_db.db';
+
+  // The new v2 database file
+  static const String _newDatabaseName = 'suki_pos_v2.db';
+  static const int _databaseVersion = 1; // Resetting to 1 for the new schema
 
   Future<Database> get database async {
-    if (_db != null) return _db!;
-    _db = await _initDb();
-    return _db!;
+    if (_database != null && _database!.isOpen) return _database!;
+    _database = await _initDatabase();
+    return _database!;
   }
 
-  Future<Database> _initDb() async {
-    String dbPath;
+  Future<Database> _initDatabase() async {
+    final dbPath = await getDatabasesPath();
+    final oldPath = join(dbPath, _oldDatabaseName);
+    final newPath = join(dbPath, _newDatabaseName);
 
-    if (Platform.isWindows) {
-      // For Windows: Place database in a 'database' folder next to the .exe
-      final String exePath = Platform.resolvedExecutable;
-      final String exeDir = dirname(exePath);
-      final String dbFolder = join(exeDir, 'database');
-
-      // Ensure the directory exists
-      final directory = Directory(dbFolder);
-      if (!directory.existsSync()) {
-        directory.createSync(recursive: true);
-      }
-
-      dbPath = join(dbFolder, 'suki_pos.db');
-    } else {
-      // For Android/iOS: Use the standard databases directory
-      final String databasesPath = await getDatabasesPath();
-      dbPath = join(databasesPath, 'suki_pos.db');
+    // DESTRUCTIVE MIGRATION: Wipe the old v1 database completely
+    final oldExists = await databaseExists(oldPath);
+    if (oldExists) {
+      developer.log('Legacy v1 database found. Deleting to apply v2 schema...');
+      await deleteDatabase(oldPath);
+      developer.log('Legacy database wiped successfully.');
     }
 
-    developer.log('Initializing database at: $dbPath', name: 'DatabaseHelper');
-
+    // Open (or create) the new v2 database
     return openDatabase(
-      dbPath,
-      version: 1,
-      onCreate: (db, version) async {
-        developer.log(
-          'Creating database version $version',
-          name: 'DatabaseHelper',
-        );
-        try {
-          await db.execute('PRAGMA foreign_keys = ON');
-          await db.execute('PRAGMA journal_mode = WAL');
-
-          developer.log(
-            'Loading v1_schema.sql from assets...',
-            name: 'DatabaseHelper',
-          );
-          final sql = await rootBundle.loadString(
-            'assets/migrations/v1_schema.sql',
-          );
-
-          // 1. Remove single-line comments (-- comment)
-          final cleanSql = sql.replaceAll(RegExp(r'--.*'), '');
-
-          final statements = <String>[];
-          final rawStatements = cleanSql.split(';');
-          String buffer = '';
-
-          for (final stmt in rawStatements) {
-            buffer += stmt;
-            final trimmed = buffer.trim();
-            final upper = trimmed.toUpperCase();
-
-            // If we are in a BEGIN block but haven't reached END, keep buffering
-            // This happens in TRIGGERS
-            if (upper.contains('BEGIN') && !upper.contains('END')) {
-              buffer += ';';
-              continue;
-            }
-
-            if (trimmed.isNotEmpty) {
-              statements.add(trimmed);
-            }
-            buffer = '';
-          }
-
-          int count = 0;
-          for (final stmt in statements) {
-            try {
-              await db.execute(stmt);
-              count++;
-            } catch (e) {
-              developer.log(
-                'Error executing statement: $stmt',
-                name: 'DatabaseHelper',
-              );
-              rethrow;
-            }
-          }
-          developer.log(
-            'Executed $count statements from v1_schema.sql',
-            name: 'DatabaseHelper',
-          );
-        } catch (e, stack) {
-          developer.log(
-            'Error during onCreate: $e',
-            name: 'DatabaseHelper',
-            error: e,
-            stackTrace: stack,
-          );
-          rethrow;
-        }
-      },
-      onOpen: (db) async {
-        developer.log('Database opened', name: 'DatabaseHelper');
-        await db.execute('PRAGMA foreign_keys = ON');
-      },
-      onUpgrade: (db, oldV, newV) async {
-        developer.log(
-          'Upgrading database from $oldV to $newV',
-          name: 'DatabaseHelper',
-        );
-        for (var v = oldV + 1; v <= newV; v++) {
-          final sql = await rootBundle.loadString(
-            'assets/migrations/v${v}_migration.sql',
-          );
-          for (final stmt in sql.split(';').where((s) => s.trim().isNotEmpty)) {
-            await db.execute(stmt);
-          }
-        }
-      },
+      newPath,
+      version: _databaseVersion,
+      onConfigure: _onConfigure,
+      onCreate: _onCreate,
     );
+  }
+
+  /// Strict SQLite configurations applied on every connection
+  Future<void> _onConfigure(Database db) async {
+    await db.execute('PRAGMA foreign_keys = ON;');
+    await db.execute('PRAGMA journal_mode = WAL;');
+  }
+
+  /// Builds the new schema in a single atomic batch
+  Future<void> _onCreate(Database db, int version) async {
+    developer.log('Building SukiPOS v2 Schema...');
+
+    // Using a transaction ensures that if one script fails, the whole DB creation aborts safely
+    await db.transaction((txn) async {
+      final batch = txn.batch();
+
+      // 1. Create Tables
+      for (final script in SchemaConstants.createTableScripts) {
+        batch.execute(script);
+      }
+
+      // 2. Create Indexes
+      for (final script in SchemaConstants.createIndexScripts) {
+        batch.execute(script);
+      }
+
+      // 3. Seed Initial Data (e.g., Superuser account)
+      for (final script in SchemaConstants.seedScripts) {
+        batch.execute(script);
+      }
+
+      await batch.commit(noResult: true);
+    });
+
+    developer.log('SukiPOS v2 Schema is ready to go!');
+  }
+
+  Future<void> close() async {
+    final db = _database;
+    if (db != null && db.isOpen) {
+      await db.close();
+      _database = null;
+    }
   }
 }
