@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:suki_pos/core/utils/responsive_layout.dart';
 
 /// A reusable form dialog wrapper.
 class CustomFormDialog extends StatelessWidget {
@@ -37,12 +36,15 @@ class CustomFormDialog extends StatelessWidget {
   /// Maximum width of the dialog.
   final double maxWidth;
 
+  static const Color _primaryBlue = Color(0xFF355C8F);
+
   @override
   Widget build(BuildContext context) {
     return Center(
       child: ConstrainedBox(
         constraints: BoxConstraints(maxWidth: maxWidth),
         child: Dialog(
+          backgroundColor: Colors.white,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(24),
           ),
@@ -57,34 +59,32 @@ class CustomFormDialog extends StatelessWidget {
                     children: [
                       Text(
                         title,
-                        style: GoogleFonts.poppins(
+                        style: GoogleFonts.inter(
                           fontSize: 20,
                           fontWeight: FontWeight.bold,
+                          color: const Color(0xFF1E293B),
                         ),
                       ),
                       const Spacer(),
                       IconButton(
-                        onPressed: isSaving
-                            ? null
-                            : () => Navigator.pop(context),
-                        icon: const Icon(Icons.close_rounded),
+                        onPressed: isSaving ? null : () => Navigator.pop(context),
+                        icon: const Icon(Icons.close_rounded, color: Colors.grey),
                       ),
                     ],
                   ),
-                  const Divider(height: 32),
+                  const Divider(height: 32, color: Color(0xFFE2E8F0)),
                   content,
                   const SizedBox(height: 32),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
                       TextButton(
-                        onPressed: isSaving
-                            ? null
-                            : () => Navigator.pop(context),
+                        onPressed: isSaving ? null : () => Navigator.pop(context),
                         child: Text(
                           cancelLabel,
-                          style: GoogleFonts.poppins(
+                          style: GoogleFonts.inter(
                             fontWeight: FontWeight.w600,
+                            color: Colors.grey[600],
                           ),
                         ),
                       ),
@@ -92,6 +92,8 @@ class CustomFormDialog extends StatelessWidget {
                       ElevatedButton(
                         onPressed: isSaving ? null : onSave,
                         style: ElevatedButton.styleFrom(
+                          backgroundColor: _primaryBlue,
+                          foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(
                             horizontal: 24,
                             vertical: 12,
@@ -99,6 +101,7 @@ class CustomFormDialog extends StatelessWidget {
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
+                          elevation: 0,
                         ),
                         child: isSaving
                             ? const SizedBox(
@@ -111,7 +114,7 @@ class CustomFormDialog extends StatelessWidget {
                               )
                             : Text(
                                 saveLabel,
-                                style: GoogleFonts.poppins(
+                                style: GoogleFonts.inter(
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),

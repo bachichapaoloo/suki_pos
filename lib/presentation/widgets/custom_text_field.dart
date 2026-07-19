@@ -12,6 +12,7 @@ class CustomTextField extends StatelessWidget {
     this.keyboardType,
     this.obscureText = false,
     this.prefixIcon,
+    this.prefixText,
     this.suffixIcon,
     this.hintText,
     this.enabled = true,
@@ -41,6 +42,9 @@ class CustomTextField extends StatelessWidget {
   /// Optional icon to display after the text.
   final Widget? suffixIcon;
 
+  /// Optional prefix text.
+  final String? prefixText;
+
   /// Optional hint text.
   final String? hintText;
 
@@ -56,6 +60,8 @@ class CustomTextField extends StatelessWidget {
   /// Callback when the field is submitted.
   final void Function(String)? onFieldSubmitted;
 
+  static const Color _primaryBlue = Color(0xFF355C8F);
+
   @override
   Widget build(BuildContext context) {
     return Padding(
@@ -65,10 +71,10 @@ class CustomTextField extends StatelessWidget {
         children: [
           Text(
             label,
-            style: GoogleFonts.poppins(
+            style: GoogleFonts.inter(
               fontSize: 14,
-              fontWeight: FontWeight.w500,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              fontWeight: FontWeight.w600,
+              color: const Color(0xFF1E293B),
             ),
           ),
           const SizedBox(height: 8),
@@ -81,14 +87,16 @@ class CustomTextField extends StatelessWidget {
             maxLines: maxLines,
             textInputAction: textInputAction,
             onFieldSubmitted: onFieldSubmitted,
-            style: GoogleFonts.poppins(fontSize: 15),
+            style: GoogleFonts.inter(fontSize: 15, color: const Color(0xFF1E293B)),
             decoration: InputDecoration(
               hintText: hintText,
+              prefixText: prefixText,
+              hintStyle: GoogleFonts.inter(color: Colors.grey[500]),
               prefixIcon: prefixIcon,
               suffixIcon: suffixIcon,
               contentPadding: const EdgeInsets.symmetric(
                 horizontal: 16,
-                vertical: 12,
+                vertical: 14,
               ),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -96,20 +104,18 @@ class CustomTextField extends StatelessWidget {
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
                 borderSide: BorderSide(
-                  color: Theme.of(context).colorScheme.outlineVariant,
+                  color: Colors.grey[300]!,
                 ),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(
-                  color: Theme.of(context).colorScheme.primary,
+                borderSide: const BorderSide(
+                  color: _primaryBlue,
                   width: 2,
                 ),
               ),
               filled: true,
-              fillColor: enabled
-                  ? Theme.of(context).colorScheme.surface
-                  : Theme.of(context).colorScheme.surfaceContainerHighest,
+              fillColor: enabled ? const Color(0xFFF7F8FA) : Colors.grey[100],
             ),
           ),
         ],
