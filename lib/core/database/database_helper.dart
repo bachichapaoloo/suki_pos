@@ -62,19 +62,13 @@ class DatabaseHelper {
       final batch = txn.batch();
 
       // 1. Create Tables
-      for (final script in SchemaConstants.createTableScripts) {
-        batch.execute(script);
-      }
+      SchemaConstants.createTableScripts.forEach(batch.execute);
 
       // 2. Create Indexes
-      for (final script in SchemaConstants.createIndexScripts) {
-        batch.execute(script);
-      }
+      SchemaConstants.createIndexScripts.forEach(batch.execute);
 
       // 3. Seed Initial Data (e.g., Superuser account)
-      for (final script in SchemaConstants.seedScripts) {
-        batch.execute(script);
-      }
+      SchemaConstants.seedScripts.forEach(batch.execute);
 
       await batch.commit(noResult: true);
     });

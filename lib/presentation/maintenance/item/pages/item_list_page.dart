@@ -1,33 +1,35 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:suki_pos/domain/entities/maintenance/product.dart';
-import 'package:suki_pos/presentation/maintenance/product/bloc/product_bloc.dart';
-import 'package:suki_pos/presentation/maintenance/product/widgets/product_form_dialog.dart';
+import 'package:suki_pos/domain/entities/maintenance/item.dart';
+import 'package:suki_pos/presentation/maintenance/item/bloc/item_bloc.dart';
+import 'package:suki_pos/presentation/maintenance/item/bloc/item_event.dart';
+import 'package:suki_pos/presentation/maintenance/item/bloc/item_state.dart';
+import 'package:suki_pos/presentation/maintenance/item/widgets/item_form_dialog.dart';
 
-class ProductListPage extends StatefulWidget {
-  const ProductListPage({super.key});
+class ItemListPage extends StatefulWidget {
+  const ItemListPage({super.key});
 
   @override
-  State<ProductListPage> createState() => _ProductListPageState();
+  State<ItemListPage> createState() => _ItemListPageState();
 }
 
-class _ProductListPageState extends State<ProductListPage> {
+class _ItemListPageState extends State<ItemListPage> {
   @override
   void initState() {
     super.initState();
-    context.read<ProductBloc>().add(GetProductsEvent());
+    context.read<ItemBloc>().add(LoadItems());
   }
 
-  Future<void> _showFormDialog([Product? product]) async {
-    final result = await showDialog<Product>(
+  Future<void> _showFormDialog([Item? item]) async {
+    final result = await showDialog<Item>(
       context: context,
       barrierDismissible: false,
-      builder: (context) => ProductFormDialog(product: product),
+      builder: (context) => ItemFormDialog(item: item),
     );
 
     if (result != null && mounted) {
-      context.read<ProductBloc>().add(SaveProductEvent(result));
+      context.read<ItemBloc>().add(SaveItemEvent(result));
     }
   }
 
@@ -35,7 +37,7 @@ class _ProductListPageState extends State<ProductListPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Products'),
+        title: const Text('Items'),
         actions: [
           IconButton(
             icon: const Icon(Icons.add_rounded),
@@ -43,13 +45,13 @@ class _ProductListPageState extends State<ProductListPage> {
           ),
         ],
       ),
-      body: BlocConsumer<ProductBloc, ProductState>(
+      body: BlocConsumer<ItemBloc, ItemState>(
         listener: (context, state) {
-          if (state is ProductSuccess) {
+          if (state is ItemActionSuccess) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(content: Text(state.message)),
             );
-          } else if (state is ProductError) {
+          } else if (state is ItemError) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(state.message),
@@ -59,29 +61,29 @@ class _ProductListPageState extends State<ProductListPage> {
           }
         },
         builder: (context, state) {
-          if (state is ProductLoading) {
+          if (state is ItemLoading) {
             return const Center(child: CircularProgressIndicator());
-          } else if (state is ProductLoaded) {
-            if (state.products.isEmpty) {
-              return const Center(child: Text('No products found.'));
+          } else if (state is ItemLoaded) {
+            if (state.items.isEmpty) {
+              return const Center(child: Text('No items found.'));
             }
             return ListView.separated(
-              itemCount: state.products.length,
+              itemCount: state.items.length,
               separatorBuilder: (context, index) => const Divider(),
               itemBuilder: (context, index) {
-                final product = state.products[index];
+                final item = state.items[index];
                 return ListTile(
                   title: Text(
-                    product.name,
+                    item.name,
                     style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
                   ),
-                  subtitle: Text(product.itemCode),
+                  subtitle: Text(item.itemCode),
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       IconButton(
                         icon: const Icon(Icons.edit_rounded),
-                        onPressed: () => _showFormDialog(product),
+                        onPressed: () => _showFormDialog(item),
                       ),
                       IconButton(
                         icon: const Icon(
@@ -89,9 +91,11 @@ class _ProductListPageState extends State<ProductListPage> {
                           color: Colors.red,
                         ),
                         onPressed: () {
-                          context.read<ProductBloc>().add(
-                            DeleteProductEvent(product.id),
-                          );
+                          if (item.id != null) {
+                            context.read<ItemBloc>().add(
+                              DeleteItemEvent(item.id!),
+                            );
+                          }
                         },
                       ),
                     ],
@@ -106,3 +110,4 @@ class _ProductListPageState extends State<ProductListPage> {
     );
   }
 }
+

@@ -5,27 +5,29 @@ import 'package:suki_pos/data/repositories/admin/user_repository_impl.dart';
 import 'package:suki_pos/data/repositories/auth/auth_repository_impl.dart';
 import 'package:suki_pos/data/repositories/maintenance/category_repository_impl.dart';
 import 'package:suki_pos/data/repositories/maintenance/department_repository_impl.dart';
-import 'package:suki_pos/data/repositories/maintenance/product_repository_impl.dart';
+import 'package:suki_pos/data/repositories/maintenance/item_repository_impl.dart';
 import 'package:suki_pos/domain/repositories/admin/role_repository.dart';
 import 'package:suki_pos/domain/repositories/admin/user_repository.dart';
 import 'package:suki_pos/domain/repositories/auth/auth_repository.dart';
 import 'package:suki_pos/domain/repositories/maintenance/category_repository.dart';
 import 'package:suki_pos/domain/repositories/maintenance/department_repository.dart';
-import 'package:suki_pos/domain/repositories/maintenance/product_repository.dart';
+import 'package:suki_pos/domain/repositories/maintenance/item_repository.dart';
 import 'package:suki_pos/domain/use_cases/admin/role_use_cases.dart';
 import 'package:suki_pos/domain/use_cases/admin/user_use_cases.dart';
 import 'package:suki_pos/domain/use_cases/auth/login.dart';
 import 'package:suki_pos/domain/use_cases/maintenance/category_use_cases.dart';
 import 'package:suki_pos/domain/use_cases/maintenance/delete_department.dart';
 import 'package:suki_pos/domain/use_cases/maintenance/get_departments.dart';
-import 'package:suki_pos/domain/use_cases/maintenance/product_use_cases.dart';
+import 'package:suki_pos/domain/use_cases/maintenance/item_use_cases.dart';
 import 'package:suki_pos/domain/use_cases/maintenance/save_department.dart';
 import 'package:suki_pos/presentation/admin/role/bloc/role_bloc.dart';
 import 'package:suki_pos/presentation/admin/user/bloc/user_bloc.dart';
 import 'package:suki_pos/presentation/auth/bloc/auth_bloc.dart';
 import 'package:suki_pos/presentation/maintenance/category/bloc/category_bloc.dart';
 import 'package:suki_pos/presentation/maintenance/department/bloc/department_bloc.dart';
-import 'package:suki_pos/presentation/maintenance/product/bloc/product_bloc.dart';
+import 'package:suki_pos/presentation/maintenance/item/bloc/item_bloc.dart';
+import 'package:suki_pos/data/dao/department_dao.dart';
+import 'package:suki_pos/data/dao/item_dao.dart';
 
 final sl = GetIt.instance;
 
@@ -47,10 +49,10 @@ Future<void> init() async {
       ),
     )
     ..registerFactory(
-      () => ProductBloc(
-        getProducts: sl(),
-        saveProduct: sl(),
-        deleteProduct: sl(),
+      () => ItemBloc(
+        getItems: sl(),
+        saveItem: sl(),
+        deleteItem: sl(),
       ),
     )
     ..registerFactory(
@@ -79,9 +81,9 @@ Future<void> init() async {
     ..registerLazySingleton(() => GetCategories(sl()))
     ..registerLazySingleton(() => SaveCategory(sl()))
     ..registerLazySingleton(() => DeleteCategory(sl()))
-    ..registerLazySingleton(() => GetProducts(sl()))
-    ..registerLazySingleton(() => SaveProduct(sl()))
-    ..registerLazySingleton(() => DeleteProduct(sl()))
+    ..registerLazySingleton(() => GetItems(sl()))
+    ..registerLazySingleton(() => SaveItem(sl()))
+    ..registerLazySingleton(() => DeleteItem(sl()))
     ..registerLazySingleton(() => GetRoles(sl()))
     ..registerLazySingleton(() => SaveRole(sl()))
     ..registerLazySingleton(() => DeleteRole(sl()))
@@ -96,9 +98,6 @@ Future<void> init() async {
     ..registerLazySingleton<CategoryRepository>(
       () => CategoryRepositoryImpl(sl()),
     )
-    ..registerLazySingleton<ProductRepository>(
-      () => ProductRepositoryImpl(sl()),
-    )
     ..registerLazySingleton<RoleRepository>(
       () => RoleRepositoryImpl(sl()),
     )
@@ -107,7 +106,13 @@ Future<void> init() async {
     )
     ..registerLazySingleton<AuthRepository>(
       () => AuthRepositoryImpl(sl()),
-    );
+    )
+    ..registerLazySingleton<ItemRepository>(
+      () => ItemRepositoryImpl(itemDao: sl()),
+    )
+    //! DAOs
+    ..registerLazySingleton(() => DepartmentDao(sl()))
+    ..registerLazySingleton(() => ItemDao(sl()));
 
   //! Core
   final dbHelper = DatabaseHelper();

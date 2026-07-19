@@ -23,10 +23,10 @@ class MaintenancePage extends StatelessWidget {
 
   static const List<_MaintenanceModule> _modules = [
     _MaintenanceModule(
-      title: 'Product Maintenance',
+      title: 'Item Maintenance',
       icon: Icons.inventory_2_rounded,
       color: Colors.blue,
-      route: '/maintenance/products',
+      route: '/maintenance/items',
     ),
     _MaintenanceModule(
       title: 'Category Maintenance',
@@ -99,7 +99,7 @@ class MaintenancePage extends StatelessWidget {
           ),
         ),
         Text(
-          'Manage your products, categories, and organizational structure.',
+          'Manage your items, categories, and organizational structure.',
           style: GoogleFonts.poppins(
             fontSize: 16,
             color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -198,3 +198,4 @@ class _ModuleCard extends StatelessWidget {
     );
   }
 }
+

@@ -66,22 +66,22 @@ class ItemRepositoryImpl implements ItemRepository {
   }
 
   @override
-  Future<Item?> getItemById(int id) async {
+  Future<Either<Failure, Item?>> getItemById(int id) async {
     try {
       final items = await itemDao.getAllItems();
-      return items.firstWhere((item) => item.id == id);
+      return Right(items.firstWhere((item) => item.id == id));
     } catch (e) {
-      throw Exception(e.toString());
+      return Left(DatabaseFailure(e.toString()));
     }
   }
 
   @override
-  Future<List<Item>> getItemsByDepartment(int departmentId) async {
+  Future<Either<Failure, List<Item>>> getItemsByDepartment(int departmentId) async {
     try {
       final items = await itemDao.getAllItems();
-      return items.where((item) => item.departmentId == departmentId).toList();
+      return Right(items.where((item) => item.departmentId == departmentId).toList());
     } catch (e) {
-      throw Exception(e.toString());
+      return Left(DatabaseFailure(e.toString()));
     }
   }
 }
