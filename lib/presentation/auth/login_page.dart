@@ -1,16 +1,12 @@
 import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:suki_pos/core/utils/responsive_layout.dart';
 import 'package:suki_pos/presentation/auth/bloc/auth_bloc.dart';
 
-/// The login page of the application where users enter their PIN.
 class LoginPage extends StatefulWidget {
-  /// Creates a [LoginPage].
   const LoginPage({super.key});
 
   @override
@@ -18,15 +14,25 @@ class LoginPage extends StatefulWidget {
 }
 
 class _LoginPageState extends State<LoginPage> {
+  static const Color _primaryBlue = Color(0xFF4A6B97); // Same as store icon
+  static const Color _darkBlue = Color(0xFF1E293B); // Darker blue for text
+  static const Color _bgGrey = Color(0xFFF8FAFC);
+  static const Color _dotEmpty = Color(0xFFCBD5E1);
+  static const Color _dotFilled = Color(0xFF94A3B8);
+
   String _pin = '';
   bool _isSuccess = false;
 
   void _onDigitPressed(String digit) {
-    if (_pin.length < 12) {
+    if (_pin.length < 6) {
       unawaited(HapticFeedback.lightImpact());
       setState(() {
         _pin += digit;
       });
+      // Auto-submit on 6th digit
+      if (_pin.length == 6) {
+        _onEnterPressed();
+      }
     }
   }
 
@@ -40,19 +46,13 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   void _onEnterPressed() {
-    if (_pin.isNotEmpty) {
+    if (_pin.length == 6) {
       context.read<AuthBloc>().add(LoginEvent(_pin));
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    if (_isSuccess) {
-      return _buildSuccessView(colorScheme);
-    }
-
     return BlocListener<AuthBloc, AuthState>(
       listener: (context, state) async {
         if (state is AuthAuthenticated) {
@@ -61,7 +61,7 @@ class _LoginPageState extends State<LoginPage> {
           setState(() {
             _isSuccess = true;
           });
-          await Future<void>.delayed(const Duration(seconds: 2));
+          await Future<void>.delayed(const Duration(milliseconds: 1500));
           if (mounted) {
             unawaited(navigator.pushReplacementNamed('/pos'));
           }
@@ -70,7 +70,7 @@ class _LoginPageState extends State<LoginPage> {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(state.message),
-              backgroundColor: colorScheme.error,
+              backgroundColor: Colors.redAccent,
               behavior: SnackBarBehavior.floating,
             ),
           );
@@ -80,399 +80,267 @@ class _LoginPageState extends State<LoginPage> {
         }
       },
       child: Scaffold(
-        backgroundColor: colorScheme.surface,
-        body: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                colorScheme.primaryContainer.withValues(alpha: 0.1),
-                colorScheme.surface,
-              ],
-            ),
-          ),
-          child: SafeArea(
-            child: ResponsiveLayout(
-              mobile: _buildMobileLayout(colorScheme),
-              tablet: _buildTabletLayout(colorScheme),
-              desktop: _buildDesktopLayout(colorScheme),
-            ),
-          ),
+        body: LayoutBuilder(
+          builder: (context, constraints) {
+            if (constraints.maxWidth >= 800) {
+              return _buildDesktopLayout();
+            }
+            return _buildMobileLayout();
+          },
         ),
       ),
     );
   }
 
-  // ================= LAYOUTS =================
-
-  Widget _buildMobileLayout(ColorScheme colorScheme) {
-    return SingleChildScrollView(
-      child: Container(
-        height:
-            MediaQuery.sizeOf(context).height -
-            MediaQuery.paddingOf(context).top -
-            MediaQuery.paddingOf(context).bottom,
-        padding: const EdgeInsets.symmetric(vertical: 24),
-        child: Column(
-          children: [
-            Expanded(
-              flex: 2,
-              child: _buildHeader(colorScheme, isCompact: true),
-            ),
-            _buildPinDisplay(colorScheme),
-            const SizedBox(height: 32),
-            _buildNumberPad(colorScheme, buttonSize: 72),
-            const SizedBox(height: 24),
-          ],
-        ),
+  // ================= MOBILE LAYOUT =================
+  Widget _buildMobileLayout() {
+    return Container(
+      color: _bgGrey,
+      child: SafeArea(
+        child: _isSuccess ? _buildSuccessView() : _buildLoginContent(isDesktop: false),
       ),
     );
   }
 
-  Widget _buildTabletLayout(ColorScheme colorScheme) {
-    return Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 800, maxHeight: 600),
-        child: Card(
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(24),
-            side: BorderSide(
-              color: colorScheme.outlineVariant.withValues(alpha: 0.5),
-            ),
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: colorScheme.primaryContainer.withValues(alpha: 0.05),
-                    borderRadius: const BorderRadius.only(
-                      topLeft: Radius.circular(24),
-                      bottomLeft: Radius.circular(24),
+  // ================= DESKTOP LAYOUT =================
+  Widget _buildDesktopLayout() {
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFFDBEAFE), Color(0xFFBFDBFE)], // Soft blue gradient
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      child: Center(
+        child: _isSuccess
+            ? _buildSuccessView()
+            : Container(
+                width: 550,
+                height: 820,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(32),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF1E3A8A).withOpacity(0.05),
+                      blurRadius: 40,
+                      offset: const Offset(0, 20),
                     ),
-                  ),
-                  child: _buildHeader(colorScheme, isCompact: false),
+                  ],
                 ),
+                child: _buildLoginContent(isDesktop: true),
               ),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 32),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      _buildPinDisplay(colorScheme),
-                      const SizedBox(height: 48),
-                      _buildNumberPad(colorScheme, buttonSize: 64),
-                    ],
-                  ),
+      ),
+    );
+  }
+
+  Widget _buildLoginContent({required bool isDesktop}) {
+    return Column(
+      children: [
+        Expanded(
+          flex: 4,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              SizedBox(height: isDesktop ? 48 : 0),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: _primaryBlue,
+                  borderRadius: BorderRadius.circular(16),
                 ),
-              ),
+                child: const Icon(
+                  Icons.storefront,
+                  color: Colors.white,
+                  size: 40,
+                ),
+              ).animate().fade().scale(),
+              const SizedBox(height: 24),
+              Text(
+                'SukiPOS',
+                style: GoogleFonts.inter(
+                  fontSize: 28,
+                  fontWeight: FontWeight.bold,
+                  color: _darkBlue,
+                ),
+              ).animate().fade().slideY(begin: 0.2),
+              const SizedBox(height: 8),
+              Text(
+                'Welcome Back',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.inter(
+                  fontSize: 15,
+                  color: const Color(0xFF475569),
+                  height: 1.4,
+                  fontWeight: FontWeight.w500,
+                ),
+              ).animate().fade().slideY(begin: 0.2),
+              const SizedBox(height: 48),
+              _buildPinDots().animate().fade().scale(),
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildDesktopLayout(ColorScheme colorScheme) {
-    return Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 900, maxHeight: 650),
-        child: Card(
-          elevation: 2,
-          shadowColor: colorScheme.shadow.withValues(alpha: 0.1),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(32),
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                flex: 4,
-                child: Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        colorScheme.primaryContainer.withValues(alpha: 0.2),
-                        colorScheme.surface,
-                      ],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: const BorderRadius.only(
-                      topLeft: Radius.circular(32),
-                      bottomLeft: Radius.circular(32),
-                    ),
-                  ),
-                  child: _buildHeader(colorScheme, isCompact: false),
-                ),
-              ),
-              Expanded(
-                flex: 5,
-                child: Padding(
-                  padding: const EdgeInsets.all(40),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      _buildPinDisplay(colorScheme),
-                      const SizedBox(height: 56),
-                      _buildNumberPad(colorScheme, buttonSize: 80),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
+        Expanded(
+          flex: 5,
+          child: _buildPinPad(isDesktop: isDesktop),
         ),
-      ),
+      ],
     );
   }
 
-  // ================= HEADER =================
-  Widget _buildHeader(ColorScheme colorScheme, {required bool isCompact}) {
-    final logoSize = isCompact ? 140.0 : 180.0;
-    final titleSize = isCompact ? 24.0 : 28.0;
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Image.asset(
-            'assets/images/suki_pos_logo_transparent.png',
-            width: logoSize,
-          ).animate().fadeIn(duration: 600.ms).scale(delay: 200.ms),
-          const SizedBox(height: 24),
-          Text(
-            'Welcome Back',
-            style: GoogleFonts.poppins(
-              fontSize: titleSize,
-              fontWeight: FontWeight.bold,
-              color: colorScheme.onSurface,
-            ),
-          ).animate().fadeIn(delay: 400.ms).slideY(begin: 0.2),
-          const SizedBox(height: 8),
-          Text(
-            'Enter your PIN to access SukiPOS',
-            textAlign: TextAlign.center,
-            style: GoogleFonts.poppins(
-              fontSize: 14,
-              color: colorScheme.onSurfaceVariant,
-            ),
-          ).animate().fadeIn(delay: 600.ms),
-          context.watch<AuthBloc>().state is AuthLoading
-              ? Padding(
-                  padding: const EdgeInsets.only(top: 24),
-                  child: SizedBox(
-                    width: 32,
-                    height: 32,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 3,
-                      color: colorScheme.primary,
-                    ),
-                  ),
-                ).animate().fadeIn()
-              : const SizedBox(height: 56),
-        ],
-      ),
-    );
-  }
-
-  // ================= PIN DISPLAY =================
-  Widget _buildPinDisplay(ColorScheme colorScheme) {
+  Widget _buildPinDots() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
       decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
-        borderRadius: BorderRadius.circular(16),
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(30),
       ),
-      child: Text(
-        _pin.isEmpty ? 'Enter PIN' : '• ' * _pin.length,
-        style: GoogleFonts.poppins(
-          fontSize: 24,
-          letterSpacing: 8,
-          fontWeight: FontWeight.bold,
-          color: _pin.isEmpty ? colorScheme.onSurfaceVariant.withValues(alpha: 0.5) : colorScheme.primary,
-        ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: List.generate(6, (index) {
+          bool isFilled = index < _pin.length;
+          return AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            margin: const EdgeInsets.symmetric(horizontal: 12),
+            width: 16,
+            height: 16,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: isFilled ? _dotFilled : _dotEmpty,
+            ),
+          );
+        }),
       ),
-    ).animate(target: _pin.isNotEmpty ? 1 : 0).shimmer();
+    );
   }
 
-  // ================= NUMBER PAD =================
-  Widget _buildNumberPad(ColorScheme colorScheme, {double buttonSize = 80}) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        _buildPadRow(['1', '2', '3'], colorScheme, buttonSize),
-        _buildPadRow(['4', '5', '6'], colorScheme, buttonSize),
-        _buildPadRow(['7', '8', '9'], colorScheme, buttonSize),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              _buildDeleteButton(colorScheme, buttonSize),
-              _buildNumberButton('0', colorScheme, buttonSize),
-              _buildEnterButton(colorScheme, buttonSize),
-            ],
+  Widget _buildPinPad({required bool isDesktop}) {
+    const bgColor = Color(0xFFEEEEEE);
+
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: isDesktop
+            ? const BorderRadius.vertical(bottom: Radius.circular(32))
+            : const BorderRadius.vertical(top: Radius.circular(32)),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _buildPadRow(['1', '2', '3'], isDesktop),
+          _buildPadRow(['4', '5', '6'], isDesktop),
+          _buildPadRow(['7', '8', '9'], isDesktop),
+          Padding(
+            padding: const EdgeInsets.only(bottom: 24),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                _buildActionButton(Icons.fingerprint, () {}, isDesktop),
+                _buildNumberButton('0', isDesktop),
+                _buildActionButton(Icons.backspace_outlined, _onDeletePressed, isDesktop),
+              ],
+            ),
           ),
-        ),
-      ],
-    ).animate().fadeIn(delay: 1000.ms).slideY(begin: 0.1);
+          const Spacer(),
+        ],
+      ),
+    ).animate().slideY(begin: 0.1, duration: 400.ms, curve: Curves.easeOut);
   }
 
-  Widget _buildPadRow(
-    List<String> digits,
-    ColorScheme colorScheme,
-    double buttonSize,
-  ) {
+  Widget _buildPadRow(List<String> numbers, bool isDesktop) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 16, left: 16, right: 16),
+      padding: const EdgeInsets.only(bottom: 24),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: digits.map((d) => _buildNumberButton(d, colorScheme, buttonSize)).toList(),
+        children: numbers.map((n) => _buildNumberButton(n, isDesktop)).toList(),
       ),
     );
   }
 
-  Widget _buildNumberButton(
-    String digit,
-    ColorScheme colorScheme,
-    double buttonSize,
-  ) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: () => _onDigitPressed(digit),
-        borderRadius: BorderRadius.circular(buttonSize / 2),
-        child: Container(
-          width: buttonSize,
-          height: buttonSize,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: colorScheme.surface,
-            border: Border.all(
-              color: colorScheme.outlineVariant.withValues(alpha: 0.5),
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.05),
-                blurRadius: 8,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: Center(
-            child: Text(
-              digit,
-              style: GoogleFonts.poppins(
-                fontSize: buttonSize * 0.35,
-                fontWeight: FontWeight.w600,
-                color: colorScheme.onSurface,
-              ),
-            ),
+  Widget _buildNumberButton(String number, bool isDesktop) {
+    return InkWell(
+      onTap: () => _onDigitPressed(number),
+      borderRadius: BorderRadius.circular(40),
+      child: Container(
+        width: 72,
+        height: 72,
+        decoration: BoxDecoration(
+          color: isDesktop ? Colors.white : Colors.white,
+          shape: BoxShape.circle,
+          boxShadow: isDesktop
+              ? [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.02),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ]
+              : null,
+        ),
+        alignment: Alignment.center,
+        child: Text(
+          number,
+          style: GoogleFonts.inter(
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+            color: const Color(0xFF1E293B),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildDeleteButton(ColorScheme colorScheme, double buttonSize) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: _onDeletePressed,
-        borderRadius: BorderRadius.circular(buttonSize / 2),
-        child: SizedBox(
-          width: buttonSize,
-          height: buttonSize,
-          child: Center(
-            child: Icon(
-              Icons.backspace_outlined,
-              color: colorScheme.error.withValues(alpha: 0.7),
-              size: buttonSize * 0.3,
-            ),
+  Widget _buildActionButton(IconData icon, VoidCallback onTap, bool isDesktop) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(40),
+      child: SizedBox(
+        width: 72,
+        height: 72,
+        child: Center(
+          child: Icon(
+            icon,
+            size: 32,
+            color: _darkBlue,
           ),
         ),
       ),
     );
   }
 
-  Widget _buildEnterButton(ColorScheme colorScheme, double buttonSize) {
-    final isLoading = context.watch<AuthBloc>().state is AuthLoading;
-
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: isLoading ? null : _onEnterPressed,
-        borderRadius: BorderRadius.circular(buttonSize / 2),
-        child: Container(
-          width: buttonSize,
-          height: buttonSize,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: colorScheme.primary,
-            boxShadow: [
-              BoxShadow(
-                color: colorScheme.primary.withValues(alpha: 0.3),
-                blurRadius: 12,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: const Center(
-            child: Icon(
-              Icons.login_rounded,
+  Widget _buildSuccessView() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: const BoxDecoration(
               color: Colors.white,
-              size: 32,
+              shape: BoxShape.circle,
             ),
+            child: const Icon(
+              Icons.check_rounded,
+              color: Color(0xFF10B981),
+              size: 64,
+            ),
+          ).animate().scale(
+            duration: 400.ms,
+            curve: Curves.easeOutBack,
           ),
-        ),
-      ),
-    );
-  }
-
-  // ================= SUCCESS VIEW =================
-  Widget _buildSuccessView(ColorScheme colorScheme) {
-    return Scaffold(
-      backgroundColor: colorScheme.primary,
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 120,
-              height: 120,
-              decoration: const BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.white,
-              ),
-              child: Icon(
-                Icons.check_rounded,
-                color: colorScheme.primary,
-                size: 80,
-              ),
-            ).animate().scale(duration: 600.ms, curve: Curves.elasticOut).then().shake(duration: 400.ms),
-            const SizedBox(height: 40),
-            Text(
-              'Authorized',
-              style: GoogleFonts.poppins(
-                fontSize: 32,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-              ),
-            ).animate().fadeIn(delay: 300.ms).slideY(begin: 0.2),
-            const SizedBox(height: 12),
-            Text(
-              'Welcome to SukiPOS',
-              style: GoogleFonts.poppins(
-                fontSize: 18,
-                color: Colors.white.withValues(alpha: 0.8),
-              ),
-            ).animate().fadeIn(delay: 500.ms),
-          ],
-        ),
+          const SizedBox(height: 24),
+          Text(
+            'Success',
+            style: GoogleFonts.inter(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: const Color(0xFF10B981),
+            ),
+          ).animate().fade().slideY(),
+        ],
       ),
     );
   }
