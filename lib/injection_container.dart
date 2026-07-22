@@ -1,17 +1,20 @@
 import 'package:get_it/get_it.dart';
 import 'package:suki_pos/core/database/database_helper.dart';
+import 'package:suki_pos/data/dao/unit_dao.dart';
 import 'package:suki_pos/data/repositories/admin/role_repository_impl.dart';
 import 'package:suki_pos/data/repositories/admin/user_repository_impl.dart';
 import 'package:suki_pos/data/repositories/auth/auth_repository_impl.dart';
 import 'package:suki_pos/data/repositories/maintenance/category_repository_impl.dart';
 import 'package:suki_pos/data/repositories/maintenance/department_repository_impl.dart';
 import 'package:suki_pos/data/repositories/maintenance/item_repository_impl.dart';
+import 'package:suki_pos/data/repositories/maintenance/unit_repository_impl.dart';
 import 'package:suki_pos/domain/repositories/admin/role_repository.dart';
 import 'package:suki_pos/domain/repositories/admin/user_repository.dart';
 import 'package:suki_pos/domain/repositories/auth/auth_repository.dart';
 import 'package:suki_pos/domain/repositories/maintenance/category_repository.dart';
 import 'package:suki_pos/domain/repositories/maintenance/department_repository.dart';
 import 'package:suki_pos/domain/repositories/maintenance/item_repository.dart';
+import 'package:suki_pos/domain/repositories/maintenance/unit_repository.dart' show UnitRepository;
 import 'package:suki_pos/domain/use_cases/admin/role_use_cases.dart';
 import 'package:suki_pos/domain/use_cases/admin/user_use_cases.dart';
 import 'package:suki_pos/domain/use_cases/auth/login.dart';
@@ -20,6 +23,7 @@ import 'package:suki_pos/domain/use_cases/maintenance/delete_department.dart';
 import 'package:suki_pos/domain/use_cases/maintenance/get_departments.dart';
 import 'package:suki_pos/domain/use_cases/maintenance/item_use_cases.dart';
 import 'package:suki_pos/domain/use_cases/maintenance/save_department.dart';
+import 'package:suki_pos/domain/use_cases/maintenance/unit_use_cases.dart';
 import 'package:suki_pos/presentation/admin/role/bloc/role_bloc.dart';
 import 'package:suki_pos/presentation/admin/user/bloc/user_bloc.dart';
 import 'package:suki_pos/presentation/auth/bloc/auth_bloc.dart';
@@ -91,6 +95,9 @@ Future<void> init() async {
     ..registerLazySingleton(() => SaveUser(sl()))
     ..registerLazySingleton(() => DeleteUser(sl()))
     ..registerLazySingleton(() => Login(sl()))
+    ..registerLazySingleton(() => GetUnits(sl()))
+    ..registerLazySingleton(() => SaveUnit(sl()))
+    ..registerLazySingleton(() => DeleteUnit(sl()))
     //! Data - Repositories
     ..registerLazySingleton<DepartmentRepository>(
       () => DepartmentRepositoryImpl(departmentDao: sl()),
@@ -110,9 +117,13 @@ Future<void> init() async {
     ..registerLazySingleton<ItemRepository>(
       () => ItemRepositoryImpl(itemDao: sl()),
     )
+    ..registerLazySingleton<UnitRepository>(
+      () => UnitRepositoryImpl(unitDao: sl()),
+    )
     //! DAOs
     ..registerLazySingleton(() => DepartmentDao(sl()))
-    ..registerLazySingleton(() => ItemDao(sl()));
+    ..registerLazySingleton(() => ItemDao(sl()))
+    ..registerLazySingleton(() => UnitDao(sl()));
 
   //! Core
   final dbHelper = DatabaseHelper();

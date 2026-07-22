@@ -1,6 +1,6 @@
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:suki_pos/core/database/database_helper.dart';
-import 'package:suki_pos/core/database/schena_constants.dart';
+import 'package:suki_pos/core/database/schema_constants.dart';
 
 class DepartmentDao {
   final DatabaseHelper _databaseHelper;

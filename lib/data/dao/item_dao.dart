@@ -1,5 +1,5 @@
 import 'package:suki_pos/core/database/database_helper.dart';
-import 'package:suki_pos/core/database/schena_constants.dart';
+import 'package:suki_pos/core/database/schema_constants.dart';
 import 'package:suki_pos/data/models/maintenance/item_model.dart';
 import 'package:suki_pos/data/models/maintenance/item_price_model.dart';
 

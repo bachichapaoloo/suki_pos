@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:developer' as developer;
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
-import 'package:suki_pos/core/database/schena_constants.dart';
+import 'package:suki_pos/core/database/schema_constants.dart';
 
 class DatabaseHelper {
   // Singleton pattern
