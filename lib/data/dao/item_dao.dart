@@ -1,3 +1,4 @@
+import 'package:sqflite/sqlite_api.dart';
 import 'package:suki_pos/core/database/database_helper.dart';
 import 'package:suki_pos/core/database/schema_constants.dart';
 import 'package:suki_pos/data/models/maintenance/item_model.dart';
@@ -39,6 +40,7 @@ class ItemDao {
 
     return await db.transaction((txn) async {
       int itemId;
+      final isNewItem = itemModel.id == null || itemModel.id == 0;
 
       // 1. Upsert the Master Item Record
       if (itemModel.id == null || itemModel.id == 0) {
@@ -71,6 +73,24 @@ class ItemDao {
           price: price.price,
         );
         batch.insert(SchemaConstants.itemPrice, priceModel.toMap(itemId));
+      }
+
+      // 3. Auto-initialize stock entry for new items
+      if (isNewItem) {
+        batch.insert(
+          SchemaConstants.stock,
+          {
+            'item_id': itemId,
+            'quantity': 0.0,
+            'reorder_level': itemModel.minStockLevel,
+            'beginning_inv': 0.0,
+            'min_level': itemModel.minStockLevel,
+            'max_level': itemModel.maxStockLevel,
+            'cost': itemModel.costPrice,
+            'updated_at': DateTime.now().toIso8601String(),
+          },
+          conflictAlgorithm: ConflictAlgorithm.ignore,
+        );
       }
 
       await batch.commit(noResult: true);
