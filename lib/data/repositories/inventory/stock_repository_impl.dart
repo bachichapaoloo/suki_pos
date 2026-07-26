@@ -3,12 +3,24 @@ import 'package:suki_pos/core/error/failures.dart';
 import 'package:suki_pos/data/dao/stock_dao.dart';
 import 'package:suki_pos/data/models/inventory/stock_model.dart';
 import 'package:suki_pos/domain/entities/inventory/stock.dart';
+import 'package:suki_pos/domain/entities/inventory/stock_with_item.dart';
 import 'package:suki_pos/domain/repositories/inventory/stock_repository.dart';
 
 class StockRepositoryImpl implements StockRepository {
   final StockDao stockDao;
 
   StockRepositoryImpl({required this.stockDao});
+
+  @override
+  Future<Either<Failure, List<Stock>>> getAllStock() async {
+    try {
+      final maps = await stockDao.getAllStock();
+      final stocks = maps.map((m) => StockModel.fromMap(m)).toList();
+      return Right(stocks);
+    } catch (e) {
+      return Left(DatabaseFailure(e.toString()));
+    }
+  }
 
   @override
   Future<Either<Failure, Stock?>> getStockByItemId(int itemId) async {
@@ -22,11 +34,20 @@ class StockRepositoryImpl implements StockRepository {
   }
 
   @override
-  Future<Either<Failure, List<Stock>>> getAllStock() async {
+  Future<Either<Failure, List<StockWithItem>>> getAllStockWithDetails() async {
     try {
-      final maps = await stockDao.getAllStock();
-      final stocks = maps.map((m) => StockModel.fromMap(m)).toList();
-      return Right(stocks);
+      final maps = await stockDao.getStockWithItemDetails();
+      final list = maps.map((map) {
+        final stock = StockModel.fromMap(map);
+        return StockWithItem(
+          stock: stock,
+          itemName: map['item_name'] as String,
+          itemCode: map['item_code'] as String,
+          barcode: map['barcode'] as String?,
+          unitName: map['unit_name'] as String?,
+        );
+      }).toList();
+      return Right(list);
     } catch (e) {
       return Left(DatabaseFailure(e.toString()));
     }

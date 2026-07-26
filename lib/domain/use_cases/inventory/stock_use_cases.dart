@@ -1,6 +1,7 @@
 import 'package:dartz/dartz.dart';
 import 'package:suki_pos/core/error/failures.dart';
 import 'package:suki_pos/domain/entities/inventory/stock.dart';
+import 'package:suki_pos/domain/entities/inventory/stock_with_item.dart';
 import 'package:suki_pos/domain/repositories/inventory/stock_repository.dart';
 
 class GetStockByItemId {
@@ -9,6 +10,15 @@ class GetStockByItemId {
 
   Future<Either<Failure, Stock?>> call(int itemId) async {
     return repository.getStockByItemId(itemId);
+  }
+}
+
+class GetStockWithDetails {
+  final StockRepository repository;
+  GetStockWithDetails(this.repository);
+
+  Future<Either<Failure, List<StockWithItem>>> call() async {
+    return await repository.getAllStockWithDetails();
   }
 }
 
