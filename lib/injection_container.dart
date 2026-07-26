@@ -1,9 +1,11 @@
 import 'package:get_it/get_it.dart';
 import 'package:suki_pos/core/database/database_helper.dart';
+import 'package:suki_pos/data/dao/stock_dao.dart';
 import 'package:suki_pos/data/dao/unit_dao.dart';
 import 'package:suki_pos/data/repositories/admin/role_repository_impl.dart';
 import 'package:suki_pos/data/repositories/admin/user_repository_impl.dart';
 import 'package:suki_pos/data/repositories/auth/auth_repository_impl.dart';
+import 'package:suki_pos/data/repositories/inventory/stock_repository_impl.dart';
 import 'package:suki_pos/data/repositories/maintenance/category_repository_impl.dart';
 import 'package:suki_pos/data/repositories/maintenance/department_repository_impl.dart';
 import 'package:suki_pos/data/repositories/maintenance/item_repository_impl.dart';
@@ -11,6 +13,7 @@ import 'package:suki_pos/data/repositories/maintenance/unit_repository_impl.dart
 import 'package:suki_pos/domain/repositories/admin/role_repository.dart';
 import 'package:suki_pos/domain/repositories/admin/user_repository.dart';
 import 'package:suki_pos/domain/repositories/auth/auth_repository.dart';
+import 'package:suki_pos/domain/repositories/inventory/stock_repository.dart';
 import 'package:suki_pos/domain/repositories/maintenance/category_repository.dart';
 import 'package:suki_pos/domain/repositories/maintenance/department_repository.dart';
 import 'package:suki_pos/domain/repositories/maintenance/item_repository.dart';
@@ -18,6 +21,7 @@ import 'package:suki_pos/domain/repositories/maintenance/unit_repository.dart' s
 import 'package:suki_pos/domain/use_cases/admin/role_use_cases.dart';
 import 'package:suki_pos/domain/use_cases/admin/user_use_cases.dart';
 import 'package:suki_pos/domain/use_cases/auth/login.dart';
+import 'package:suki_pos/domain/use_cases/inventory/stock_use_cases.dart';
 import 'package:suki_pos/domain/use_cases/maintenance/category_use_cases.dart';
 import 'package:suki_pos/domain/use_cases/maintenance/delete_department.dart';
 import 'package:suki_pos/domain/use_cases/maintenance/get_departments.dart';
@@ -98,6 +102,8 @@ Future<void> init() async {
     ..registerLazySingleton(() => GetUnits(sl()))
     ..registerLazySingleton(() => SaveUnit(sl()))
     ..registerLazySingleton(() => DeleteUnit(sl()))
+    ..registerLazySingleton(() => GetStockByItemId(sl()))
+    ..registerLazySingleton(() => UpdateStockQuantity(sl()))
     //! Data - Repositories
     ..registerLazySingleton<DepartmentRepository>(
       () => DepartmentRepositoryImpl(departmentDao: sl()),
@@ -120,10 +126,14 @@ Future<void> init() async {
     ..registerLazySingleton<UnitRepository>(
       () => UnitRepositoryImpl(unitDao: sl()),
     )
+    ..registerLazySingleton<StockRepository>(
+      () => StockRepositoryImpl(stockDao: sl()),
+    )
     //! DAOs
     ..registerLazySingleton(() => DepartmentDao(sl()))
     ..registerLazySingleton(() => ItemDao(sl()))
-    ..registerLazySingleton(() => UnitDao(sl()));
+    ..registerLazySingleton(() => UnitDao(sl()))
+    ..registerLazySingleton(() => StockDao(sl()));
 
   //! Core
   final dbHelper = DatabaseHelper();
