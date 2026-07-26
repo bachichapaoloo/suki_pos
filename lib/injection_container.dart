@@ -31,6 +31,7 @@ import 'package:suki_pos/domain/use_cases/maintenance/unit_use_cases.dart';
 import 'package:suki_pos/presentation/admin/role/bloc/role_bloc.dart';
 import 'package:suki_pos/presentation/admin/user/bloc/user_bloc.dart';
 import 'package:suki_pos/presentation/auth/bloc/auth_bloc.dart';
+import 'package:suki_pos/presentation/inventory/stock_cubit.dart';
 import 'package:suki_pos/presentation/maintenance/category/bloc/category_bloc.dart';
 import 'package:suki_pos/presentation/maintenance/department/bloc/department_bloc.dart';
 import 'package:suki_pos/presentation/maintenance/item/bloc/item_bloc.dart';
@@ -61,6 +62,12 @@ Future<void> init() async {
         getItems: sl(),
         saveItem: sl(),
         deleteItem: sl(),
+      ),
+    )
+    ..registerFactory(
+      () => StockCubit(
+        getStockWithDetails: sl(),
+        updateStockQuantity: sl(),
       ),
     )
     ..registerFactory(
@@ -104,6 +111,7 @@ Future<void> init() async {
     ..registerLazySingleton(() => DeleteUnit(sl()))
     ..registerLazySingleton(() => GetStockByItemId(sl()))
     ..registerLazySingleton(() => UpdateStockQuantity(sl()))
+    ..registerLazySingleton(() => GetStockWithDetails(sl()))
     //! Data - Repositories
     ..registerLazySingleton<DepartmentRepository>(
       () => DepartmentRepositoryImpl(departmentDao: sl()),
