@@ -1,5 +1,7 @@
 import 'package:get_it/get_it.dart';
 import 'package:suki_pos/core/database/database_helper.dart';
+import 'package:suki_pos/data/dao/option_group_dao.dart';
+import 'package:suki_pos/data/dao/order_dao.dart';
 import 'package:suki_pos/data/dao/stock_dao.dart';
 import 'package:suki_pos/data/dao/unit_dao.dart';
 import 'package:suki_pos/data/repositories/admin/role_repository_impl.dart';
@@ -10,6 +12,7 @@ import 'package:suki_pos/data/repositories/maintenance/category_repository_impl.
 import 'package:suki_pos/data/repositories/maintenance/department_repository_impl.dart';
 import 'package:suki_pos/data/repositories/maintenance/item_repository_impl.dart';
 import 'package:suki_pos/data/repositories/maintenance/unit_repository_impl.dart';
+import 'package:suki_pos/data/repositories/orders/order_repository_impl.dart';
 import 'package:suki_pos/domain/repositories/admin/role_repository.dart';
 import 'package:suki_pos/domain/repositories/admin/user_repository.dart';
 import 'package:suki_pos/domain/repositories/auth/auth_repository.dart';
@@ -18,6 +21,7 @@ import 'package:suki_pos/domain/repositories/maintenance/category_repository.dar
 import 'package:suki_pos/domain/repositories/maintenance/department_repository.dart';
 import 'package:suki_pos/domain/repositories/maintenance/item_repository.dart';
 import 'package:suki_pos/domain/repositories/maintenance/unit_repository.dart' show UnitRepository;
+import 'package:suki_pos/domain/repositories/orders/order_repository.dart';
 import 'package:suki_pos/domain/use_cases/admin/role_use_cases.dart';
 import 'package:suki_pos/domain/use_cases/admin/user_use_cases.dart';
 import 'package:suki_pos/domain/use_cases/auth/login.dart';
@@ -26,8 +30,10 @@ import 'package:suki_pos/domain/use_cases/maintenance/category_use_cases.dart';
 import 'package:suki_pos/domain/use_cases/maintenance/delete_department.dart';
 import 'package:suki_pos/domain/use_cases/maintenance/get_departments.dart';
 import 'package:suki_pos/domain/use_cases/maintenance/item_use_cases.dart';
+import 'package:suki_pos/domain/use_cases/maintenance/option_group_use_cases.dart';
 import 'package:suki_pos/domain/use_cases/maintenance/save_department.dart';
 import 'package:suki_pos/domain/use_cases/maintenance/unit_use_cases.dart';
+import 'package:suki_pos/domain/use_cases/orders/process_checkout.dart';
 import 'package:suki_pos/presentation/admin/role/bloc/role_bloc.dart';
 import 'package:suki_pos/presentation/admin/user/bloc/user_bloc.dart';
 import 'package:suki_pos/presentation/auth/bloc/auth_bloc.dart';
@@ -37,6 +43,7 @@ import 'package:suki_pos/presentation/maintenance/department/bloc/department_blo
 import 'package:suki_pos/presentation/maintenance/item/bloc/item_bloc.dart';
 import 'package:suki_pos/data/dao/department_dao.dart';
 import 'package:suki_pos/data/dao/item_dao.dart';
+import 'package:suki_pos/presentation/maintenance/option_group/bloc/option_group_cubit.dart';
 
 final sl = GetIt.instance;
 
@@ -68,6 +75,12 @@ Future<void> init() async {
       () => StockCubit(
         getStockWithDetails: sl(),
         updateStockQuantity: sl(),
+      ),
+    )
+    ..registerFactory(
+      () => OptionGroupCubit(
+        getOptionGroups: sl(),
+        saveOptionGroup: sl(),
       ),
     )
     ..registerFactory(
@@ -112,6 +125,10 @@ Future<void> init() async {
     ..registerLazySingleton(() => GetStockByItemId(sl()))
     ..registerLazySingleton(() => UpdateStockQuantity(sl()))
     ..registerLazySingleton(() => GetStockWithDetails(sl()))
+    ..registerLazySingleton(() => GetOptionGroups(sl()))
+    ..registerLazySingleton(() => SaveOptionGroup(sl()))
+    ..registerLazySingleton(() => AssignOptionGroupToItem(sl()))
+    ..registerLazySingleton(() => ProcessCheckout(sl()))
     //! Data - Repositories
     ..registerLazySingleton<DepartmentRepository>(
       () => DepartmentRepositoryImpl(departmentDao: sl()),
@@ -137,11 +154,16 @@ Future<void> init() async {
     ..registerLazySingleton<StockRepository>(
       () => StockRepositoryImpl(stockDao: sl()),
     )
+    ..registerLazySingleton<OrderRepository>(
+      () => OrderRepositoryImpl(orderDao: sl()),
+    )
     //! DAOs
     ..registerLazySingleton(() => DepartmentDao(sl()))
     ..registerLazySingleton(() => ItemDao(sl()))
     ..registerLazySingleton(() => UnitDao(sl()))
-    ..registerLazySingleton(() => StockDao(sl()));
+    ..registerLazySingleton(() => StockDao(sl()))
+    ..registerLazySingleton(() => OptionGroupDao(sl()))
+    ..registerLazySingleton(() => OrderDao(sl()));
 
   //! Core
   final dbHelper = DatabaseHelper();
