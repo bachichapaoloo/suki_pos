@@ -1,4 +1,5 @@
 import 'package:equatable/equatable.dart';
+import 'package:suki_pos/data/models/maintenance/item_price_model.dart';
 import 'item_price.dart';
 
 class Item extends Equatable {
@@ -39,7 +40,7 @@ class Item extends Equatable {
   final double discCapPercentage;
   final bool isActive;
 
-  final List<ItemPrice> prices;
+  final List<ItemPriceModel> prices;
 
   const Item({
     this.id,

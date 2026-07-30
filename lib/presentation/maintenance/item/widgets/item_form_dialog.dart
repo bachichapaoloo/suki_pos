@@ -6,6 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 
 import 'package:suki_pos/core/use_case/use_case.dart';
+import 'package:suki_pos/data/models/maintenance/item_price_model.dart';
 import 'package:suki_pos/domain/entities/maintenance/category.dart';
 import 'package:suki_pos/domain/entities/maintenance/department.dart';
 import 'package:suki_pos/domain/entities/maintenance/item.dart';
@@ -165,7 +166,7 @@ class _ItemFormDialogState extends State<ItemFormDialog> {
   void _submit() {
     if (_formKey.currentState!.validate()) {
       final prices = [
-        ItemPrice(
+        ItemPriceModel(
           priceLevel: 'default',
           price: double.tryParse(_defaultPriceCtrl.text) ?? 0.0,
         ),
@@ -267,7 +268,9 @@ class _ItemFormDialogState extends State<ItemFormDialog> {
                                 child: _buildDropdown(
                                   label: 'Department',
                                   value: _selectedDepartmentId,
-                                  items: _departments.map((d) => DropdownMenuItem(value: d.id, child: Text(d.name))).toList(),
+                                  items: _departments
+                                      .map((d) => DropdownMenuItem(value: d.id, child: Text(d.name)))
+                                      .toList(),
                                   onChanged: _onDepartmentChanged,
                                 ),
                               ),
@@ -276,7 +279,9 @@ class _ItemFormDialogState extends State<ItemFormDialog> {
                                 child: _buildDropdown(
                                   label: 'Category',
                                   value: _selectedCategoryId,
-                                  items: _categories.map((c) => DropdownMenuItem(value: c.id, child: Text(c.name))).toList(),
+                                  items: _categories
+                                      .map((c) => DropdownMenuItem(value: c.id, child: Text(c.name)))
+                                      .toList(),
                                   onChanged: _onCategoryChanged,
                                 ),
                               ),
