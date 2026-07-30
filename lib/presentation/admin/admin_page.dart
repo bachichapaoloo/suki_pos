@@ -33,6 +33,12 @@ class AdminPage extends StatelessWidget {
       color: Colors.orange,
       route: '/admin/roles',
     ),
+    _AdminModule(
+      title: 'Receipt Maintenance',
+      icon: Icons.receipt,
+      color: Colors.blueGrey,
+      route: '/pos/transaction-history',
+    ),
   ];
 
   @override
@@ -117,8 +123,7 @@ class AdminPage extends StatelessWidget {
         childAspectRatio: 1.5,
       ),
       itemCount: _modules.length,
-      itemBuilder: (context, index) =>
-          _AdminModuleCard(module: _modules[index]),
+      itemBuilder: (context, index) => _AdminModuleCard(module: _modules[index]),
     );
   }
 }
