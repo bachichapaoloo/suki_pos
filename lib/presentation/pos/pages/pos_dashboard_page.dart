@@ -58,8 +58,6 @@ class PosDashboardPage extends StatelessWidget {
               ),
             ),
             const Spacer(),
-            // Center Title or Empty space
-            const Spacer(),
             const Icon(Icons.access_time, color: Colors.grey, size: 20),
             const SizedBox(width: 8),
             Text(
@@ -456,6 +454,7 @@ class PosDashboardPage extends StatelessWidget {
                           iconBg: const Color(0xFFE2E8F0),
                           iconColor: const Color(0xFF475569),
                           height: cardHeight,
+                          route: '/inventory/stock',
                         ),
                       ),
                     ],
@@ -491,6 +490,7 @@ class PosDashboardPage extends StatelessWidget {
                       iconBg: const Color(0xFFFECACA),
                       iconColor: const Color(0xFFB91C1C),
                       height: cardHeight,
+                      route: '/admin',
                     ),
                   ),
                 ],
@@ -506,7 +506,9 @@ class PosDashboardPage extends StatelessWidget {
 
   Widget _buildSalesEntryCard(BuildContext context, {required double height}) {
     return InkWell(
-      onTap: () {},
+      onTap: () {
+        Navigator.of(context).pushNamed('/pos/sales-entry');
+      },
       borderRadius: BorderRadius.circular(20),
       child: Container(
         height: height,
@@ -795,6 +797,7 @@ class PosDashboardPage extends StatelessWidget {
                 Icons.point_of_sale_rounded,
                 const Color(0xFF355C8F),
                 Colors.white,
+                route: '/pos/sales-entry',
               ),
             ),
             const SizedBox(width: 16),
@@ -843,6 +846,7 @@ class PosDashboardPage extends StatelessWidget {
                 Icons.inventory_2_outlined,
                 const Color(0xFFA5DDF1),
                 const Color(0xFF0369A1),
+                route: '/inventory/stock',
               ),
             ),
             const SizedBox(width: 16),
@@ -861,7 +865,9 @@ class PosDashboardPage extends StatelessWidget {
         const SizedBox(height: 16),
         // Admin Panel Row
         InkWell(
-          onTap: () {},
+          onTap: () {
+            Navigator.of(context).pushNamed('/admin');
+          },
           borderRadius: BorderRadius.circular(16),
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),

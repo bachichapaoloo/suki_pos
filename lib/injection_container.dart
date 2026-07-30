@@ -12,6 +12,7 @@ import 'package:suki_pos/data/repositories/maintenance/category_repository_impl.
 import 'package:suki_pos/data/repositories/maintenance/department_repository_impl.dart';
 import 'package:suki_pos/data/repositories/maintenance/item_repository_impl.dart';
 import 'package:suki_pos/data/repositories/maintenance/unit_repository_impl.dart';
+import 'package:suki_pos/data/repositories/maintenance/option_group_repository_impl.dart';
 import 'package:suki_pos/data/repositories/orders/order_repository_impl.dart';
 import 'package:suki_pos/domain/repositories/admin/role_repository.dart';
 import 'package:suki_pos/domain/repositories/admin/user_repository.dart';
@@ -20,6 +21,7 @@ import 'package:suki_pos/domain/repositories/inventory/stock_repository.dart';
 import 'package:suki_pos/domain/repositories/maintenance/category_repository.dart';
 import 'package:suki_pos/domain/repositories/maintenance/department_repository.dart';
 import 'package:suki_pos/domain/repositories/maintenance/item_repository.dart';
+import 'package:suki_pos/domain/repositories/maintenance/option_group_repository.dart';
 import 'package:suki_pos/domain/repositories/maintenance/unit_repository.dart' show UnitRepository;
 import 'package:suki_pos/domain/repositories/orders/order_repository.dart';
 import 'package:suki_pos/domain/use_cases/admin/role_use_cases.dart';
@@ -44,6 +46,7 @@ import 'package:suki_pos/presentation/maintenance/item/bloc/item_bloc.dart';
 import 'package:suki_pos/data/dao/department_dao.dart';
 import 'package:suki_pos/data/dao/item_dao.dart';
 import 'package:suki_pos/presentation/maintenance/option_group/bloc/option_group_cubit.dart';
+import 'package:suki_pos/presentation/pos/bloc/cart_cubit.dart';
 
 final sl = GetIt.instance;
 
@@ -102,6 +105,11 @@ Future<void> init() async {
         loginUseCase: sl(),
       ),
     )
+    ..registerFactory(
+      () => CartCubit(
+        processCheckout: sl(),
+      ),
+    )
     //! Domain - Use Cases
     ..registerLazySingleton(() => GetDepartments(sl()))
     ..registerLazySingleton(() => SaveDepartment(sl()))
@@ -156,6 +164,9 @@ Future<void> init() async {
     )
     ..registerLazySingleton<OrderRepository>(
       () => OrderRepositoryImpl(orderDao: sl()),
+    )
+    ..registerLazySingleton<OptionGroupRepository>(
+      () => OptionGroupRepositoryImpl(optionGroupDao: sl()),
     )
     //! DAOs
     ..registerLazySingleton(() => DepartmentDao(sl()))
