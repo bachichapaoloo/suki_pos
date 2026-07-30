@@ -35,6 +35,7 @@ import 'package:suki_pos/domain/use_cases/maintenance/item_use_cases.dart';
 import 'package:suki_pos/domain/use_cases/maintenance/option_group_use_cases.dart';
 import 'package:suki_pos/domain/use_cases/maintenance/save_department.dart';
 import 'package:suki_pos/domain/use_cases/maintenance/unit_use_cases.dart';
+import 'package:suki_pos/domain/use_cases/orders/get_transaction_history.dart';
 import 'package:suki_pos/domain/use_cases/orders/process_checkout.dart';
 import 'package:suki_pos/presentation/admin/role/bloc/role_bloc.dart';
 import 'package:suki_pos/presentation/admin/user/bloc/user_bloc.dart';
@@ -47,6 +48,7 @@ import 'package:suki_pos/data/dao/department_dao.dart';
 import 'package:suki_pos/data/dao/item_dao.dart';
 import 'package:suki_pos/presentation/maintenance/option_group/bloc/option_group_cubit.dart';
 import 'package:suki_pos/presentation/pos/bloc/cart_cubit.dart';
+import 'package:suki_pos/presentation/pos/bloc/transaction_history_cubit.dart';
 
 final sl = GetIt.instance;
 
@@ -110,6 +112,11 @@ Future<void> init() async {
         processCheckout: sl(),
       ),
     )
+    ..registerFactory(
+      () => TransactionHistoryCubit(
+        getTransactionHistory: sl(),
+      ),
+    )
     //! Domain - Use Cases
     ..registerLazySingleton(() => GetDepartments(sl()))
     ..registerLazySingleton(() => SaveDepartment(sl()))
@@ -137,6 +144,7 @@ Future<void> init() async {
     ..registerLazySingleton(() => SaveOptionGroup(sl()))
     ..registerLazySingleton(() => AssignOptionGroupToItem(sl()))
     ..registerLazySingleton(() => ProcessCheckout(sl()))
+    ..registerLazySingleton(() => GetTransactionHistory(sl()))
     //! Data - Repositories
     ..registerLazySingleton<DepartmentRepository>(
       () => DepartmentRepositoryImpl(departmentDao: sl()),

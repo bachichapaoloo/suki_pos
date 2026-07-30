@@ -25,8 +25,10 @@ import 'package:suki_pos/presentation/maintenance/item/pages/item_list_page.dart
 import 'package:suki_pos/presentation/maintenance/maintenance_page.dart';
 import 'package:suki_pos/presentation/maintenance/option_group/bloc/option_group_cubit.dart';
 import 'package:suki_pos/presentation/pos/bloc/cart_cubit.dart';
+import 'package:suki_pos/presentation/pos/bloc/transaction_history_cubit.dart';
 import 'package:suki_pos/presentation/pos/pages/pos_dashboard_page.dart';
 import 'package:suki_pos/presentation/pos/pages/sales_entry_page.dart';
+import 'package:suki_pos/presentation/pos/pages/transaction_history_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -62,6 +64,7 @@ class MainApp extends StatelessWidget {
         BlocProvider(create: (_) => di.sl<CartCubit>()),
         BlocProvider(create: (_) => di.sl<OptionGroupCubit>()),
         BlocProvider(create: (_) => di.sl<StockCubit>()),
+        BlocProvider(create: (_) => di.sl<TransactionHistoryCubit>()),
       ],
       child: MaterialApp(
         title: 'Suki POS',
@@ -78,6 +81,7 @@ class MainApp extends StatelessWidget {
           '/': (context) => const LoginPage(),
           '/pos': (context) => const PosDashboardPage(),
           '/pos/sales-entry': (context) => const SalesEntryPage(),
+          '/pos/transaction-history': (context) => const TransactionHistoryPage(),
           '/inventory/stock': (context) => const StockListPage(),
           '/maintenance': (context) => const MaintenancePage(),
           '/maintenance/departments': (context) => const DepartmentListPage(),

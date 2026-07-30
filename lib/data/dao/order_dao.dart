@@ -118,4 +118,70 @@ class OrderDao {
       return orderId;
     });
   }
+
+  Future<List<Map<String, dynamic>>> getTransactionHistory({
+    int limit = 50,
+  }) async {
+    final db = await _databaseHelper.database;
+
+    return await db.rawQuery(
+      '''
+      SELECT
+        st.id AS transaction_id,
+        st.sales_order_id,
+        st.gross_amount,
+        st.net_amount,
+        st.transaction_date,
+        st.status,
+        u.username AS cashier_name,
+        ot.name AS order_type_name,
+        p.cash_tendered,
+        p.change_given,
+        pm.name AS payment_method_name
+      FROM ${SchemaConstants.saleTransaction} st
+      LEFT JOIN ${SchemaConstants.appUser} u ON st.cashier_id = u.id
+      LEFT JOIN ${SchemaConstants.orderType} ot ON st.order_type_id = ot.id
+      LEFT JOIN ${SchemaConstants.payment} p ON st.id = p.sale_transaction_id
+      LEFT JOIN ${SchemaConstants.paymentMethod} pm ON p.payment_method_id = pm.id
+      ORDER BY st.transaction_date DESC
+      LIMIT ?
+      ''',
+      [limit],
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> getTransactionLineDetails(int transactionId) async {
+    final db = await _databaseHelper.database;
+
+    return await db.rawQuery(
+      '''
+      SELECT
+        tl.item_id,
+        tl.item_name,
+        tl.barcode,
+        tl.quantity,
+        tl.unit_price,
+        tl.amount,
+        soi.id AS sales_order_item_id
+      FROM ${SchemaConstants.transactionLine} tl
+      LEFT JOIN ${SchemaConstants.saleTransaction} st ON tl.sale_transaction_id = st.id
+      LEFT JOIN ${SchemaConstants.salesOrderItem} soi ON soi.sales_order_id = st.sales_order_id AND soi.item_id = tl.item_id
+      WHERE tl.sales_transaction_id = ?
+      ''',
+      [transactionId],
+    );
+  }
+
+  Future<List<String>> getOrderItemOptions(int salesOrderItemId) async {
+    final db = await _databaseHelper.database;
+
+    final results = await db.query(
+      SchemaConstants.orderItemOption,
+      columns: ['option_value_name'],
+      where: 'sales_order_item_id = ?',
+      whereArgs: [salesOrderItemId],
+    );
+
+    return results.map((r) => r['option_value_name']! as String).toList();
+  }
 }
