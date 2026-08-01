@@ -7,6 +7,8 @@ import 'package:suki_pos/presentation/maintenance/item/bloc/item_event.dart';
 import 'package:suki_pos/presentation/maintenance/item/bloc/item_state.dart';
 import 'package:suki_pos/presentation/maintenance/option_group/bloc/option_group_cubit.dart';
 import 'package:suki_pos/presentation/maintenance/option_group/bloc/option_group_state.dart';
+import 'package:suki_pos/presentation/auth/bloc/auth_bloc.dart';
+import 'package:suki_pos/presentation/inventory/stock_cubit.dart';
 import 'package:suki_pos/presentation/pos/bloc/cart_cubit.dart';
 import 'package:suki_pos/presentation/pos/bloc/cart_state.dart';
 import 'package:suki_pos/presentation/pos/widgets/item_modifier_model_dialog.dart';
@@ -282,8 +284,10 @@ class _SalesEntryPageState extends State<SalesEntryPage> {
                                         builder: (dialogCtx) => PaymentDialog(
                                           totalAmount: cartState.totalAmount,
                                           onPay: (methodId, tendered) {
+                                            final authState = context.read<AuthBloc>().state;
+                                            final cashierId = authState is AuthAuthenticated ? (authState.user.id ?? 1) : 1;
                                             context.read<CartCubit>().submitOrder(
-                                              cashierId: 1,
+                                              cashierId: cashierId,
                                               paymentMethodId: methodId,
                                               cashTendered: tendered,
                                             );
