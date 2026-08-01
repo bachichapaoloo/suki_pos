@@ -34,8 +34,9 @@ class MainLayout extends StatelessWidget {
   }
 
   Widget _buildMobileLayout(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
-      backgroundColor: const Color(0xFFF7F8FA),
+      backgroundColor: theme.colorScheme.surface,
       appBar: mobileAppBar,
       body: mobileBody,
       floatingActionButton: floatingActionButton,
@@ -43,8 +44,9 @@ class MainLayout extends StatelessWidget {
   }
 
   Widget _buildDesktopLayout(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
-      backgroundColor: const Color(0xFFF7F8FA),
+      backgroundColor: theme.colorScheme.surface,
       body: Row(
         children: [
           // Main Content

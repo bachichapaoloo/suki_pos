@@ -60,10 +60,11 @@ class CustomTextField extends StatelessWidget {
   /// Callback when the field is submitted.
   final void Function(String)? onFieldSubmitted;
 
-  static const Color _primaryBlue = Color(0xFF355C8F);
-
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: Column(
@@ -74,7 +75,7 @@ class CustomTextField extends StatelessWidget {
             style: GoogleFonts.inter(
               fontSize: 14,
               fontWeight: FontWeight.w600,
-              color: const Color(0xFF1E293B),
+              color: colorScheme.onSurface,
             ),
           ),
           const SizedBox(height: 8),
@@ -87,11 +88,11 @@ class CustomTextField extends StatelessWidget {
             maxLines: maxLines,
             textInputAction: textInputAction,
             onFieldSubmitted: onFieldSubmitted,
-            style: GoogleFonts.inter(fontSize: 15, color: const Color(0xFF1E293B)),
+            style: GoogleFonts.inter(fontSize: 15, color: colorScheme.onSurface),
             decoration: InputDecoration(
               hintText: hintText,
               prefixText: prefixText,
-              hintStyle: GoogleFonts.inter(color: Colors.grey[500]),
+              hintStyle: GoogleFonts.inter(color: colorScheme.onSurfaceVariant.withOpacity(0.6)),
               prefixIcon: prefixIcon,
               suffixIcon: suffixIcon,
               contentPadding: const EdgeInsets.symmetric(
@@ -104,18 +105,20 @@ class CustomTextField extends StatelessWidget {
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
                 borderSide: BorderSide(
-                  color: Colors.grey[300]!,
+                  color: colorScheme.outlineVariant,
                 ),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(
-                  color: _primaryBlue,
+                borderSide: BorderSide(
+                  color: colorScheme.primary,
                   width: 2,
                 ),
               ),
               filled: true,
-              fillColor: enabled ? const Color(0xFFF7F8FA) : Colors.grey[100],
+              fillColor: enabled
+                  ? colorScheme.surfaceContainerHighest.withOpacity(0.3)
+                  : colorScheme.onSurface.withOpacity(0.05),
             ),
           ),
         ],

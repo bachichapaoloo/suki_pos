@@ -36,15 +36,16 @@ class CustomFormDialog extends StatelessWidget {
   /// Maximum width of the dialog.
   final double maxWidth;
 
-  static const Color _primaryBlue = Color(0xFF355C8F);
-
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Center(
       child: ConstrainedBox(
         constraints: BoxConstraints(maxWidth: maxWidth),
         child: Dialog(
-          backgroundColor: Colors.white,
+          backgroundColor: colorScheme.surface,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(24),
           ),
@@ -62,17 +63,17 @@ class CustomFormDialog extends StatelessWidget {
                         style: GoogleFonts.inter(
                           fontSize: 20,
                           fontWeight: FontWeight.bold,
-                          color: const Color(0xFF1E293B),
+                          color: colorScheme.onSurface,
                         ),
                       ),
                       const Spacer(),
                       IconButton(
                         onPressed: isSaving ? null : () => Navigator.pop(context),
-                        icon: const Icon(Icons.close_rounded, color: Colors.grey),
+                        icon: Icon(Icons.close_rounded, color: colorScheme.onSurfaceVariant),
                       ),
                     ],
                   ),
-                  const Divider(height: 32, color: Color(0xFFE2E8F0)),
+                  Divider(height: 32, color: colorScheme.outlineVariant),
                   content,
                   const SizedBox(height: 32),
                   Row(
@@ -84,7 +85,7 @@ class CustomFormDialog extends StatelessWidget {
                           cancelLabel,
                           style: GoogleFonts.inter(
                             fontWeight: FontWeight.w600,
-                            color: Colors.grey[600],
+                            color: colorScheme.onSurfaceVariant,
                           ),
                         ),
                       ),
@@ -92,8 +93,8 @@ class CustomFormDialog extends StatelessWidget {
                       ElevatedButton(
                         onPressed: isSaving ? null : onSave,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: _primaryBlue,
-                          foregroundColor: Colors.white,
+                          backgroundColor: colorScheme.primary,
+                          foregroundColor: colorScheme.onPrimary,
                           padding: const EdgeInsets.symmetric(
                             horizontal: 24,
                             vertical: 12,
@@ -104,12 +105,12 @@ class CustomFormDialog extends StatelessWidget {
                           elevation: 0,
                         ),
                         child: isSaving
-                            ? const SizedBox(
+                            ? SizedBox(
                                 width: 20,
                                 height: 20,
                                 child: CircularProgressIndicator(
                                   strokeWidth: 2,
-                                  color: Colors.white,
+                                  color: colorScheme.onPrimary,
                                 ),
                               )
                             : Text(
