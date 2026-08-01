@@ -7,6 +7,7 @@ import 'package:suki_pos/presentation/maintenance/item/bloc/item_bloc.dart';
 import 'package:suki_pos/presentation/maintenance/item/bloc/item_event.dart';
 import 'package:suki_pos/presentation/maintenance/item/bloc/item_state.dart';
 import 'package:suki_pos/presentation/maintenance/item/widgets/item_form_dialog.dart';
+import 'package:suki_pos/presentation/widgets/app_snackbar.dart';
 import 'package:suki_pos/presentation/widgets/main_layout.dart';
 
 class ItemListPage extends StatefulWidget {
@@ -446,9 +447,7 @@ class _ItemListPageState extends State<ItemListPage> {
     if (state is ItemActionSuccess) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(state.message)));
     } else if (state is ItemError) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(state.message), backgroundColor: Theme.of(context).colorScheme.error),
-      );
+      AppSnackBar.showError(context, state.message);
     }
   }
 
