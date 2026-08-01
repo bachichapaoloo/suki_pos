@@ -1,25 +1,82 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/intl.dart';
+import 'package:suki_pos/presentation/auth/bloc/auth_bloc.dart';
+import 'package:suki_pos/presentation/pos/bloc/cart_cubit.dart';
+import 'package:suki_pos/presentation/pos/bloc/cart_state.dart';
+import 'package:suki_pos/presentation/pos/bloc/transaction_history_cubit.dart';
+import 'package:suki_pos/presentation/pos/bloc/transaction_history_state.dart';
+import 'package:suki_pos/presentation/pos/widgets/shift_reconciliation_dialog.dart';
+import 'package:suki_pos/presentation/widgets/app_snackbar.dart';
 import 'package:suki_pos/presentation/widgets/main_layout.dart';
 
-class PosDashboardPage extends StatelessWidget {
+class PosDashboardPage extends StatefulWidget {
   const PosDashboardPage({super.key});
 
   @override
+  State<PosDashboardPage> createState() => _PosDashboardPageState();
+}
+
+class _PosDashboardPageState extends State<PosDashboardPage> {
+  late Timer _timer;
+  late DateTime _currentTime;
+  late DateTime _shiftStartTime;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentTime = DateTime.now();
+    _shiftStartTime = DateTime.now().subtract(const Duration(hours: 1, minutes: 41, seconds: 22));
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (mounted) {
+        setState(() {
+          _currentTime = DateTime.now();
+        });
+      }
+    });
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<TransactionHistoryCubit>().loadHistory();
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer.cancel();
+    super.dispose();
+  }
+
+  String get _formattedTime => DateFormat('h:mm:ss a').format(_currentTime);
+  String get _formattedDate => DateFormat('EEEE, MMMM d, yyyy').format(_currentTime);
+
+  String get _shiftDuration {
+    final diff = _currentTime.difference(_shiftStartTime);
+    final hours = diff.inHours.toString().padLeft(2, '0');
+    final minutes = (diff.inMinutes % 60).toString().padLeft(2, '0');
+    final seconds = (diff.inSeconds % 60).toString().padLeft(2, '0');
+    return '$hours:$minutes:$seconds';
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return MainLayout(
       currentTab: MainTab.home,
       mobileAppBar: AppBar(
-        backgroundColor: const Color(0xFFF7F8FA),
+        backgroundColor: colorScheme.surface,
         elevation: 0,
         title: Row(
           children: [
-            const Icon(Icons.storefront_outlined, color: Color(0xFF355C8F)),
+            Icon(Icons.storefront_outlined, color: colorScheme.primary),
             const SizedBox(width: 8),
             Text(
               'SukiPOS',
               style: GoogleFonts.inter(
-                color: const Color(0xFF355C8F),
+                color: colorScheme.primary,
                 fontWeight: FontWeight.bold,
                 fontSize: 18,
               ),
@@ -27,13 +84,24 @@ class PosDashboardPage extends StatelessWidget {
           ],
         ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.access_time, color: Color(0xFF1E293B)),
-            onPressed: () {},
+          Row(
+            children: [
+              Icon(Icons.access_time, color: colorScheme.onSurfaceVariant, size: 18),
+              const SizedBox(width: 4),
+              Text(
+                _formattedTime,
+                style: GoogleFonts.inter(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
           ),
+          const SizedBox(width: 12),
           IconButton(
-            icon: const Icon(Icons.logout, color: Color(0xFF1E293B)),
-            onPressed: () => Navigator.of(context).pushReplacementNamed('/login'),
+            icon: Icon(Icons.logout, color: colorScheme.onSurfaceVariant),
+            onPressed: () => Navigator.of(context).pushReplacementNamed('/'),
           ),
           const SizedBox(width: 8),
         ],
@@ -42,36 +110,37 @@ class PosDashboardPage extends StatelessWidget {
         height: 80,
         padding: const EdgeInsets.symmetric(horizontal: 32),
         decoration: BoxDecoration(
-          color: Colors.white,
-          border: Border(bottom: BorderSide(color: Colors.grey[200]!)),
+          color: colorScheme.surface,
+          border: Border(bottom: BorderSide(color: colorScheme.outlineVariant)),
         ),
         child: Row(
           children: [
-            const Icon(Icons.storefront_outlined, color: Color(0xFF355C8F), size: 32),
+            Icon(Icons.storefront_outlined, color: colorScheme.primary, size: 32),
             const SizedBox(width: 8),
             Text(
               'SukiPOS',
               style: GoogleFonts.inter(
-                color: const Color(0xFF355C8F),
+                color: colorScheme.primary,
                 fontWeight: FontWeight.bold,
                 fontSize: 24,
               ),
             ),
             const Spacer(),
-            const Icon(Icons.access_time, color: Colors.grey, size: 20),
+            Icon(Icons.access_time, color: colorScheme.onSurfaceVariant, size: 20),
             const SizedBox(width: 8),
             Text(
-              '1:10 AM',
+              _formattedTime,
               style: GoogleFonts.inter(
                 fontWeight: FontWeight.w600,
-                color: Colors.grey[800],
+                color: colorScheme.onSurface,
+                fontSize: 16,
               ),
             ),
             const SizedBox(width: 24),
             IconButton(
-              icon: const Icon(Icons.logout, color: Colors.grey),
+              icon: Icon(Icons.logout, color: colorScheme.onSurfaceVariant),
               onPressed: () {
-                Navigator.of(context).pushReplacementNamed('/login');
+                Navigator.of(context).pushReplacementNamed('/');
               },
             ),
           ],
@@ -114,46 +183,85 @@ class PosDashboardPage extends StatelessWidget {
   }
 
   Widget _buildDesktopWelcomeSection() {
+    final colorScheme = Theme.of(context).colorScheme;
+    final authState = context.watch<AuthBloc>().state;
+    final userName = authState is AuthAuthenticated ? authState.user.name : 'Cashier';
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
-            Text(
-              'Welcome back, Maria',
-              style: GoogleFonts.inter(
-                fontSize: 32,
-                fontWeight: FontWeight.bold,
-                color: const Color(0xFF1E293B),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Welcome back, $userName 👋',
+                  style: GoogleFonts.inter(
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                    color: colorScheme.onSurface,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  _formattedDate,
+                  style: GoogleFonts.inter(
+                    fontSize: 16,
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+            const Spacer(),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.green[50],
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: Colors.green[200]!),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 8,
+                    height: 8,
+                    decoration: const BoxDecoration(
+                      color: Colors.green,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Shift Active',
+                    style: GoogleFonts.inter(
+                      fontWeight: FontWeight.w600,
+                      color: Colors.green[700],
+                    ),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(width: 12),
-            const Text('👋', style: TextStyle(fontSize: 32)),
           ],
-        ),
-        const SizedBox(height: 8),
-        Text(
-          'Shift started at 08:00 AM • Main Store Branch',
-          style: GoogleFonts.inter(
-            fontSize: 16,
-            color: Colors.grey[600],
-            fontWeight: FontWeight.w500,
-          ),
         ),
       ],
     );
   }
 
   Widget _buildMobileWelcomeSection() {
+    final colorScheme = Theme.of(context).colorScheme;
+    final authState = context.watch<AuthBloc>().state;
+    final userName = authState is AuthAuthenticated ? authState.user.name : 'Cashier';
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Welcome back, Maria',
+          'Welcome, $userName 👋',
           style: GoogleFonts.inter(
-            fontSize: 16,
-            fontWeight: FontWeight.w500,
-            color: const Color(0xFF1E293B),
+            fontSize: 22,
+            fontWeight: FontWeight.bold,
+            color: colorScheme.onSurface,
           ),
         ),
         const SizedBox(height: 4),
