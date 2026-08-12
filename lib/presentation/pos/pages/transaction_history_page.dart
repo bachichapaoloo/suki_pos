@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
+import 'package:suki_pos/presentation/pos/widgets/void_order_dialog.dart';
 import '../bloc/transaction_history_cubit.dart';
 import '../bloc/transaction_history_state.dart';
 import '../widgets/receipt_preview_dialog.dart';
@@ -81,15 +82,40 @@ class _TransactionHistoryPageState extends State<TransactionHistoryPage> {
                           subtitle: Text(
                             '${dateFormat.format(txn.transactionDate)} | ${txn.orderTypeName} | Cashier: ${txn.cashierName}',
                           ),
-                          trailing: OutlinedButton.icon(
-                            icon: const Icon(Icons.receipt_long, size: 18),
-                            label: const Text('Receipt'),
-                            onPressed: () {
-                              showDialog(
-                                context: context,
-                                builder: (_) => ReceiptPreviewDialog(transaction: txn),
-                              );
-                            },
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              OutlinedButton.icon(
+                                icon: const Icon(Icons.receipt_long, size: 18),
+                                label: const Text('Receipt'),
+                                onPressed: () {
+                                  showDialog(
+                                    context: context,
+                                    builder: (_) => ReceiptPreviewDialog(transaction: txn),
+                                  );
+                                },
+                              ),
+                              const SizedBox(width: 8),
+                              IconButton(
+                                icon: const Icon(Icons.cancel_outlined, color: Colors.red),
+                                tooltip: 'Void Transaction',
+                                onPressed: () {
+                                  showDialog(
+                                    context: context,
+                                    builder: (_) => VoidOrderDialog(
+                                      transactionNo: txn.transactionNo,
+                                      onConfirmVoid: (reason) {
+                                        context.read<TransactionHistoryCubit>().voidTransaction(
+                                          transactionId: txn.transactionId,
+                                          cashierId: 1, // Logged in user ID
+                                          reason: reason,
+                                        );
+                                      },
+                                    ),
+                                  );
+                                },
+                              ),
+                            ],
                           ),
                         );
                       },

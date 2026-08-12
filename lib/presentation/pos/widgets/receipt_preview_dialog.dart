@@ -5,8 +5,13 @@ import 'package:suki_pos/domain/entities/orders/transaction_detail.dart';
 
 class ReceiptPreviewDialog extends StatelessWidget {
   final TransactionDetail transaction;
+  final bool isVoided;
 
-  const ReceiptPreviewDialog({super.key, required this.transaction});
+  const ReceiptPreviewDialog({
+    super.key,
+    required this.transaction,
+    this.isVoided = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -17,7 +22,7 @@ class ReceiptPreviewDialog extends StatelessWidget {
       contentPadding: const EdgeInsets.all(16),
       content: SingleChildScrollView(
         child: Container(
-          width: 340, // 80mm thermal paper width simulator
+          width: 340, // 80mm thermal paper width
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
             color: Colors.white,
@@ -33,20 +38,24 @@ class ReceiptPreviewDialog extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              if (isVoided)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  color: Colors.red,
+                  child: const Text(
+                    '*** VOIDED TRANSACTION ***',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+                  ),
+                ),
+              if (isVoided) const SizedBox(height: 12),
+
               // HEADER
-              Text(
-                'SUKIPOS STORE',
-                style: GoogleFonts.robotoMono(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              Text(
-                'Main Branch, Quezon City',
-                style: GoogleFonts.robotoMono(fontSize: 12, color: Colors.grey[700]),
-              ),
-              Text(
-                'TIN: 000-123-456-00000',
-                style: GoogleFonts.robotoMono(fontSize: 12, color: Colors.grey[700]),
-              ),
-              const SizedBox(height: 12),
+              Text('SUKIPOS STORE', style: GoogleFonts.robotoMono(fontSize: 18, fontWeight: FontWeight.bold)),
+              Text('Main Branch, Quezon City', style: GoogleFonts.robotoMono(fontSize: 12, color: Colors.grey[700])),
+              Text('TIN: 000-123-456-00000', style: GoogleFonts.robotoMono(fontSize: 12, color: Colors.grey[700])),
+              const SizedBox(height: 8),
               const Text('------------------------------------------'),
               const SizedBox(height: 8),
 
@@ -141,7 +150,6 @@ class ReceiptPreviewDialog extends StatelessWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: 4),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -159,13 +167,8 @@ class ReceiptPreviewDialog extends StatelessWidget {
 
               const SizedBox(height: 16),
               Text(
-                '*** THANK YOU & PLEASE COME AGAIN ***',
+                isVoided ? '*** TRANSACTION CANCELLED / VOIDED ***' : '*** THANK YOU & PLEASE COME AGAIN ***',
                 style: GoogleFonts.robotoMono(fontSize: 10, fontWeight: FontWeight.bold),
-                textAlign: TextAlign.center,
-              ),
-              Text(
-                'THIS SERVES AS YOUR OFFICIAL RECEIPT',
-                style: GoogleFonts.robotoMono(fontSize: 9, color: Colors.grey[600]),
                 textAlign: TextAlign.center,
               ),
             ],
@@ -182,7 +185,7 @@ class ReceiptPreviewDialog extends StatelessWidget {
           label: const Text('Print Receipt'),
           onPressed: () {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Sending print job to ESC/POS printer...')),
+              const SnackBar(content: Text('Sending thermal receipt to ESC/POS printer...')),
             );
             Navigator.of(context).pop();
           },
