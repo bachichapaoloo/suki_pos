@@ -1,12 +1,11 @@
 import 'dart:io';
 
 import 'package:device_preview/device_preview.dart';
-import 'package:flex_color_scheme/flex_color_scheme.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:suki_pos/core/theme/app_theme.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import 'package:suki_pos/core/theme/app_theme.dart';
 import 'package:suki_pos/injection_container.dart' as di;
 import 'package:suki_pos/presentation/admin/admin_page.dart';
 import 'package:suki_pos/presentation/admin/role/bloc/role_bloc.dart';

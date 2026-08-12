@@ -1,18 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:suki_pos/domain/entities/maintenance/item.dart';
-import 'package:suki_pos/presentation/maintenance/category/bloc/category_bloc.dart';
-import 'package:suki_pos/presentation/maintenance/item/bloc/item_bloc.dart';
+import 'package:suki_pos/domain/entities/maintenance/option_group.dart';
+import 'package:suki_pos/domain/entities/orders/tax_discount_breakdown.dart';
 import 'package:suki_pos/presentation/maintenance/item/bloc/item_event.dart';
 import 'package:suki_pos/presentation/maintenance/item/bloc/item_state.dart';
-import 'package:suki_pos/presentation/maintenance/option_group/bloc/option_group_cubit.dart';
-import 'package:suki_pos/presentation/maintenance/option_group/bloc/option_group_state.dart';
-import 'package:suki_pos/presentation/auth/bloc/auth_bloc.dart';
-import 'package:suki_pos/presentation/inventory/stock_cubit.dart';
-import 'package:suki_pos/presentation/pos/bloc/cart_cubit.dart';
-import 'package:suki_pos/presentation/pos/bloc/cart_state.dart';
-import 'package:suki_pos/presentation/pos/widgets/item_modifier_model_dialog.dart';
-import 'package:suki_pos/presentation/pos/widgets/payment_dialog.dart';
+import 'package:suki_pos/presentation/pos/widgets/receipt_preview_dialog.dart';
+import '../../../../domain/entities/maintenance/item.dart';
+import '../../../../domain/entities/orders/cart_item.dart';
+import '../../maintenance/category/bloc/category_bloc.dart';
+import '../../maintenance/item/bloc/item_bloc.dart';
+import '../../maintenance/option_group/bloc/option_group_cubit.dart';
+import '../../maintenance/option_group/bloc/option_group_state.dart';
+import '../bloc/cart_cubit.dart';
+import '../bloc/cart_state.dart';
+import '../widgets/discount_selection_dialog.dart';
+import '../widgets/item_detail_modal_dialog.dart';
+import '../widgets/payment_dialog.dart';
 
 class SalesEntryPage extends StatefulWidget {
   const SalesEntryPage({super.key});
@@ -32,27 +35,102 @@ class _SalesEntryPageState extends State<SalesEntryPage> {
     context.read<OptionGroupCubit>().loadOptionGroups();
   }
 
-  void _handleItemClick(BuildContext context, Item item) {
+  void _openItemDetailModal(BuildContext context, Item item, {CartItem? existingCartItem}) {
     final optionGroupState = context.read<OptionGroupCubit>().state;
-
-    if (optionGroupState is OptionGroupLoaded && optionGroupState.optionGroups.isNotEmpty) {
-      showDialog(
-        context: context,
-        builder: (_) => ItemModifierModalDialog(
-          item: item,
-          optionGroups: optionGroupState.optionGroups,
-          onConfirm: (selectedOptions, notes) {
-            context.read<CartCubit>().addItem(
-              item,
-              selectedOptions: selectedOptions,
-              notes: notes,
-            );
-          },
-        ),
-      );
+    final List<OptionGroup> optionGroups;
+    if (optionGroupState is OptionGroupLoaded) {
+      optionGroups = optionGroupState.optionGroups;
     } else {
-      context.read<CartCubit>().addItem(item);
+      optionGroups = [];
     }
+
+    showDialog(
+      context: context,
+      builder: (_) => ItemDetailModalDialog(
+        item: item,
+        optionGroups: optionGroups,
+        existingCartItem: existingCartItem,
+        onConfirm:
+            ({
+              required selectedOptions,
+              required quantity,
+              notes,
+            }) {
+              if (existingCartItem != null) {
+                // Edit existing item in cart
+                final updated = existingCartItem.copyWith(
+                  selectedOptions: selectedOptions,
+                  quantity: quantity,
+                  notes: notes,
+                );
+                context.read<CartCubit>().updateCartItem(existingCartItem.id, updated);
+              } else {
+                // Add new item to cart
+                context.read<CartCubit>().addItem(
+                  item: item,
+                  selectedOptions: selectedOptions,
+                  quantity: quantity,
+                  notes: notes,
+                );
+              }
+            },
+      ),
+    );
+  }
+
+  void _openPaymentDialog(BuildContext context, TaxDiscountBreakdown breakdown) {
+    showDialog(
+      context: context,
+      barrierDismissible: false, // Prevents accidental closing during processing
+      builder: (dialogCtx) => PaymentDialog(
+        totalAmount: breakdown.netTotal,
+        onPay: (paymentMethodId, cashTendered) async {
+          // 1. Submit order via CartCubit and receive the completed TransactionDetail
+          final completedTxn = await context.read<CartCubit>().submitOrder(
+            cashierId: 1, // ID of active cashier (can be linked to AuthBloc)
+            paymentMethodId: paymentMethodId,
+            cashTendered: cashTendered,
+          );
+
+          // 2. Validate completion and widget context
+          if (completedTxn != null && mounted) {
+            // Show success toast notification
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Row(
+                  children: [
+                    const Icon(Icons.check_circle, color: Colors.white),
+                    const SizedBox(width: 8),
+                    Text('Sale Completed! ${completedTxn.transactionNo}'),
+                  ],
+                ),
+                backgroundColor: Colors.green[700],
+                behavior: SnackBarBehavior.floating,
+                duration: const Duration(seconds: 3),
+              ),
+            );
+
+            // 3. Immediately open the Thermal Receipt & EJ Preview Dialog
+            showDialog(
+              context: context,
+              builder: (_) => ReceiptPreviewDialog(
+                transaction: completedTxn,
+              ),
+            );
+          } else if (mounted) {
+            // Handle error state
+            final errorMsg = context.read<CartCubit>().state.errorMessage ?? 'Checkout failed. Please try again.';
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(errorMsg),
+                backgroundColor: Theme.of(context).colorScheme.error,
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+          }
+        },
+      ),
+    );
   }
 
   @override
@@ -125,7 +203,9 @@ class _SalesEntryPageState extends State<SalesEntryPage> {
                 Expanded(
                   child: BlocBuilder<ItemBloc, ItemState>(
                     builder: (context, state) {
-                      if (state is ItemLoading) return const Center(child: CircularProgressIndicator());
+                      if (state is ItemLoading) {
+                        return const Center(child: CircularProgressIndicator());
+                      }
                       if (state is ItemLoaded) {
                         final items = _selectedCategoryId == null
                             ? state.items
@@ -151,7 +231,7 @@ class _SalesEntryPageState extends State<SalesEntryPage> {
                             return Card(
                               elevation: 2,
                               child: InkWell(
-                                onTap: () => _handleItemClick(context, item),
+                                onTap: () => _openItemDetailModal(context, item),
                                 borderRadius: BorderRadius.circular(12),
                                 child: Padding(
                                   padding: const EdgeInsets.all(12.0),
@@ -191,6 +271,8 @@ class _SalesEntryPageState extends State<SalesEntryPage> {
             flex: 2,
             child: BlocBuilder<CartCubit, CartState>(
               builder: (context, cartState) {
+                final breakdown = cartState.breakdown;
+
                 return Column(
                   children: [
                     Container(
@@ -218,10 +300,27 @@ class _SalesEntryPageState extends State<SalesEntryPage> {
                               itemBuilder: (context, idx) {
                                 final cartItem = cartState.items[idx];
                                 return ListTile(
-                                  title: Text(cartItem.item.name),
-                                  subtitle: cartItem.selectedOptions.isNotEmpty
-                                      ? Text(cartItem.selectedOptions.map((o) => o.alias).join(', '))
-                                      : null,
+                                  onTap: () => _openItemDetailModal(
+                                    context,
+                                    cartItem.item,
+                                    existingCartItem: cartItem,
+                                  ),
+                                  title: Text(cartItem.item.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                                  subtitle: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      if (cartItem.selectedOptions.isNotEmpty)
+                                        Text(
+                                          cartItem.selectedOptions.map((o) => o.alias).join(', '),
+                                          style: TextStyle(color: theme.colorScheme.primary, fontSize: 12),
+                                        ),
+                                      if (cartItem.notes != null)
+                                        Text(
+                                          'Note: ${cartItem.notes}',
+                                          style: const TextStyle(fontStyle: FontStyle.italic, fontSize: 11),
+                                        ),
+                                    ],
+                                  ),
                                   trailing: Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
@@ -249,16 +348,60 @@ class _SalesEntryPageState extends State<SalesEntryPage> {
                             ),
                     ),
                     const Divider(height: 1),
+
+                    // BIR TAX & DISCOUNT BREAKDOWN SUMMARY
                     Padding(
-                      padding: const EdgeInsets.all(16.0),
+                      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
                       child: Column(
                         children: [
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
+                              const Text('Subtotal:'),
+                              Text('₱${breakdown.grossSubtotal.toStringAsFixed(2)}'),
+                            ],
+                          ),
+                          if (breakdown.manualDiscountAmount > 0)
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Text('Discount:'),
+                                Text(
+                                  '-₱${breakdown.manualDiscountAmount.toStringAsFixed(2)}',
+                                  style: TextStyle(color: theme.colorScheme.error, fontWeight: FontWeight.bold),
+                                ),
+                              ],
+                            ),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text('VATable Sales:', style: TextStyle(color: theme.colorScheme.outline, fontSize: 12)),
+                              Text(
+                                '₱${breakdown.vatableSales.toStringAsFixed(2)}',
+                                style: TextStyle(color: theme.colorScheme.outline, fontSize: 12),
+                              ),
+                            ],
+                          ),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                'VAT Amount (12%):',
+                                style: TextStyle(color: theme.colorScheme.outline, fontSize: 12),
+                              ),
+                              Text(
+                                '₱${breakdown.vatAmount.toStringAsFixed(2)}',
+                                style: TextStyle(color: theme.colorScheme.outline, fontSize: 12),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
                               Text('Total Due:', style: theme.textTheme.titleLarge),
                               Text(
-                                '₱${cartState.totalAmount.toStringAsFixed(2)}',
+                                '₱${breakdown.netTotal.toStringAsFixed(2)}',
                                 style: theme.textTheme.headlineMedium?.copyWith(
                                   fontWeight: FontWeight.bold,
                                   color: theme.colorScheme.primary,
@@ -266,36 +409,53 @@ class _SalesEntryPageState extends State<SalesEntryPage> {
                               ),
                             ],
                           ),
-                          const SizedBox(height: 16),
-                          SizedBox(
-                            width: double.infinity,
-                            height: 54,
-                            child: FilledButton.icon(
-                              icon: const Icon(Icons.payments),
-                              label: const Text(
-                                'PAY / CHECKOUT',
-                                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  icon: const Icon(Icons.discount_outlined),
+                                  label: Text(
+                                    cartState.manualDiscountPercentage > 0
+                                        ? '${cartState.manualDiscountPercentage.toInt()}% Off'
+                                        : (cartState.manualDiscountFixed > 0
+                                              ? '₱${cartState.manualDiscountFixed.toStringAsFixed(0)} Off'
+                                              : 'Discount'),
+                                  ),
+                                  onPressed: cartState.items.isEmpty
+                                      ? null
+                                      : () {
+                                          showDialog(
+                                            context: context,
+                                            builder: (_) => DiscountSelectionDialog(
+                                              currentPercentage: cartState.manualDiscountPercentage,
+                                              currentFixed: cartState.manualDiscountFixed,
+                                              onApplyPercentage: (p) =>
+                                                  context.read<CartCubit>().applyDiscountPercentage(p),
+                                              onApplyFixed: (a) => context.read<CartCubit>().applyDiscountFixed(a),
+                                              onRemoveDiscount: () => context.read<CartCubit>().removeDiscount(),
+                                            ),
+                                          );
+                                        },
+                                ),
                               ),
-                              onPressed: cartState.items.isEmpty
-                                  ? null
-                                  : () {
-                                      showDialog(
-                                        context: context,
-                                        builder: (dialogCtx) => PaymentDialog(
-                                          totalAmount: cartState.totalAmount,
-                                          onPay: (methodId, tendered) {
-                                            final authState = context.read<AuthBloc>().state;
-                                            final cashierId = authState is AuthAuthenticated ? (authState.user.id ?? 1) : 1;
-                                            context.read<CartCubit>().submitOrder(
-                                              cashierId: cashierId,
-                                              paymentMethodId: methodId,
-                                              cashTendered: tendered,
-                                            );
-                                          },
-                                        ),
-                                      );
-                                    },
-                            ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                flex: 2,
+                                child: FilledButton.icon(
+                                  icon: const Icon(Icons.payments),
+                                  label: const Text(
+                                    'CHECKOUT',
+                                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                                  ),
+                                  onPressed: cartState.items.isEmpty
+                                      ? null
+                                      : () {
+                                          _openPaymentDialog(context, breakdown);
+                                        },
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
@@ -310,3 +470,5 @@ class _SalesEntryPageState extends State<SalesEntryPage> {
     );
   }
 }
+
+class LoadCategories {}
