@@ -88,4 +88,21 @@ class OrderRepositoryImpl implements OrderRepository {
       );
     }
   }
+
+  Future<Either<Failure, void>> voidOrderTransaction({
+    required int transactionId,
+    required int cashierId,
+    required String reason,
+  }) async {
+    try {
+      await orderDao.voidOrderTransaction(
+        transactionId: transactionId,
+        cashierId: cashierId,
+        reason: reason,
+      );
+      return const Right(null);
+    } catch (e) {
+      return Left(DatabaseFailure(e.toString()));
+    }
+  }
 }

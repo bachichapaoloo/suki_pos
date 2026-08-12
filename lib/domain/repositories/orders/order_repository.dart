@@ -14,4 +14,10 @@ abstract class OrderRepository {
   Future<Either<Failure, List<TransactionDetail>>> getTransactionHistory({
     int limit = 50,
   });
+
+  Future<Either<Failure, void>> voidOrderTransaction({
+    required int transactionId,
+    required int cashierId,
+    required String reason,
+  });
 }
