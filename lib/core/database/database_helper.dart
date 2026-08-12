@@ -17,7 +17,7 @@ class DatabaseHelper {
 
   // The new v2 database file
   static const String _newDatabaseName = 'suki_pos_v2.db';
-  static const int _databaseVersion = 1; // Resetting to 1 for the new schema
+  static const int _databaseVersion = 2; // Resetting to 1 for the new schema
 
   Future<Database> get database async {
     if (_database != null && _database!.isOpen) return _database!;
@@ -44,6 +44,8 @@ class DatabaseHelper {
       version: _databaseVersion,
       onConfigure: _onConfigure,
       onCreate: _onCreate,
+      onUpgrade: _onUpgrade,
+      onOpen: _onOpen,
     );
   }
 
@@ -51,6 +53,29 @@ class DatabaseHelper {
   Future<void> _onConfigure(Database db) async {
     await db.execute('PRAGMA foreign_keys = ON;');
     await db.execute('PRAGMA journal_mode = WAL;');
+  }
+
+  /// Ensures required seed data exists even if database was created previously
+  Future<void> _onOpen(Database db) async {
+    await db.transaction((txn) async {
+      final batch = txn.batch();
+      SchemaConstants.seedScripts.forEach(batch.execute);
+      await batch.commit(noResult: true);
+    });
+  }
+
+  /// Handles schema upgrades sequentially when _databaseVersion is incremented
+  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    developer.log('Upgrading database from version $oldVersion to $newVersion...');
+    await db.transaction((txn) async {
+      final batch = txn.batch();
+
+      // Ensure any newly defined tables in SchemaConstants are created
+      SchemaConstants.createTableScripts.forEach(batch.execute);
+      SchemaConstants.createIndexScripts.forEach(batch.execute);
+
+      await batch.commit(noResult: true);
+    });
   }
 
   /// Builds the new schema in a single atomic batch

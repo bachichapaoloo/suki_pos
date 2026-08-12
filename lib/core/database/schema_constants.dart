@@ -81,6 +81,7 @@ class SchemaConstants {
   static const String selfOrder = 'self_order';
   static const String selfOrderItem = 'self_order_item';
   static const String selfOrderItemOption = 'self_order_item_option';
+  static const String electronicJournal = 'electronic_journal';
 
   /// Complete list of DDL statements executed during database creation.
   static const List<String> createTableScripts = [
@@ -1271,6 +1272,18 @@ class SchemaConstants {
         price_delta        REAL    NOT NULL DEFAULT 0
     );
     ''',
+    '''
+    CREATE TABLE IF NOT EXISTS electronic_journal (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      sale_transaction_id INTEGER,
+      cashier_id INTEGER NOT NULL,
+      activity_type TEXT NOT NULL,
+      content TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      FOREIGN KEY (sale_transaction_id) REFERENCES sale_transaction (id) ON DELETE SET NULL,
+      FOREIGN KEY (cashier_id) REFERENCES app_user (id)
+    );
+    ''',
   ];
 
   /// Indexes to accelerate queries across transactions and lookup catalogs.
@@ -1297,6 +1310,8 @@ class SchemaConstants {
     'CREATE INDEX IF NOT EXISTS idx_sync_table ON sync_status(table_name, record_id);',
     'CREATE INDEX IF NOT EXISTS idx_user_role ON app_user(role_id);',
     'CREATE INDEX IF NOT EXISTS idx_role_perm_role ON role_permission(role_id);',
+    'CREATE INDEX IF NOT EXISTS idx_ej_transaction ON electronic_journal(sale_transaction_id);',
+    'CREATE INDEX IF NOT EXISTS idx_ej_date ON electronic_journal(created_at);',
   ];
 
   /// Triggers to automatically maintain `updated_at` timestamps on row updates.
@@ -1337,10 +1352,22 @@ class SchemaConstants {
         UPDATE app_user SET updated_at = datetime('now') WHERE id = NEW.id;
     END;
     ''',
+    '''
+    CREATE TRIGGER IF NOT EXISTS trg_ej_inserted
+        AFTER INSERT ON electronic_journal BEGIN
+        UPDATE sales_order SET updated_at = datetime('now') WHERE id = NEW.sale_transaction_id;
+    END;
+    ''',
   ];
 
-  /// Seed data inserted on new database initialization[cite: 2].
+  /// Seed data inserted on new database initialization.
   static const List<String> seedScripts = [
+    '''
+    INSERT OR IGNORE INTO order_type (id, name, is_active) VALUES
+        (1, 'Dine-In', 1),
+        (2, 'Take-Out', 1),
+        (3, 'Delivery', 1);
+    ''',
     '''
     INSERT OR IGNORE INTO discount_type (code, name) VALUES
         ('generic',     'Generic Discount'),
@@ -1353,21 +1380,21 @@ class SchemaConstants {
         ('custom',      'Custom Discount');
     ''',
     '''
-    INSERT OR IGNORE INTO payment_method (code, name) VALUES
-        ('cash',       'Cash'),
-        ('card',       'Credit/Debit Card'),
-        ('atm',        'ATM / Online Banking'),
-        ('bank_check', 'Bank Check'),
-        ('gift_check', 'Gift Check'),
-        ('charge',     'Charge Account'),
-        ('coupon',     'Coupon');
+    INSERT OR IGNORE INTO payment_method (id, code, name) VALUES
+        (1, 'cash',       'Cash'),
+        (2, 'card',       'Credit/Debit Card'),
+        (3, 'atm',        'ATM / Online Banking'),
+        (4, 'bank_check', 'Bank Check'),
+        (5, 'gift_check', 'Gift Check'),
+        (6, 'charge',     'Charge Account'),
+        (7, 'coupon',     'Coupon');
     ''',
     '''
-    INSERT INTO role (id, name, can_sales_entry, can_sales_order, can_sales_reading, can_sales_inquiry, can_file_maintenance, can_admin_mode, can_dtr_menu, can_kiosk, can_inventory, is_active)
+    INSERT OR IGNORE INTO role (id, name, can_sales_entry, can_sales_order, can_sales_reading, can_sales_inquiry, can_file_maintenance, can_admin_mode, can_dtr_menu, can_kiosk, can_inventory, is_active)
     VALUES (1, 'Superuser', 1, 1, 1, 1, 1, 1, 1, 1, 1, 1);
     ''',
     '''
-    INSERT INTO app_user (id, role_id, name, password_hash, is_active)
+    INSERT OR IGNORE INTO app_user (id, role_id, name, password_hash, is_active)
     VALUES (1, 1, 'Superuser', '050724', 1);
     ''',
   ];

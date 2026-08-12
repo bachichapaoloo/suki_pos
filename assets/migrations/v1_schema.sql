@@ -1481,6 +1481,20 @@ CREATE TABLE IF NOT EXISTS self_order_item_option (
     price_delta         REAL    NOT NULL DEFAULT 0
 );
 
+-- ---------------------------------------------------------------------------
+-- 13.15  electronic_journal
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS electronic_journal (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  sale_transaction_id INTEGER,
+  cashier_id INTEGER NOT NULL,
+  activity_type TEXT NOT NULL,
+  content TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  FOREIGN KEY (sale_transaction_id) REFERENCES sale_transaction (id) ON DELETE SET NULL,
+  FOREIGN KEY (cashier_id) REFERENCES user (id)
+);
+
 
 -- =============================================================================
 -- SECTION 14: INDEXES
@@ -1518,6 +1532,10 @@ CREATE INDEX IF NOT EXISTS idx_sync_table           ON sync_status(table_name, r
 CREATE INDEX IF NOT EXISTS idx_user_role            ON app_user(role_id);
 CREATE INDEX IF NOT EXISTS idx_role_perm_role       ON role_permission(role_id);
 
+--Electronic Journal
+CREATE INDEX IF NOT EXISTS idx_ej_transaction       ON electronic_journal(sale_transaction_id);
+CREATE INDEX IF NOT EXISTS idx_ej_date              ON electronic_journal(created_at);
+
 
 -- =============================================================================
 -- SECTION 15: TRIGGERS (auto-maintain updated_at)
@@ -1551,6 +1569,11 @@ END;
 CREATE TRIGGER IF NOT EXISTS trg_app_user_updated
     AFTER UPDATE ON app_user BEGIN
     UPDATE app_user SET updated_at = datetime('now') WHERE id = NEW.id;
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_ej_inserted
+    AFTER INSERT ON electronic_journal BEGIN
+    UPDATE sales_order SET updated_at = datetime('now') WHERE id = NEW.sale_transaction_id;
 END;
 
 -- =============================================================================
