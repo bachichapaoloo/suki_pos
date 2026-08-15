@@ -22,34 +22,11 @@ class ItemRepositoryImpl implements ItemRepository {
   @override
   Future<Either<Failure, Item>> saveItem(Item item) async {
     try {
-      final itemModel = ItemModel(
-        id: item.id,
-        itemCode: item.itemCode,
-        name: item.name,
-        printName: item.printName,
-        categoryId: item.categoryId,
-        departmentId: item.departmentId,
-        costPrice: item.costPrice,
-        isActive: item.isActive,
-        prices: item.prices,
-      );
-
+      final itemModel = ItemModel.fromEntity(item);
       final newId = await itemDao.saveItemAggregate(itemModel);
 
       // Return the item with its newly assigned SQLite ID
-      return Right(
-        ItemModel(
-          id: newId,
-          itemCode: item.itemCode,
-          name: item.name,
-          printName: item.printName,
-          categoryId: item.categoryId,
-          departmentId: item.departmentId,
-          costPrice: item.costPrice,
-          isActive: item.isActive,
-          prices: item.prices,
-        ),
-      );
+      return Right(item.copyWith(id: newId));
     } catch (e) {
       return Left(DatabaseFailure(e.toString()));
     }

@@ -75,6 +75,42 @@ class ItemModel extends Item {
     );
   }
 
+  factory ItemModel.fromEntity(Item item) {
+    return ItemModel(
+      id: item.id,
+      itemCode: item.itemCode,
+      barcode: item.barcode,
+      name: item.name,
+      printName: item.printName,
+      labelName: item.labelName,
+      itemDetails: item.itemDetails,
+      isLabelSameAsReceipt: item.isLabelSameAsReceipt,
+      categoryId: item.categoryId,
+      departmentId: item.departmentId,
+      unitId: item.unitId,
+      costPrice: item.costPrice,
+      markupPercentage: item.markupPercentage,
+      conversionQty: item.conversionQty,
+      minStockLevel: item.minStockLevel,
+      maxStockLevel: item.maxStockLevel,
+      assignedPrinter: item.assignedPrinter,
+      displayImage: item.displayImage,
+      buttonIndex: item.buttonIndex,
+      isDiscountExempt: item.isDiscountExempt,
+      isVatExempt: item.isVatExempt,
+      isCombo: item.isCombo,
+      isFinishedGood: item.isFinishedGood,
+      isComposition: item.isComposition,
+      isRawMaterial: item.isRawMaterial,
+      isGiftCheck: item.isGiftCheck,
+      giftCheckId: item.giftCheckId,
+      discCapAmount: item.discCapAmount,
+      discCapPercentage: item.discCapPercentage,
+      isActive: item.isActive,
+      prices: item.prices,
+    );
+  }
+
   Map<String, dynamic> toMasterTableMap() {
     return {
       'item_code': itemCode,
