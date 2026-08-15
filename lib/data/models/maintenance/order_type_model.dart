@@ -28,9 +28,9 @@ class OrderTypeModel extends OrderType {
       isKiosk: map['is_kiosk'] == 1,
       noSurcharge: map['no_surcharge'] == 1,
       surChargeFormula: map['sur_charge_formula'] == 1,
-      priceLevel: map['price_level'] as String,
+      priceLevel: (map['price_level'] ?? 'DEFAULT') as String,
       requiresPassword: map['requires_password'] == 1,
-      additionalPercentage: map['additional_percentage'] as double,
+      additionalPercentage: (map['additional_percentage'] ?? 0.0) as double,
       printAdditionalCopy: map['print_additional_copy'] == 1,
     );
   }
@@ -63,7 +63,7 @@ class OrderTypeModel extends OrderType {
       'is_delivery': isDelivery ? 1 : 0,
       'is_kiosk': isKiosk ? 1 : 0,
       'no_surcharge': noSurcharge ? 1 : 0,
-      'sur_charge_formula': surChargeFormula ? 1 : 0,
+      'surcharge_formula': surChargeFormula ? 1 : 0,
       'price_level': priceLevel,
       'requires_password': requiresPassword ? 1 : 0,
       'additional_percentage': additionalPercentage,

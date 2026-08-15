@@ -20,7 +20,10 @@ class OrderTypeCubit extends Cubit<OrderTypeState> {
     emit(OrderTypeLoading());
     final result = await getOrderTypes();
     return result.fold(
-      (failure) => false,
+      (failure) {
+        emit(OrderTypeError(message: 'Failed to load order types'));
+        return false;
+      },
       (orderTypes) {
         emit(OrderTypeLoaded(orderTypes: orderTypes));
         return true;

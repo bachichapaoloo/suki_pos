@@ -15,15 +15,24 @@ import 'package:suki_pos/presentation/maintenance/item/bloc/item_event.dart';
 import 'package:suki_pos/presentation/maintenance/item/bloc/item_state.dart';
 import 'package:suki_pos/presentation/maintenance/option_group/bloc/option_group_cubit.dart';
 import 'package:suki_pos/presentation/maintenance/option_group/bloc/option_group_state.dart';
+import 'package:suki_pos/presentation/maintenance/order_type/bloc/order_type_cubit.dart';
+import 'package:suki_pos/presentation/maintenance/order_type/bloc/order_type_state.dart';
 import 'package:suki_pos/presentation/pos/bloc/cart_cubit.dart';
 import 'package:suki_pos/presentation/pos/bloc/cart_state.dart';
 import 'package:suki_pos/presentation/pos/bloc/shift_cubit.dart';
 import 'package:suki_pos/presentation/pos/bloc/shift_state.dart';
+import 'package:suki_pos/presentation/pos/widgets/cart_line_item_tile.dart';
 import 'package:suki_pos/presentation/pos/widgets/change_fund_dialog.dart';
 import 'package:suki_pos/presentation/pos/widgets/discount_selection_dialog.dart';
 import 'package:suki_pos/presentation/pos/widgets/item_detail_modal_dialog.dart';
 import 'package:suki_pos/presentation/pos/widgets/payment_dialog.dart';
 import 'package:suki_pos/presentation/pos/widgets/receipt_preview_dialog.dart';
+
+/// Responsive breakpoints for the Sales Entry layout.
+class _Breakpoints {
+  static const double mobile = 700;
+  static const double tablet = 1100;
+}
 
 class SalesEntryPage extends StatefulWidget {
   const SalesEntryPage({super.key});
@@ -34,6 +43,9 @@ class SalesEntryPage extends StatefulWidget {
 
 class _SalesEntryPageState extends State<SalesEntryPage> {
   int? _selectedCategoryId;
+  int? _selectedOrderTypeId;
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
 
   @override
   void initState() {
@@ -41,11 +53,25 @@ class _SalesEntryPageState extends State<SalesEntryPage> {
     context.read<ItemBloc>().add(LoadItems());
     context.read<CategoryBloc>().add(GetCategoriesEvent());
     context.read<OptionGroupCubit>().loadOptionGroups();
+    context.read<OrderTypeCubit>().loadOrderTypes();
+
+    _searchController.addListener(() {
+      final query = _searchController.text.trim().toLowerCase();
+      if (query != _searchQuery) {
+        setState(() => _searchQuery = query);
+      }
+    });
 
     // Verify shift status
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _verifyShiftStatus();
     });
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   void _verifyShiftStatus() {
@@ -129,7 +155,7 @@ class _SalesEntryPageState extends State<SalesEntryPage> {
                   children: [
                     const Icon(Icons.check_circle, color: Colors.white),
                     const SizedBox(width: 8),
-                    Text('Sale Completed! ${completedTxn.transactionNo}'),
+                    Expanded(child: Text('Sale Completed! ${completedTxn.transactionNo}')),
                   ],
                 ),
                 backgroundColor: Colors.green[700],
@@ -161,403 +187,454 @@ class _SalesEntryPageState extends State<SalesEntryPage> {
     );
   }
 
+  void _openMobileCartSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        return DraggableScrollableSheet(
+          initialChildSize: 0.9,
+          minChildSize: 0.5,
+          maxChildSize: 0.95,
+          expand: false,
+          builder: (context, scrollController) {
+            return Container(
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+              ),
+              child: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[300],
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: _buildCartPanel(context, Theme.of(context), scrollController: scrollController),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  List<Item> _filteredItems(List<Item> items) {
+    var filtered = _selectedCategoryId == null
+        ? items
+        : items.where((i) => i.categoryId == _selectedCategoryId).toList();
+
+    if (_searchQuery.isNotEmpty) {
+      filtered = filtered.where((i) => i.name.toLowerCase().contains(_searchQuery)).toList();
+    }
+    return filtered;
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Cashier Terminal / Register'),
+        title: const Text('Sales Entry'),
         actions: [
-          BlocBuilder<CartCubit, CartState>(
-            builder: (context, state) {
-              // return SegmentedButton<int>(
-              //   segments: const [
-              //     ButtonSegment(value: 1, label: Text('Dine-In')),
-              //     ButtonSegment(value: 2, label: Text('Take-Out')),
-              //   ],
-              //   selected: {state.orderTypeId},
-              //   onSelectionChanged: (set) {
-              //     context.read<CartCubit>().setOrderType(set.first);
-              //   },
-              // );
-              return DropdownButton<int>(
-                value: state.orderTypeId,
-                onChanged: (value) {
-                  context.read<CartCubit>().setOrderType(value!);
+          // Cart icon + badge, shown only on mobile widths (search/order-type live in the body).
+          Builder(
+            builder: (context) {
+              final isMobile = MediaQuery.of(context).size.width < _Breakpoints.mobile;
+              if (!isMobile) return const SizedBox.shrink();
+              return BlocBuilder<CartCubit, CartState>(
+                builder: (context, cartState) {
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.shopping_cart_outlined),
+                          tooltip: 'View Cart',
+                          onPressed: cartState.items.isEmpty ? null : () => _openMobileCartSheet(context),
+                        ),
+                        if (cartState.totalItemCount > 0)
+                          Positioned(
+                            right: 4,
+                            top: 4,
+                            child: Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
+                              constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                              child: Text(
+                                '${cartState.totalItemCount}',
+                                style: const TextStyle(color: Colors.white, fontSize: 10),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  );
                 },
-                items: [
-                  DropdownMenuItem(value: 0, child: Text('Select Order Type')),
-                ],
               );
             },
           ),
-          const SizedBox(width: 16),
         ],
       ),
-      body: Row(
+      body: SafeArea(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final isMobile = constraints.maxWidth < _Breakpoints.mobile;
+            final isTablet = !isMobile && constraints.maxWidth < _Breakpoints.tablet;
+
+            if (isMobile) {
+              return _buildMobileLayout(theme);
+            }
+            return _buildWideLayout(theme, isTablet: isTablet);
+          },
+        ),
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------
+  // LAYOUTS
+  // ---------------------------------------------------------------------
+
+  Widget _buildMobileLayout(ThemeData theme) {
+    return Column(
+      children: [
+        _buildControlsBar(theme, isMobile: true),
+        Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: _buildCategoryChips(theme),
+        ),
+        const Divider(height: 1),
+        Expanded(child: _buildItemGrid(theme, crossAxisExtent: 180)),
+        _buildMobileCartSummaryBar(theme),
+      ],
+    );
+  }
+
+  Widget _buildWideLayout(ThemeData theme, {required bool isTablet}) {
+    return Padding(
+      padding: const EdgeInsets.all(8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // LEFT PANEL: Product Grid & Category Filters
           Expanded(
-            flex: 3,
+            flex: isTablet ? 5 : 3,
             child: Column(
               children: [
-                // Category Filter Bar
-                BlocBuilder<CategoryBloc, CategoryState>(
-                  builder: (context, state) {
-                    if (state is CategoryLoaded) {
-                      return SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        child: Row(
-                          children: [
-                            FilterChip(
-                              label: const Text('All Items'),
-                              selected: _selectedCategoryId == null,
-                              onSelected: (_) => setState(() => _selectedCategoryId = null),
-                            ),
-                            const SizedBox(width: 8),
-                            ...state.categories.map(
-                              (cat) => Padding(
-                                padding: const EdgeInsets.only(right: 8.0),
-                                child: FilterChip(
-                                  label: Text(cat.name),
-                                  selected: _selectedCategoryId == cat.id,
-                                  onSelected: (_) => setState(() => _selectedCategoryId = cat.id),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    }
-                    return const SizedBox.shrink();
-                  },
+                _buildControlsBar(theme, isMobile: false),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: _buildCategoryChips(theme),
                 ),
                 const Divider(height: 1),
-
-                // Item Grid
-                Expanded(
-                  child: BlocBuilder<ItemBloc, ItemState>(
-                    builder: (context, state) {
-                      if (state is ItemLoading) {
-                        return const Center(child: CircularProgressIndicator());
-                      }
-                      if (state is ItemLoaded) {
-                        final items = _selectedCategoryId == null
-                            ? state.items
-                            : state.items.where((i) => i.categoryId == _selectedCategoryId).toList();
-
-                        if (items.isEmpty) {
-                          return const Center(child: Text('No items in this category.'));
-                        }
-
-                        return GridView.builder(
-                          padding: const EdgeInsets.all(12),
-                          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 4,
-                            childAspectRatio: 0.78,
-                            crossAxisSpacing: 12,
-                            mainAxisSpacing: 12,
-                          ),
-                          itemCount: items.length,
-                          itemBuilder: (context, idx) {
-                            final item = items[idx];
-                            final defaultPrice = item.prices.isNotEmpty ? item.prices.first.price : 0.0;
-
-                            return Card(
-                              elevation: 2,
-                              clipBehavior: Clip.antiAlias,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                              child: InkWell(
-                                onTap: () => _openItemDetailModal(context, item),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    _buildProductCardImage(theme, item),
-                                    Expanded(
-                                      child: Padding(
-                                        padding: const EdgeInsets.all(10.0),
-                                        child: Column(
-                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              item.name,
-                                              style: GoogleFonts.inter(
-                                                fontSize: 13,
-                                                fontWeight: FontWeight.w600,
-                                                color: const Color(0xFF1E293B),
-                                              ),
-                                              maxLines: 2,
-                                              overflow: TextOverflow.ellipsis,
-                                            ),
-                                            Text(
-                                              '₱${defaultPrice.toStringAsFixed(2)}',
-                                              style: GoogleFonts.inter(
-                                                fontSize: 15,
-                                                fontWeight: FontWeight.bold,
-                                                color: theme.colorScheme.primary,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            );
-                          },
-                        );
-                      }
-                      return const Center(child: Text('No items available.'));
-                    },
-                  ),
-                ),
+                Expanded(child: _buildItemGrid(theme, crossAxisExtent: isTablet ? 170 : 200)),
               ],
             ),
           ),
-
           const VerticalDivider(width: 1),
-
           // RIGHT PANEL: Cart & Order Summary
           Expanded(
-            flex: 2,
-            child: BlocBuilder<CartCubit, CartState>(
-              builder: (context, cartState) {
-                final breakdown = cartState.breakdown;
+            flex: isTablet ? 4 : 2,
+            child: _buildCartPanel(context, theme),
+          ),
+        ],
+      ),
+    );
+  }
 
-                return Column(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      color: theme.colorScheme.surfaceContainerHighest,
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            'Current Cart (${cartState.totalItemCount})',
-                            style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.delete_sweep),
-                            onPressed: cartState.items.isEmpty ? null : () => context.read<CartCubit>().clearCart(),
-                          ),
-                        ],
+  // ---------------------------------------------------------------------
+  // CONTROLS: SEARCH + ORDER TYPE (moved out of the AppBar so it never
+  // gets squeezed — stacks on mobile, sits side-by-side on wider screens)
+  // ---------------------------------------------------------------------
+
+  Widget _buildControlsBar(ThemeData theme, {required bool isMobile}) {
+    final searchField = TextFormField(
+      controller: _searchController,
+      decoration: InputDecoration(
+        hintText: 'Search items...',
+        prefixIcon: const Icon(Icons.search),
+        suffixIcon: _searchQuery.isNotEmpty
+            ? IconButton(
+                icon: const Icon(Icons.clear),
+                onPressed: () => _searchController.clear(),
+              )
+            : null,
+        filled: true,
+        fillColor: Colors.white,
+        contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 12),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: Colors.grey.shade300),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: Colors.grey.shade300),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: theme.colorScheme.primary),
+        ),
+      ),
+    );
+
+    final orderTypeDropdown = BlocBuilder<OrderTypeCubit, OrderTypeState>(
+      builder: (context, state) {
+        if (state is OrderTypeLoading) {
+          return const Center(
+            child: SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+          );
+        }
+        if (state is OrderTypeError) {
+          return Text(state.message, style: TextStyle(color: theme.colorScheme.error));
+        }
+        if (state is OrderTypeLoaded && state.orderTypes.isNotEmpty) {
+          return Container(
+            height: 48,
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.grey.shade300),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.04),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<int>(
+                value: _selectedOrderTypeId ?? state.orderTypes.first.id,
+                isExpanded: true,
+                icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 22),
+                borderRadius: BorderRadius.circular(12),
+                dropdownColor: Colors.white,
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w500,
+                  color: Color(0xFF1F2937),
+                ),
+                onChanged: (value) {
+                  if (value != null) {
+                    // context.read<CartCubit>().setOrderType(value);
+                    setState(() => _selectedOrderTypeId = value);
+                  }
+                },
+                items: [
+                  const DropdownMenuItem<int>(
+                    enabled: false,
+                    value: 0,
+                    child: Text(
+                      'Select Order Type',
+                      style: TextStyle(color: Color(0xFF9CA3AF), fontWeight: FontWeight.w400),
+                    ),
+                  ),
+                  ...state.orderTypes.map(
+                    (orderType) => DropdownMenuItem<int>(
+                      value: orderType.id,
+                      child: Text(orderType.name.toUpperCase()),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+        return const SizedBox.shrink();
+      },
+    );
+
+    return Padding(
+      padding: const EdgeInsets.all(12),
+      child: isMobile
+          ? Column(
+              children: [
+                searchField,
+                const SizedBox(height: 8),
+                orderTypeDropdown,
+              ],
+            )
+          : Row(
+              children: [
+                Expanded(flex: 2, child: searchField),
+                const SizedBox(width: 12),
+                Expanded(flex: 1, child: orderTypeDropdown),
+              ],
+            ),
+    );
+  }
+
+  // ---------------------------------------------------------------------
+  // CATEGORY FILTER CHIPS
+  // ---------------------------------------------------------------------
+
+  Widget _buildCategoryChips(ThemeData theme) {
+    return BlocBuilder<CategoryBloc, CategoryState>(
+      builder: (context, state) {
+        if (state is! CategoryLoaded) return const SizedBox.shrink();
+
+        return SizedBox(
+          height: 44,
+          child: ListView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            children: [
+              _buildChip(
+                theme,
+                label: 'All Items',
+                selected: _selectedCategoryId == null,
+                onTap: () => setState(() => _selectedCategoryId = null),
+              ),
+              const SizedBox(width: 8),
+              ...state.categories.map(
+                (cat) => Padding(
+                  padding: const EdgeInsets.only(right: 8.0),
+                  child: _buildChip(
+                    theme,
+                    label: cat.name,
+                    selected: _selectedCategoryId == cat.id,
+                    onTap: () => setState(() => _selectedCategoryId = cat.id),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildChip(ThemeData theme, {required String label, required bool selected, required VoidCallback onTap}) {
+    return FilterChip(
+      label: Text(label),
+      selected: selected,
+      onSelected: (_) => onTap(),
+      showCheckmark: false,
+      selectedColor: theme.colorScheme.primary,
+      backgroundColor: Colors.white,
+      side: BorderSide(color: selected ? theme.colorScheme.primary : Colors.grey.shade300),
+      labelStyle: TextStyle(
+        color: selected ? Colors.white : const Color(0xFF374151),
+        fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+    );
+  }
+
+  // ---------------------------------------------------------------------
+  // ITEM GRID (auto-fits columns to available width — no hardcoded count)
+  // ---------------------------------------------------------------------
+
+  Widget _buildItemGrid(ThemeData theme, {required double crossAxisExtent}) {
+    return BlocBuilder<ItemBloc, ItemState>(
+      builder: (context, state) {
+        if (state is ItemLoading) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (state is ItemLoaded) {
+          final items = _filteredItems(state.items);
+
+          if (items.isEmpty) {
+            return Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.search_off, size: 48, color: Colors.grey[400]),
+                  const SizedBox(height: 8),
+                  Text(
+                    _searchQuery.isNotEmpty
+                        ? 'No items match "${_searchController.text}"'
+                        : 'No items in this category.',
+                    style: TextStyle(color: Colors.grey[600]),
+                  ),
+                ],
+              ),
+            );
+          }
+
+          return GridView.builder(
+            padding: const EdgeInsets.all(12),
+            gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+              maxCrossAxisExtent: crossAxisExtent,
+              childAspectRatio: 0.72,
+              crossAxisSpacing: 12,
+              mainAxisSpacing: 12,
+            ),
+            itemCount: items.length,
+            itemBuilder: (context, idx) {
+              final item = items[idx];
+              final defaultPrice = item.prices.isNotEmpty ? item.prices.first.price : 0.0;
+
+              return Card(
+                elevation: 2,
+                clipBehavior: Clip.antiAlias,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                child: InkWell(
+                  onTap: () => _openItemDetailModal(context, item),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      AspectRatio(
+                        aspectRatio: 1.1,
+                        child: _buildProductCardImage(theme, item),
                       ),
-                    ),
-                    Expanded(
-                      child: cartState.items.isEmpty
-                          ? const Center(child: Text('Cart is empty'))
-                          : ListView.builder(
-                              itemCount: cartState.items.length,
-                              itemBuilder: (context, idx) {
-                                final cartItem = cartState.items[idx];
-                                return ListTile(
-                                  leading: Container(
-                                    width: 44,
-                                    height: 44,
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFFF1F5F9),
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: ClipRRect(
-                                      borderRadius: BorderRadius.circular(8),
-                                      child:
-                                          (cartItem.item.displayImage != null && cartItem.item.displayImage!.isNotEmpty)
-                                          ? FutureBuilder<String?>(
-                                              future: ImageStorageService.resolveImagePath(cartItem.item.displayImage),
-                                              builder: (_, snap) {
-                                                final path = snap.data;
-                                                if (path != null) {
-                                                  return Image.file(
-                                                    File(path),
-                                                    fit: BoxFit.cover,
-                                                    errorBuilder: (_, __, ___) => Icon(
-                                                      Icons.inventory_2_outlined,
-                                                      size: 20,
-                                                      color: Colors.grey[400],
-                                                    ),
-                                                  );
-                                                }
-                                                return Icon(
-                                                  Icons.inventory_2_outlined,
-                                                  size: 20,
-                                                  color: Colors.grey[400],
-                                                );
-                                              },
-                                            )
-                                          : Icon(Icons.inventory_2_outlined, size: 20, color: Colors.grey[400]),
-                                    ),
-                                  ),
-                                  onTap: () => _openItemDetailModal(
-                                    context,
-                                    cartItem.item,
-                                    existingCartItem: cartItem,
-                                  ),
-                                  title: Text(cartItem.item.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                                  subtitle: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      if (cartItem.selectedOptions.isNotEmpty)
-                                        Text(
-                                          cartItem.selectedOptions.map((o) => o.alias).join(', '),
-                                          style: TextStyle(color: theme.colorScheme.primary, fontSize: 12),
-                                        ),
-                                      if (cartItem.notes != null)
-                                        Text(
-                                          'Note: ${cartItem.notes}',
-                                          style: const TextStyle(fontStyle: FontStyle.italic, fontSize: 11),
-                                        ),
-                                    ],
-                                  ),
-                                  trailing: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      IconButton(
-                                        icon: const Icon(Icons.remove_circle_outline),
-                                        onPressed: () => context.read<CartCubit>().updateQuantity(cartItem.id, -1),
-                                      ),
-                                      Text('${cartItem.quantity}', style: theme.textTheme.titleMedium),
-                                      IconButton(
-                                        icon: const Icon(Icons.add_circle_outline),
-                                        onPressed: () => context.read<CartCubit>().updateQuantity(cartItem.id, 1),
-                                      ),
-                                      SizedBox(
-                                        width: 70,
-                                        child: Text(
-                                          '₱${cartItem.totalPrice.toStringAsFixed(2)}',
-                                          textAlign: TextAlign.right,
-                                          style: const TextStyle(fontWeight: FontWeight.bold),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                );
-                              },
-                            ),
-                    ),
-                    const Divider(height: 1),
-
-                    // BIR TAX & DISCOUNT BREAKDOWN SUMMARY
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                      child: Column(
-                        children: [
-                          Row(
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.all(10.0),
+                          child: Column(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text('Subtotal:'),
-                              Text('₱${breakdown.grossSubtotal.toStringAsFixed(2)}'),
-                            ],
-                          ),
-                          if (breakdown.manualDiscountAmount > 0)
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                const Text('Discount:'),
-                                Text(
-                                  '-₱${breakdown.manualDiscountAmount.toStringAsFixed(2)}',
-                                  style: TextStyle(color: theme.colorScheme.error, fontWeight: FontWeight.bold),
+                              Text(
+                                item.name,
+                                style: GoogleFonts.inter(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: const Color(0xFF1E293B),
                                 ),
-                              ],
-                            ),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text('VATable Sales:', style: TextStyle(color: theme.colorScheme.outline, fontSize: 12)),
-                              Text(
-                                '₱${breakdown.vatableSales.toStringAsFixed(2)}',
-                                style: TextStyle(color: theme.colorScheme.outline, fontSize: 12),
-                              ),
-                            ],
-                          ),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                'VAT Amount (12%):',
-                                style: TextStyle(color: theme.colorScheme.outline, fontSize: 12),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
                               ),
                               Text(
-                                '₱${breakdown.vatAmount.toStringAsFixed(2)}',
-                                style: TextStyle(color: theme.colorScheme.outline, fontSize: 12),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text('Total Due:', style: theme.textTheme.titleLarge),
-                              Text(
-                                '₱${breakdown.netTotal.toStringAsFixed(2)}',
-                                style: theme.textTheme.headlineMedium?.copyWith(
+                                '₱${defaultPrice.toStringAsFixed(2)}',
+                                style: GoogleFonts.inter(
+                                  fontSize: 15,
                                   fontWeight: FontWeight.bold,
                                   color: theme.colorScheme.primary,
                                 ),
                               ),
                             ],
                           ),
-                          const SizedBox(height: 12),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: OutlinedButton.icon(
-                                  icon: const Icon(Icons.discount_outlined),
-                                  label: Text(
-                                    cartState.manualDiscountPercentage > 0
-                                        ? '${cartState.manualDiscountPercentage.toInt()}% Off'
-                                        : (cartState.manualDiscountFixed > 0
-                                              ? '₱${cartState.manualDiscountFixed.toStringAsFixed(0)} Off'
-                                              : 'Discount'),
-                                  ),
-                                  onPressed: cartState.items.isEmpty
-                                      ? null
-                                      : () {
-                                          showDialog(
-                                            context: context,
-                                            builder: (_) => DiscountSelectionDialog(
-                                              currentPercentage: cartState.manualDiscountPercentage,
-                                              currentFixed: cartState.manualDiscountFixed,
-                                              onApplyPercentage: (p) =>
-                                                  context.read<CartCubit>().applyDiscountPercentage(p),
-                                              onApplyFixed: (a) => context.read<CartCubit>().applyDiscountFixed(a),
-                                              onRemoveDiscount: () => context.read<CartCubit>().removeDiscount(),
-                                            ),
-                                          );
-                                        },
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                flex: 2,
-                                child: FilledButton.icon(
-                                  icon: const Icon(Icons.payments),
-                                  label: const Text(
-                                    'CHECKOUT',
-                                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                                  ),
-                                  onPressed: cartState.items.isEmpty
-                                      ? null
-                                      : () {
-                                          _openPaymentDialog(context, breakdown);
-                                        },
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
+                        ),
                       ),
-                    ),
-                  ],
-                );
-              },
-            ),
-          ),
-        ],
-      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          );
+        }
+        return const Center(child: Text('No items available.'));
+      },
     );
   }
 
@@ -566,26 +643,23 @@ class _SalesEntryPageState extends State<SalesEntryPage> {
 
     return ClipRRect(
       borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-      child: SizedBox(
-        height: 265,
-        width: double.infinity,
-        child: hasImage
-            ? FutureBuilder<String?>(
-                future: ImageStorageService.resolveImagePath(item.displayImage),
-                builder: (_, snap) {
-                  final path = snap.data;
-                  if (path != null) {
-                    return Image.file(
-                      File(path),
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => _buildFallbackImage(theme, item),
-                    );
-                  }
-                  return _buildFallbackImage(theme, item);
-                },
-              )
-            : _buildFallbackImage(theme, item),
-      ),
+      child: hasImage
+          ? FutureBuilder<String?>(
+              future: ImageStorageService.resolveImagePath(item.displayImage),
+              builder: (_, snap) {
+                final path = snap.data;
+                if (path != null) {
+                  return Image.file(
+                    File(path),
+                    fit: BoxFit.cover,
+                    width: double.infinity,
+                    errorBuilder: (_, __, ___) => _buildFallbackImage(theme, item),
+                  );
+                }
+                return _buildFallbackImage(theme, item);
+              },
+            )
+          : _buildFallbackImage(theme, item),
     );
   }
 
@@ -608,6 +682,239 @@ class _SalesEntryPageState extends State<SalesEntryPage> {
           color: theme.colorScheme.primary.withValues(alpha: 0.6),
         ),
       ),
+    );
+  }
+
+  // ---------------------------------------------------------------------
+  // CART PANEL — shared by the wide side-panel and the mobile bottom sheet
+  // ---------------------------------------------------------------------
+
+  Widget _buildCartPanel(BuildContext context, ThemeData theme, {ScrollController? scrollController}) {
+    return BlocBuilder<CartCubit, CartState>(
+      builder: (context, cartState) {
+        final breakdown = cartState.breakdown;
+
+        return Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              color: theme.colorScheme.surfaceContainerHighest,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Current Cart (${cartState.totalItemCount})',
+                    style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.delete_sweep),
+                    onPressed: cartState.items.isEmpty ? null : () => context.read<CartCubit>().clearCart(),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: cartState.items.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.shopping_cart_outlined, size: 40, color: Colors.grey[400]),
+                          const SizedBox(height: 8),
+                          Text('Cart is empty', style: TextStyle(color: Colors.grey[600])),
+                        ],
+                      ),
+                    )
+                  : ListView.separated(
+                      controller: scrollController,
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      itemCount: cartState.items.length,
+                      separatorBuilder: (_, __) => const Divider(height: 1, indent: 16, endIndent: 16),
+                      itemBuilder: (context, idx) {
+                        final cartItem = cartState.items[idx];
+                        return CartLineItemTile(
+                          cartItem: cartItem,
+                          onTap: () => _openItemDetailModal(context, cartItem.item, existingCartItem: cartItem),
+                          onDecrease: () => context.read<CartCubit>().updateQuantity(cartItem.id, -1),
+                          onIncrease: () => context.read<CartCubit>().updateQuantity(cartItem.id, 1),
+                        );
+                      },
+                    ),
+            ),
+            const Divider(height: 1),
+
+            // BIR TAX & DISCOUNT BREAKDOWN SUMMARY
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+              child: Column(
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Subtotal:'),
+                      Text('₱${breakdown.grossSubtotal.toStringAsFixed(2)}'),
+                    ],
+                  ),
+                  if (breakdown.manualDiscountAmount > 0)
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Discount:'),
+                        Text(
+                          '-₱${breakdown.manualDiscountAmount.toStringAsFixed(2)}',
+                          style: TextStyle(color: theme.colorScheme.error, fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                    ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('VATable Sales:', style: TextStyle(color: theme.colorScheme.outline, fontSize: 12)),
+                      Text(
+                        '₱${breakdown.vatableSales.toStringAsFixed(2)}',
+                        style: TextStyle(color: theme.colorScheme.outline, fontSize: 12),
+                      ),
+                    ],
+                  ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('VAT Amount (12%):', style: TextStyle(color: theme.colorScheme.outline, fontSize: 12)),
+                      Text(
+                        '₱${breakdown.vatAmount.toStringAsFixed(2)}',
+                        style: TextStyle(color: theme.colorScheme.outline, fontSize: 12),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('Total Due:', style: theme.textTheme.titleLarge),
+                      Flexible(
+                        child: Text(
+                          '₱${breakdown.netTotal.toStringAsFixed(2)}',
+                          textAlign: TextAlign.right,
+                          style: theme.textTheme.headlineSmall?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: theme.colorScheme.primary,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          icon: const Icon(Icons.discount_outlined),
+                          label: Text(
+                            cartState.manualDiscountPercentage > 0
+                                ? '${cartState.manualDiscountPercentage.toInt()}% Off'
+                                : (cartState.manualDiscountFixed > 0
+                                      ? '₱${cartState.manualDiscountFixed.toStringAsFixed(0)} Off'
+                                      : 'Discount'),
+                            style: TextStyle(fontSize: 12),
+                          ),
+                          onPressed: cartState.items.isEmpty
+                              ? null
+                              : () {
+                                  showDialog(
+                                    context: context,
+                                    builder: (_) => DiscountSelectionDialog(
+                                      currentPercentage: cartState.manualDiscountPercentage,
+                                      currentFixed: cartState.manualDiscountFixed,
+                                      onApplyPercentage: (p) => context.read<CartCubit>().applyDiscountPercentage(p),
+                                      onApplyFixed: (a) => context.read<CartCubit>().applyDiscountFixed(a),
+                                      onRemoveDiscount: () => context.read<CartCubit>().removeDiscount(),
+                                    ),
+                                  );
+                                },
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        flex: 2,
+                        child: FilledButton.icon(
+                          icon: const Icon(Icons.payments),
+                          label: const Text('CHECKOUT', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                          onPressed: cartState.items.isEmpty
+                              ? null
+                              : () {
+                                  if (scrollController != null) {
+                                    // Inside the mobile bottom sheet — close it before opening the dialog.
+                                    Navigator.of(context).pop();
+                                  }
+                                  _openPaymentDialog(context, breakdown);
+                                },
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // ---------------------------------------------------------------------
+  // MOBILE BOTTOM CART SUMMARY BAR
+  // ---------------------------------------------------------------------
+
+  Widget _buildMobileCartSummaryBar(ThemeData theme) {
+    return BlocBuilder<CartCubit, CartState>(
+      builder: (context, cartState) {
+        if (cartState.items.isEmpty) return const SizedBox.shrink();
+
+        final breakdown = cartState.breakdown;
+        return SafeArea(
+          top: false,
+          child: Container(
+            margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.primary,
+              borderRadius: BorderRadius.circular(14),
+              boxShadow: [
+                BoxShadow(color: Colors.black.withOpacity(0.15), blurRadius: 10, offset: const Offset(0, 4)),
+              ],
+            ),
+            child: InkWell(
+              onTap: () => _openMobileCartSheet(context),
+              borderRadius: BorderRadius.circular(14),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.shopping_cart, color: Colors.white),
+                      const SizedBox(width: 8),
+                      Text(
+                        '${cartState.totalItemCount} item${cartState.totalItemCount == 1 ? '' : 's'}',
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                      ),
+                    ],
+                  ),
+                  Row(
+                    children: [
+                      Text(
+                        '₱${breakdown.netTotal.toStringAsFixed(2)}',
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                      ),
+                      const SizedBox(width: 6),
+                      const Icon(Icons.arrow_forward_ios, color: Colors.white, size: 14),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }
