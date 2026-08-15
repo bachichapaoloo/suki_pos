@@ -24,6 +24,7 @@ import 'package:suki_pos/presentation/maintenance/item/bloc/item_bloc.dart';
 import 'package:suki_pos/presentation/maintenance/item/pages/item_list_page.dart';
 import 'package:suki_pos/presentation/maintenance/maintenance_page.dart';
 import 'package:suki_pos/presentation/maintenance/option_group/bloc/option_group_cubit.dart';
+import 'package:suki_pos/presentation/maintenance/order_type/bloc/order_type_cubit.dart';
 import 'package:suki_pos/presentation/pos/bloc/cart_cubit.dart';
 import 'package:suki_pos/presentation/pos/bloc/shift_cubit.dart';
 import 'package:suki_pos/presentation/pos/bloc/transaction_history_cubit.dart';
@@ -66,6 +67,7 @@ class MainApp extends StatelessWidget {
         BlocProvider(create: (_) => di.sl<CartCubit>()),
         BlocProvider(create: (_) => di.sl<ShiftCubit>()),
         BlocProvider(create: (_) => di.sl<OptionGroupCubit>()),
+        BlocProvider(create: (_) => di.sl<OrderTypeCubit>()..loadOrderTypes()),
         BlocProvider(create: (_) => di.sl<StockCubit>()),
         BlocProvider(create: (_) => di.sl<TransactionHistoryCubit>()),
       ],

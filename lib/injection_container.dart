@@ -4,6 +4,7 @@ import 'package:suki_pos/data/dao/department_dao.dart';
 import 'package:suki_pos/data/dao/item_dao.dart';
 import 'package:suki_pos/data/dao/option_group_dao.dart';
 import 'package:suki_pos/data/dao/order_dao.dart';
+import 'package:suki_pos/data/dao/order_type_dao.dart';
 import 'package:suki_pos/data/dao/shift_dao.dart';
 import 'package:suki_pos/data/dao/stock_dao.dart';
 import 'package:suki_pos/data/dao/unit_dao.dart';
@@ -15,6 +16,7 @@ import 'package:suki_pos/data/repositories/maintenance/category_repository_impl.
 import 'package:suki_pos/data/repositories/maintenance/department_repository_impl.dart';
 import 'package:suki_pos/data/repositories/maintenance/item_repository_impl.dart';
 import 'package:suki_pos/data/repositories/maintenance/option_group_repository_impl.dart';
+import 'package:suki_pos/data/repositories/maintenance/order_type_repository_impl.dart';
 import 'package:suki_pos/data/repositories/maintenance/unit_repository_impl.dart';
 import 'package:suki_pos/data/repositories/orders/order_repository_impl.dart';
 import 'package:suki_pos/domain/repositories/admin/role_repository.dart';
@@ -25,6 +27,7 @@ import 'package:suki_pos/domain/repositories/maintenance/category_repository.dar
 import 'package:suki_pos/domain/repositories/maintenance/department_repository.dart';
 import 'package:suki_pos/domain/repositories/maintenance/item_repository.dart';
 import 'package:suki_pos/domain/repositories/maintenance/option_group_repository.dart';
+import 'package:suki_pos/domain/repositories/maintenance/order_type_repository.dart';
 import 'package:suki_pos/domain/repositories/maintenance/unit_repository.dart' show UnitRepository;
 import 'package:suki_pos/domain/repositories/orders/order_repository.dart';
 import 'package:suki_pos/domain/use_cases/admin/role_use_cases.dart';
@@ -36,6 +39,7 @@ import 'package:suki_pos/domain/use_cases/maintenance/delete_department.dart';
 import 'package:suki_pos/domain/use_cases/maintenance/get_departments.dart';
 import 'package:suki_pos/domain/use_cases/maintenance/item_use_cases.dart';
 import 'package:suki_pos/domain/use_cases/maintenance/option_group_use_cases.dart';
+import 'package:suki_pos/domain/use_cases/maintenance/order_type_use_cases.dart';
 import 'package:suki_pos/domain/use_cases/maintenance/save_department.dart';
 import 'package:suki_pos/domain/use_cases/maintenance/unit_use_cases.dart';
 import 'package:suki_pos/domain/use_cases/orders/get_transaction_history.dart';
@@ -49,6 +53,7 @@ import 'package:suki_pos/presentation/maintenance/category/bloc/category_bloc.da
 import 'package:suki_pos/presentation/maintenance/department/bloc/department_bloc.dart';
 import 'package:suki_pos/presentation/maintenance/item/bloc/item_bloc.dart';
 import 'package:suki_pos/presentation/maintenance/option_group/bloc/option_group_cubit.dart';
+import 'package:suki_pos/presentation/maintenance/order_type/bloc/order_type_cubit.dart';
 import 'package:suki_pos/presentation/pos/bloc/cart_cubit.dart';
 import 'package:suki_pos/presentation/pos/bloc/shift_cubit.dart';
 import 'package:suki_pos/presentation/pos/bloc/transaction_history_cubit.dart';
@@ -126,6 +131,14 @@ Future<void> init() async {
         shiftDao: sl(),
       ),
     )
+    ..registerFactory(
+      () => OrderTypeCubit(
+        getOrderTypes: sl(),
+        getOrderTypeById: sl(),
+        saveOrderType: sl(),
+        deleteOrderType: sl(),
+      ),
+    )
     //! Domain - Use Cases
     ..registerLazySingleton(() => GetDepartments(sl()))
     ..registerLazySingleton(() => SaveDepartment(sl()))
@@ -155,6 +168,10 @@ Future<void> init() async {
     ..registerLazySingleton(() => ProcessCheckout(sl()))
     ..registerLazySingleton(() => GetTransactionHistory(sl()))
     ..registerLazySingleton(() => VoidOrderTransaction(sl()))
+    ..registerLazySingleton(() => GetOrderTypes(sl()))
+    ..registerLazySingleton(() => GetOrderTypeById(sl()))
+    ..registerLazySingleton(() => SaveOrderType(sl()))
+    ..registerLazySingleton(() => DeleteOrderType(sl()))
     //! Data - Repositories
     ..registerLazySingleton<DepartmentRepository>(
       () => DepartmentRepositoryImpl(departmentDao: sl()),
@@ -186,6 +203,9 @@ Future<void> init() async {
     ..registerLazySingleton<OptionGroupRepository>(
       () => OptionGroupRepositoryImpl(optionGroupDao: sl()),
     )
+    ..registerLazySingleton<OrderTypeRepository>(
+      () => OrderTypeRepositoryImpl(orderTypeDao: sl()),
+    )
     //! DAOs
     ..registerLazySingleton(() => DepartmentDao(sl()))
     ..registerLazySingleton(() => ItemDao(sl()))
@@ -193,6 +213,7 @@ Future<void> init() async {
     ..registerLazySingleton(() => StockDao(sl()))
     ..registerLazySingleton(() => OptionGroupDao(sl()))
     ..registerLazySingleton(() => OrderDao(sl()))
+    ..registerLazySingleton(() => OrderTypeDao(sl()))
     ..registerLazySingleton(() => ShiftDao(sl()));
 
   //! Core

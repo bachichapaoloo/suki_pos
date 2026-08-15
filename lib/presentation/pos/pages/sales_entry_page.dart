@@ -6,6 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:suki_pos/core/utils/image_storage_service.dart';
 import 'package:suki_pos/domain/entities/maintenance/item.dart';
 import 'package:suki_pos/domain/entities/maintenance/option_group.dart';
+import 'package:suki_pos/domain/entities/maintenance/order_type.dart';
 import 'package:suki_pos/domain/entities/orders/cart_item.dart';
 import 'package:suki_pos/domain/entities/orders/tax_discount_breakdown.dart';
 import 'package:suki_pos/presentation/maintenance/category/bloc/category_bloc.dart';
@@ -170,15 +171,24 @@ class _SalesEntryPageState extends State<SalesEntryPage> {
         actions: [
           BlocBuilder<CartCubit, CartState>(
             builder: (context, state) {
-              return SegmentedButton<int>(
-                segments: const [
-                  ButtonSegment(value: 1, label: Text('Dine-In')),
-                  ButtonSegment(value: 2, label: Text('Take-Out')),
-                ],
-                selected: {state.orderTypeId},
-                onSelectionChanged: (set) {
-                  context.read<CartCubit>().setOrderType(set.first);
+              // return SegmentedButton<int>(
+              //   segments: const [
+              //     ButtonSegment(value: 1, label: Text('Dine-In')),
+              //     ButtonSegment(value: 2, label: Text('Take-Out')),
+              //   ],
+              //   selected: {state.orderTypeId},
+              //   onSelectionChanged: (set) {
+              //     context.read<CartCubit>().setOrderType(set.first);
+              //   },
+              // );
+              return DropdownButton<int>(
+                value: state.orderTypeId,
+                onChanged: (value) {
+                  context.read<CartCubit>().setOrderType(value!);
                 },
+                items: [
+                  DropdownMenuItem(value: 0, child: Text('Select Order Type')),
+                ],
               );
             },
           ),
@@ -354,7 +364,8 @@ class _SalesEntryPageState extends State<SalesEntryPage> {
                                     ),
                                     child: ClipRRect(
                                       borderRadius: BorderRadius.circular(8),
-                                      child: (cartItem.item.displayImage != null && cartItem.item.displayImage!.isNotEmpty)
+                                      child:
+                                          (cartItem.item.displayImage != null && cartItem.item.displayImage!.isNotEmpty)
                                           ? FutureBuilder<String?>(
                                               future: ImageStorageService.resolveImagePath(cartItem.item.displayImage),
                                               builder: (_, snap) {
@@ -370,7 +381,11 @@ class _SalesEntryPageState extends State<SalesEntryPage> {
                                                     ),
                                                   );
                                                 }
-                                                return Icon(Icons.inventory_2_outlined, size: 20, color: Colors.grey[400]);
+                                                return Icon(
+                                                  Icons.inventory_2_outlined,
+                                                  size: 20,
+                                                  color: Colors.grey[400],
+                                                );
                                               },
                                             )
                                           : Icon(Icons.inventory_2_outlined, size: 20, color: Colors.grey[400]),
@@ -552,7 +567,7 @@ class _SalesEntryPageState extends State<SalesEntryPage> {
     return ClipRRect(
       borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
       child: SizedBox(
-        height: 105,
+        height: 265,
         width: double.infinity,
         child: hasImage
             ? FutureBuilder<String?>(
