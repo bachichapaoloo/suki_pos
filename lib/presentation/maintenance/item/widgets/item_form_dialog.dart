@@ -4,8 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
+import 'package:suki_pos/core/utils/image_storage_service.dart';
 
 import 'package:suki_pos/core/use_case/use_case.dart';
 import 'package:suki_pos/data/models/maintenance/item_price_model.dart';
@@ -53,7 +52,10 @@ class _ItemFormDialogState extends State<ItemFormDialog> {
   List<Department> _departments = [];
 
   // Image State
+  /// The *stored* value (filename-only) kept in sync with SQLite.
   String? _displayImage;
+  /// The resolved absolute path used only for UI preview.
+  String? _resolvedImagePath;
 
   // Boolean Flags
   late bool _isVatExempt;
@@ -97,6 +99,12 @@ class _ItemFormDialogState extends State<ItemFormDialog> {
       _selectedCategoryId = i.categoryId;
       _selectedDepartmentId = i.departmentId;
       _displayImage = i.displayImage;
+      // Resolve stored filename → full path for the UI preview
+      if (_displayImage != null) {
+        ImageStorageService.resolveImagePath(_displayImage).then((path) {
+          if (mounted) setState(() => _resolvedImagePath = path);
+        });
+      }
     }
 
     _loadData();
@@ -143,7 +151,7 @@ class _ItemFormDialogState extends State<ItemFormDialog> {
     try {
       String? sourcePath;
 
-      // On Desktop (Windows/macOS/Linux), FilePicker is usually preferred and more reliable
+      // On Desktop (Windows/macOS/Linux), FilePicker is more reliable
       if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
         final result = await FilePicker.platform.pickFiles(type: FileType.image);
         if (result != null && result.files.single.path != null) {
@@ -158,14 +166,14 @@ class _ItemFormDialogState extends State<ItemFormDialog> {
       }
 
       if (sourcePath != null) {
-        // Copy to permanent application documents directory so it survives cache clearing
-        final appDir = await getApplicationDocumentsDirectory();
-        final ext = p.extension(sourcePath);
-        final fileName = 'item_${DateTime.now().millisecondsSinceEpoch}$ext';
-        final savedFile = await File(sourcePath).copy('${appDir.path}/$fileName');
+        // Copy to fixed managed folder: <AppDocuments>/suki_pos/item_images/
+        // Only the filename is stored in the DB for portability.
+        final fileName = await ImageStorageService.saveImage(sourcePath);
+        final resolvedPath = await ImageStorageService.resolveImagePath(fileName);
 
         setState(() {
-          _displayImage = savedFile.path;
+          _displayImage = fileName;         // persisted in SQLite
+          _resolvedImagePath = resolvedPath; // used for UI preview
         });
       }
     } catch (e) {
@@ -211,6 +219,7 @@ class _ItemFormDialogState extends State<ItemFormDialog> {
         itemDetails: _detailsCtrl.text,
         categoryId: _selectedCategoryId ?? 0,
         departmentId: _selectedDepartmentId ?? 0,
+        // Store only the filename (portable) — NOT the full absolute path
         displayImage: _displayImage,
         costPrice: double.tryParse(_costPriceCtrl.text) ?? 0.0,
         minStockLevel: double.tryParse(_minStockCtrl.text) ?? 0.0,
@@ -320,11 +329,11 @@ class _ItemFormDialogState extends State<ItemFormDialog> {
                           const SizedBox(height: 16),
                           Row(
                             children: [
-                              if (_displayImage != null) ...[
+                              if (_resolvedImagePath != null) ...[
                                 ClipRRect(
                                   borderRadius: BorderRadius.circular(12),
                                   child: Image.file(
-                                    File(_displayImage!),
+                                    File(_resolvedImagePath!),
                                     width: 72,
                                     height: 72,
                                     fit: BoxFit.cover,

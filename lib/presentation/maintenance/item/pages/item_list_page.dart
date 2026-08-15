@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:suki_pos/core/utils/image_storage_service.dart';
 import 'package:suki_pos/domain/entities/maintenance/item.dart';
 import 'package:suki_pos/presentation/maintenance/item/bloc/item_bloc.dart';
 import 'package:suki_pos/presentation/maintenance/item/bloc/item_event.dart';
@@ -313,10 +314,19 @@ class _ItemListPageState extends State<ItemListPage> {
                     color: const Color(0xFFF3F4F6),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: item.displayImage != null
-                      ? ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: Image.file(File(item.displayImage!), fit: BoxFit.cover),
+                  child: item.displayImage != null && item.displayImage!.isNotEmpty
+                      ? FutureBuilder<String?>(
+                          future: ImageStorageService.resolveImagePath(item.displayImage),
+                          builder: (_, snap) {
+                            final path = snap.data;
+                            if (path != null) {
+                              return ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: Image.file(File(path), fit: BoxFit.cover),
+                              );
+                            }
+                            return Icon(Icons.inventory_2_outlined, color: Colors.grey[400]);
+                          },
                         )
                       : Icon(Icons.inventory_2_outlined, color: Colors.grey[400]),
                 ),

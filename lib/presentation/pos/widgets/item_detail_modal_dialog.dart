@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:suki_pos/core/utils/image_storage_service.dart';
 import 'package:suki_pos/domain/entities/maintenance/item.dart';
 import 'package:suki_pos/domain/entities/maintenance/option_group.dart';
 import 'package:suki_pos/domain/entities/maintenance/option_value.dart';
@@ -109,17 +110,29 @@ class _ItemDetailModalDialogState extends State<ItemDetailModalDialog> {
       title: Row(
         children: [
           if (widget.item.displayImage != null && widget.item.displayImage!.isNotEmpty) ...[
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: Image.file(
-                File(widget.item.displayImage!),
-                width: 44,
-                height: 44,
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => const Icon(Icons.fastfood_outlined, size: 36),
-              ),
+            FutureBuilder<String?>(
+              future: ImageStorageService.resolveImagePath(widget.item.displayImage),
+              builder: (_, snap) {
+                final path = snap.data;
+                if (path == null) return const SizedBox.shrink();
+                return Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Image.file(
+                        File(path),
+                        width: 44,
+                        height: 44,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => const Icon(Icons.fastfood_outlined, size: 36),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                  ],
+                );
+              },
             ),
-            const SizedBox(width: 12),
           ],
           Expanded(
             child: Text(

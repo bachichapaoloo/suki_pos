@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:suki_pos/core/utils/image_storage_service.dart';
 import 'package:suki_pos/domain/entities/maintenance/item.dart';
 import 'package:suki_pos/domain/entities/maintenance/option_group.dart';
 import 'package:suki_pos/domain/entities/orders/cart_item.dart';
@@ -351,20 +352,29 @@ class _SalesEntryPageState extends State<SalesEntryPage> {
                                       color: const Color(0xFFF1F5F9),
                                       borderRadius: BorderRadius.circular(8),
                                     ),
-                                    child: (cartItem.item.displayImage != null && cartItem.item.displayImage!.isNotEmpty)
-                                        ? ClipRRect(
-                                            borderRadius: BorderRadius.circular(8),
-                                            child: Image.file(
-                                              File(cartItem.item.displayImage!),
-                                              fit: BoxFit.cover,
-                                              errorBuilder: (_, __, ___) => Icon(
-                                                Icons.inventory_2_outlined,
-                                                size: 20,
-                                                color: Colors.grey[400],
-                                              ),
-                                            ),
-                                          )
-                                        : Icon(Icons.inventory_2_outlined, size: 20, color: Colors.grey[400]),
+                                    child: ClipRRect(
+                                      borderRadius: BorderRadius.circular(8),
+                                      child: (cartItem.item.displayImage != null && cartItem.item.displayImage!.isNotEmpty)
+                                          ? FutureBuilder<String?>(
+                                              future: ImageStorageService.resolveImagePath(cartItem.item.displayImage),
+                                              builder: (_, snap) {
+                                                final path = snap.data;
+                                                if (path != null) {
+                                                  return Image.file(
+                                                    File(path),
+                                                    fit: BoxFit.cover,
+                                                    errorBuilder: (_, __, ___) => Icon(
+                                                      Icons.inventory_2_outlined,
+                                                      size: 20,
+                                                      color: Colors.grey[400],
+                                                    ),
+                                                  );
+                                                }
+                                                return Icon(Icons.inventory_2_outlined, size: 20, color: Colors.grey[400]);
+                                              },
+                                            )
+                                          : Icon(Icons.inventory_2_outlined, size: 20, color: Colors.grey[400]),
+                                    ),
                                   ),
                                   onTap: () => _openItemDetailModal(
                                     context,
@@ -545,10 +555,19 @@ class _SalesEntryPageState extends State<SalesEntryPage> {
         height: 105,
         width: double.infinity,
         child: hasImage
-            ? Image.file(
-                File(item.displayImage!),
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => _buildFallbackImage(theme, item),
+            ? FutureBuilder<String?>(
+                future: ImageStorageService.resolveImagePath(item.displayImage),
+                builder: (_, snap) {
+                  final path = snap.data;
+                  if (path != null) {
+                    return Image.file(
+                      File(path),
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => _buildFallbackImage(theme, item),
+                    );
+                  }
+                  return _buildFallbackImage(theme, item);
+                },
               )
             : _buildFallbackImage(theme, item),
       ),
