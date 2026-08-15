@@ -1,5 +1,8 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:suki_pos/domain/entities/maintenance/item.dart';
 import 'package:suki_pos/domain/entities/maintenance/option_group.dart';
 import 'package:suki_pos/domain/entities/orders/cart_item.dart';
@@ -242,7 +245,7 @@ class _SalesEntryPageState extends State<SalesEntryPage> {
                           padding: const EdgeInsets.all(12),
                           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                             crossAxisCount: 4,
-                            childAspectRatio: 1.1,
+                            childAspectRatio: 0.78,
                             crossAxisSpacing: 12,
                             mainAxisSpacing: 12,
                           ),
@@ -253,26 +256,44 @@ class _SalesEntryPageState extends State<SalesEntryPage> {
 
                             return Card(
                               elevation: 2,
+                              clipBehavior: Clip.antiAlias,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                               child: InkWell(
                                 onTap: () => _openItemDetailModal(context, item),
-                                borderRadius: BorderRadius.circular(12),
-                                child: Padding(
-                                  padding: const EdgeInsets.all(12.0),
-                                  child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        item.name,
-                                        style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-                                        maxLines: 2,
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    _buildProductCardImage(theme, item),
+                                    Expanded(
+                                      child: Padding(
+                                        padding: const EdgeInsets.all(10.0),
+                                        child: Column(
+                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              item.name,
+                                              style: GoogleFonts.inter(
+                                                fontSize: 13,
+                                                fontWeight: FontWeight.w600,
+                                                color: const Color(0xFF1E293B),
+                                              ),
+                                              maxLines: 2,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                            Text(
+                                              '₱${defaultPrice.toStringAsFixed(2)}',
+                                              style: GoogleFonts.inter(
+                                                fontSize: 15,
+                                                fontWeight: FontWeight.bold,
+                                                color: theme.colorScheme.primary,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
                                       ),
-                                      Text(
-                                        '₱${defaultPrice.toStringAsFixed(2)}',
-                                        style: theme.textTheme.titleLarge?.copyWith(color: theme.colorScheme.primary),
-                                      ),
-                                    ],
-                                  ),
+                                    ),
+                                  ],
                                 ),
                               ),
                             );
@@ -323,6 +344,28 @@ class _SalesEntryPageState extends State<SalesEntryPage> {
                               itemBuilder: (context, idx) {
                                 final cartItem = cartState.items[idx];
                                 return ListTile(
+                                  leading: Container(
+                                    width: 44,
+                                    height: 44,
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFF1F5F9),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: (cartItem.item.displayImage != null && cartItem.item.displayImage!.isNotEmpty)
+                                        ? ClipRRect(
+                                            borderRadius: BorderRadius.circular(8),
+                                            child: Image.file(
+                                              File(cartItem.item.displayImage!),
+                                              fit: BoxFit.cover,
+                                              errorBuilder: (_, __, ___) => Icon(
+                                                Icons.inventory_2_outlined,
+                                                size: 20,
+                                                color: Colors.grey[400],
+                                              ),
+                                            ),
+                                          )
+                                        : Icon(Icons.inventory_2_outlined, size: 20, color: Colors.grey[400]),
+                                  ),
                                   onTap: () => _openItemDetailModal(
                                     context,
                                     cartItem.item,
@@ -489,6 +532,47 @@ class _SalesEntryPageState extends State<SalesEntryPage> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildProductCardImage(ThemeData theme, Item item) {
+    final hasImage = item.displayImage != null && item.displayImage!.isNotEmpty;
+
+    return ClipRRect(
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+      child: SizedBox(
+        height: 105,
+        width: double.infinity,
+        child: hasImage
+            ? Image.file(
+                File(item.displayImage!),
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => _buildFallbackImage(theme, item),
+              )
+            : _buildFallbackImage(theme, item),
+      ),
+    );
+  }
+
+  Widget _buildFallbackImage(ThemeData theme, Item item) {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            theme.colorScheme.primaryContainer.withValues(alpha: 0.4),
+            theme.colorScheme.surfaceContainerHighest,
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      child: Center(
+        child: Icon(
+          Icons.fastfood_outlined,
+          size: 36,
+          color: theme.colorScheme.primary.withValues(alpha: 0.6),
+        ),
       ),
     );
   }

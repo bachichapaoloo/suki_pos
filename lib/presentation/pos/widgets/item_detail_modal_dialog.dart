@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:suki_pos/domain/entities/maintenance/item.dart';
 import 'package:suki_pos/domain/entities/maintenance/option_group.dart';
@@ -105,8 +107,20 @@ class _ItemDetailModalDialogState extends State<ItemDetailModalDialog> {
 
     return AlertDialog(
       title: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
+          if (widget.item.displayImage != null && widget.item.displayImage!.isNotEmpty) ...[
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Image.file(
+                File(widget.item.displayImage!),
+                width: 44,
+                height: 44,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => const Icon(Icons.fastfood_outlined, size: 36),
+              ),
+            ),
+            const SizedBox(width: 12),
+          ],
           Expanded(
             child: Text(
               isEditing ? 'Edit ${widget.item.name}' : widget.item.name,
@@ -114,6 +128,7 @@ class _ItemDetailModalDialogState extends State<ItemDetailModalDialog> {
               overflow: TextOverflow.ellipsis,
             ),
           ),
+          const SizedBox(width: 8),
           Text(
             '₱${(_computedUnitPrice * _quantity).toStringAsFixed(2)}',
             style: theme.textTheme.titleLarge?.copyWith(

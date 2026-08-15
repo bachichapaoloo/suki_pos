@@ -1,9 +1,11 @@
 import 'dart:io';
-
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
 
 import 'package:suki_pos/core/use_case/use_case.dart';
 import 'package:suki_pos/data/models/maintenance/item_price_model.dart';
@@ -138,12 +140,40 @@ class _ItemFormDialogState extends State<ItemFormDialog> {
   }
 
   Future<void> _pickImage() async {
-    final picker = ImagePicker();
-    final pickedFile = await picker.pickImage(source: ImageSource.gallery);
-    if (pickedFile != null) {
-      setState(() {
-        _displayImage = pickedFile.path;
-      });
+    try {
+      String? sourcePath;
+
+      // On Desktop (Windows/macOS/Linux), FilePicker is usually preferred and more reliable
+      if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+        final result = await FilePicker.platform.pickFiles(type: FileType.image);
+        if (result != null && result.files.single.path != null) {
+          sourcePath = result.files.single.path;
+        }
+      } else {
+        final picker = ImagePicker();
+        final pickedFile = await picker.pickImage(source: ImageSource.gallery);
+        if (pickedFile != null) {
+          sourcePath = pickedFile.path;
+        }
+      }
+
+      if (sourcePath != null) {
+        // Copy to permanent application documents directory so it survives cache clearing
+        final appDir = await getApplicationDocumentsDirectory();
+        final ext = p.extension(sourcePath);
+        final fileName = 'item_${DateTime.now().millisecondsSinceEpoch}$ext';
+        final savedFile = await File(sourcePath).copy('${appDir.path}/$fileName');
+
+        setState(() {
+          _displayImage = savedFile.path;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to pick image: $e')),
+        );
+      }
     }
   }
 
