@@ -536,6 +536,7 @@ class _PosDashboardPageState extends State<PosDashboardPage> {
                           iconBg: const Color(0xFFA5DDF1),
                           iconColor: const Color(0xFF0369A1),
                           height: cardHeight,
+                          route: '/pos/sales-reading',
                         ),
                       ),
                     ],

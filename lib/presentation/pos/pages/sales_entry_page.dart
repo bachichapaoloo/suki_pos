@@ -1,21 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:suki_pos/domain/entities/maintenance/item.dart';
 import 'package:suki_pos/domain/entities/maintenance/option_group.dart';
+import 'package:suki_pos/domain/entities/orders/cart_item.dart';
 import 'package:suki_pos/domain/entities/orders/tax_discount_breakdown.dart';
+import 'package:suki_pos/presentation/maintenance/category/bloc/category_bloc.dart';
+import 'package:suki_pos/presentation/maintenance/item/bloc/item_bloc.dart';
 import 'package:suki_pos/presentation/maintenance/item/bloc/item_event.dart';
 import 'package:suki_pos/presentation/maintenance/item/bloc/item_state.dart';
+import 'package:suki_pos/presentation/maintenance/option_group/bloc/option_group_cubit.dart';
+import 'package:suki_pos/presentation/maintenance/option_group/bloc/option_group_state.dart';
+import 'package:suki_pos/presentation/pos/bloc/cart_cubit.dart';
+import 'package:suki_pos/presentation/pos/bloc/cart_state.dart';
+import 'package:suki_pos/presentation/pos/bloc/shift_cubit.dart';
+import 'package:suki_pos/presentation/pos/bloc/shift_state.dart';
+import 'package:suki_pos/presentation/pos/widgets/change_fund_dialog.dart';
+import 'package:suki_pos/presentation/pos/widgets/discount_selection_dialog.dart';
+import 'package:suki_pos/presentation/pos/widgets/item_detail_modal_dialog.dart';
+import 'package:suki_pos/presentation/pos/widgets/payment_dialog.dart';
 import 'package:suki_pos/presentation/pos/widgets/receipt_preview_dialog.dart';
-import '../../../../domain/entities/maintenance/item.dart';
-import '../../../../domain/entities/orders/cart_item.dart';
-import '../../maintenance/category/bloc/category_bloc.dart';
-import '../../maintenance/item/bloc/item_bloc.dart';
-import '../../maintenance/option_group/bloc/option_group_cubit.dart';
-import '../../maintenance/option_group/bloc/option_group_state.dart';
-import '../bloc/cart_cubit.dart';
-import '../bloc/cart_state.dart';
-import '../widgets/discount_selection_dialog.dart';
-import '../widgets/item_detail_modal_dialog.dart';
-import '../widgets/payment_dialog.dart';
 
 class SalesEntryPage extends StatefulWidget {
   const SalesEntryPage({super.key});
@@ -33,6 +36,26 @@ class _SalesEntryPageState extends State<SalesEntryPage> {
     context.read<ItemBloc>().add(LoadItems());
     context.read<CategoryBloc>().add(GetCategoriesEvent());
     context.read<OptionGroupCubit>().loadOptionGroups();
+
+    // Verify shift status
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _verifyShiftStatus();
+    });
+  }
+
+  void _verifyShiftStatus() {
+    final shiftState = context.read<ShiftCubit>().state;
+    if (shiftState is ShiftInactive || shiftState is ShiftInitial) {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => ChangeFundDialog(
+          onConfirm: (beginningCash) {
+            context.read<ShiftCubit>().openShift(1, beginningCash); // Cashier ID = 1
+          },
+        ),
+      );
+    }
   }
 
   void _openItemDetailModal(BuildContext context, Item item, {CartItem? existingCartItem}) {

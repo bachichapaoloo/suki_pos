@@ -1,7 +1,10 @@
 import 'package:get_it/get_it.dart';
 import 'package:suki_pos/core/database/database_helper.dart';
+import 'package:suki_pos/data/dao/department_dao.dart';
+import 'package:suki_pos/data/dao/item_dao.dart';
 import 'package:suki_pos/data/dao/option_group_dao.dart';
 import 'package:suki_pos/data/dao/order_dao.dart';
+import 'package:suki_pos/data/dao/shift_dao.dart';
 import 'package:suki_pos/data/dao/stock_dao.dart';
 import 'package:suki_pos/data/dao/unit_dao.dart';
 import 'package:suki_pos/data/repositories/admin/role_repository_impl.dart';
@@ -11,8 +14,8 @@ import 'package:suki_pos/data/repositories/inventory/stock_repository_impl.dart'
 import 'package:suki_pos/data/repositories/maintenance/category_repository_impl.dart';
 import 'package:suki_pos/data/repositories/maintenance/department_repository_impl.dart';
 import 'package:suki_pos/data/repositories/maintenance/item_repository_impl.dart';
-import 'package:suki_pos/data/repositories/maintenance/unit_repository_impl.dart';
 import 'package:suki_pos/data/repositories/maintenance/option_group_repository_impl.dart';
+import 'package:suki_pos/data/repositories/maintenance/unit_repository_impl.dart';
 import 'package:suki_pos/data/repositories/orders/order_repository_impl.dart';
 import 'package:suki_pos/domain/repositories/admin/role_repository.dart';
 import 'package:suki_pos/domain/repositories/admin/user_repository.dart';
@@ -45,13 +48,12 @@ import 'package:suki_pos/presentation/inventory/stock_cubit.dart';
 import 'package:suki_pos/presentation/maintenance/category/bloc/category_bloc.dart';
 import 'package:suki_pos/presentation/maintenance/department/bloc/department_bloc.dart';
 import 'package:suki_pos/presentation/maintenance/item/bloc/item_bloc.dart';
-import 'package:suki_pos/data/dao/department_dao.dart';
-import 'package:suki_pos/data/dao/item_dao.dart';
 import 'package:suki_pos/presentation/maintenance/option_group/bloc/option_group_cubit.dart';
 import 'package:suki_pos/presentation/pos/bloc/cart_cubit.dart';
+import 'package:suki_pos/presentation/pos/bloc/shift_cubit.dart';
 import 'package:suki_pos/presentation/pos/bloc/transaction_history_cubit.dart';
 
-final sl = GetIt.instance;
+final GetIt sl = GetIt.instance;
 
 Future<void> init() async {
   //! Presentation - BLoCs
@@ -117,6 +119,11 @@ Future<void> init() async {
       () => TransactionHistoryCubit(
         getTransactionHistory: sl(),
         voidOrderTransaction: sl(),
+      ),
+    )
+    ..registerFactory(
+      () => ShiftCubit(
+        shiftDao: sl(),
       ),
     )
     //! Domain - Use Cases
@@ -185,7 +192,8 @@ Future<void> init() async {
     ..registerLazySingleton(() => UnitDao(sl()))
     ..registerLazySingleton(() => StockDao(sl()))
     ..registerLazySingleton(() => OptionGroupDao(sl()))
-    ..registerLazySingleton(() => OrderDao(sl()));
+    ..registerLazySingleton(() => OrderDao(sl()))
+    ..registerLazySingleton(() => ShiftDao(sl()));
 
   //! Core
   final dbHelper = DatabaseHelper();
