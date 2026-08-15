@@ -1492,9 +1492,25 @@ CREATE TABLE IF NOT EXISTS electronic_journal (
   content TEXT NOT NULL,
   created_at TEXT NOT NULL,
   FOREIGN KEY (sale_transaction_id) REFERENCES sale_transaction (id) ON DELETE SET NULL,
-  FOREIGN KEY (cashier_id) REFERENCES user (id)
+  FOREIGN KEY (cashier_id) REFERENCES app_user (id)
 );
 
+-- ---------------------------------------------------------------------------
+-- 13.16  shift
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS shift (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  cashier_id INTEGER NOT NULL,
+  beginning_cash REAL NOT NULL DEFAULT 0.0,
+  ending_cash REAL,
+  cash_variance REAL,
+  status INTEGER NOT NULL DEFAULT 1, -- 1 = Open, 2 = Closed
+  start_time TEXT NOT NULL,
+  end_time TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT,
+  FOREIGN KEY (cashier_id) REFERENCES app_user (id)
+);
 
 -- =============================================================================
 -- SECTION 14: INDEXES
@@ -1532,9 +1548,14 @@ CREATE INDEX IF NOT EXISTS idx_sync_table           ON sync_status(table_name, r
 CREATE INDEX IF NOT EXISTS idx_user_role            ON app_user(role_id);
 CREATE INDEX IF NOT EXISTS idx_role_perm_role       ON role_permission(role_id);
 
---Electronic Journal
+-- Electronic Journal
 CREATE INDEX IF NOT EXISTS idx_ej_transaction       ON electronic_journal(sale_transaction_id);
 CREATE INDEX IF NOT EXISTS idx_ej_date              ON electronic_journal(created_at);
+
+-- shift
+CREATE INDEX IF NOT EXISTS idx_shift_cashier ON shift(cashier_id);
+CREATE INDEX IF NOT EXISTS idx_shift_date ON shift(start_time);
+CREATE INDEX IF NOT EXISTS idx_shift_status ON shift(status);
 
 
 -- =============================================================================
@@ -1574,6 +1595,11 @@ END;
 CREATE TRIGGER IF NOT EXISTS trg_ej_inserted
     AFTER INSERT ON electronic_journal BEGIN
     UPDATE sales_order SET updated_at = datetime('now') WHERE id = NEW.sale_transaction_id;
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_shift_inserted
+    AFTER INSERT ON shift BEGIN
+    UPDATE shift SET updated_at = datetime('now') WHERE id = NEW.id;
 END;
 
 -- =============================================================================

@@ -82,6 +82,7 @@ class SchemaConstants {
   static const String selfOrderItem = 'self_order_item';
   static const String selfOrderItemOption = 'self_order_item_option';
   static const String electronicJournal = 'electronic_journal';
+  static const String shift = 'shift';
 
   /// Complete list of DDL statements executed during database creation.
   static const List<String> createTableScripts = [
@@ -1284,6 +1285,21 @@ class SchemaConstants {
       FOREIGN KEY (cashier_id) REFERENCES app_user (id)
     );
     ''',
+    '''
+    CREATE TABLE IF NOT EXISTS shift (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      cashier_id INTEGER NOT NULL,
+      beginning_cash REAL NOT NULL DEFAULT 0.0,
+      ending_cash REAL,
+      cash_variance REAL,
+      status INTEGER NOT NULL DEFAULT 1, -- 1 = Open, 2 = Closed
+      start_time TEXT NOT NULL,
+      end_time TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT,
+      FOREIGN KEY (cashier_id) REFERENCES app_user (id)
+    );
+    ''',
   ];
 
   /// Indexes to accelerate queries across transactions and lookup catalogs.
@@ -1312,6 +1328,9 @@ class SchemaConstants {
     'CREATE INDEX IF NOT EXISTS idx_role_perm_role ON role_permission(role_id);',
     'CREATE INDEX IF NOT EXISTS idx_ej_transaction ON electronic_journal(sale_transaction_id);',
     'CREATE INDEX IF NOT EXISTS idx_ej_date ON electronic_journal(created_at);',
+    'CREATE INDEX IF NOT EXISTS idx_shift_cashier ON shift(cashier_id);',
+    'CREATE INDEX IF NOT EXISTS idx_shift_date ON shift(start_time);',
+    'CREATE INDEX IF NOT EXISTS idx_shift_status ON shift(status);',
   ];
 
   /// Triggers to automatically maintain `updated_at` timestamps on row updates.
@@ -1356,6 +1375,18 @@ class SchemaConstants {
     CREATE TRIGGER IF NOT EXISTS trg_ej_inserted
         AFTER INSERT ON electronic_journal BEGIN
         UPDATE sales_order SET updated_at = datetime('now') WHERE id = NEW.sale_transaction_id;
+    END;
+    ''',
+    '''
+    CREATE TRIGGER IF NOT EXISTS trg_shift_updated
+        AFTER UPDATE ON shift BEGIN
+        UPDATE shift SET updated_at = datetime('now') WHERE id = NEW.id;
+    END;
+    ''',
+    '''
+    CREATE TRIGGER IF NOT EXISTS trg_shift_inserted
+        AFTER INSERT ON shift BEGIN
+        UPDATE shift SET updated_at = datetime('now') WHERE id = NEW.id;
     END;
     ''',
   ];
