@@ -8,6 +8,8 @@ class SalesOrderAggregate extends Equatable {
   final int cashierId;
   final int guestCount;
   final List<CartItem> items;
+  final double discPercentage;
+  final double discFixedAmount;
   final int paymentStatus;
   final String? remarks;
   final DateTime createdAt;
@@ -19,6 +21,8 @@ class SalesOrderAggregate extends Equatable {
     required this.cashierId,
     this.guestCount = 1,
     required this.items,
+    this.discPercentage = 0.0,
+    this.discFixedAmount = 0.0,
     this.paymentStatus = 0,
     this.remarks,
     required this.createdAt,
@@ -34,6 +38,8 @@ class SalesOrderAggregate extends Equatable {
     cashierId,
     guestCount,
     items,
+    discPercentage,
+    discFixedAmount,
     paymentStatus,
     remarks,
     createdAt,

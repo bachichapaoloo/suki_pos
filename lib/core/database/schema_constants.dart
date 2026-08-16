@@ -1292,7 +1292,7 @@ class SchemaConstants {
       beginning_cash REAL NOT NULL DEFAULT 0.0,
       ending_cash REAL,
       cash_variance REAL,
-      status INTEGER NOT NULL DEFAULT 1, -- 1 = Open, 2 = Closed
+      status INTEGER NOT NULL DEFAULT 1,
       start_time TEXT NOT NULL,
       end_time TEXT,
       created_at TEXT NOT NULL,

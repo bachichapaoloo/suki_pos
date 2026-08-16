@@ -1,8 +1,8 @@
 import 'package:sqflite/sqflite.dart';
-import 'package:suki_pos/services/cart_calculator.dart';
 import '../../core/database/database_helper.dart';
 import '../../core/database/schema_constants.dart';
-import '../../../domain/entities/orders/sales_order.dart';
+import '../../domain/entities/orders/sales_order.dart';
+import '../../services/cart_calculator.dart';
 
 class OrderDao {
   final DatabaseHelper _databaseHelper;
@@ -16,19 +16,30 @@ class OrderDao {
     required int paymentMethodId,
     required double cashTendered,
     required double changeGiven,
+    double manualDiscountPercentage = 0.0,
+    double manualDiscountFixed = 0.0,
   }) async {
     final db = await _databaseHelper.database;
 
     return await db.transaction((txn) async {
       final now = DateTime.now().toIso8601String();
 
-      // 1. Insert Master Sales Order
+      // 1. Calculate Financial Breakdown with actual discounts
+      final breakdown = CartCalculator.calculate(
+        items: order.items,
+        manualDiscountPercentage: manualDiscountPercentage > 0 ? manualDiscountPercentage : (order.discPercentage),
+        manualDiscountFixed: manualDiscountFixed > 0 ? manualDiscountFixed : (order.discFixedAmount),
+      );
+
+      // 2. Insert Master Sales Order
       final orderId = await txn.insert(SchemaConstants.salesOrder, {
         'dining_table_id': order.diningTableId,
         'order_type_id': order.orderTypeId,
         'cashier_id': order.cashierId,
         'guest_count': order.guestCount,
         'payment_status': 1, // 1 = Paid
+        'disc_percentage': order.discPercentage,
+        'disc_fixed_amount': order.discFixedAmount,
         'remarks': order.remarks,
         'transaction_date': now,
         'paid_at': now,
@@ -36,15 +47,19 @@ class OrderDao {
         'updated_at': now,
       });
 
-      // 2. Insert Sale Transaction Record for BIR Audit
-      final breakdown = CartCalculator.calculate(items: order.items);
+      // 3. Insert Sale Transaction Record for BIR Audit
       final txnId = await txn.insert(SchemaConstants.saleTransaction, {
         'sales_order_id': orderId,
         'cashier_id': order.cashierId,
         'order_type_id': order.orderTypeId,
         'guest_count': order.guestCount,
         'gross_amount': breakdown.grossSubtotal,
+        'discount_amount': breakdown.manualDiscountAmount,
         'net_amount': breakdown.netTotal,
+        'vat_sales': breakdown.vatableSales,
+        'vat_amount': breakdown.vatAmount,
+        'vat_exempt': breakdown.vatExemptSales,
+        'vat_zero_rated': breakdown.zeroRatedSales,
         'status': 1, // 1 = Completed
         'transaction_date': now,
         'created_at': now,
@@ -64,7 +79,7 @@ class OrderDao {
       ejBuffer.writeln('----------------------------------------');
       ejBuffer.writeln('ITEMS SOLD:');
 
-      // 3. Insert Line Items, Options, and Deduct Stock
+      // 4. Insert Line Items, Options, and Deduct Stock
       for (final cartItem in order.items) {
         final orderItemId = await txn.insert(SchemaConstants.salesOrderItem, {
           'sales_order_id': orderId,
@@ -74,6 +89,7 @@ class OrderDao {
           'quantity': cartItem.quantity,
           'unit_price': cartItem.unitPrice,
           'amount': cartItem.totalPrice,
+          'is_disc_exempt': cartItem.item.isDiscountExempt ? 1 : 0,
           'notes': cartItem.notes,
           'created_at': now,
         });
@@ -100,7 +116,14 @@ class OrderDao {
           ejBuffer.writeln('    Note: ${cartItem.notes}');
         }
 
-        // Insert Transaction Line
+        // Calculate line-level tax breakdown
+        final lineGross = cartItem.totalPrice;
+        final isVatExempt = cartItem.item.isVatExempt;
+        final lineVatableSales = isVatExempt ? 0.0 : (lineGross / 1.12);
+        final lineVatAmount = isVatExempt ? 0.0 : (lineGross - lineVatableSales);
+        final lineVatExemptSales = isVatExempt ? lineGross : 0.0;
+
+        // Insert Transaction Line (Standardized sale_transaction_id)
         await txn.insert(SchemaConstants.transactionLine, {
           'sale_transaction_id': txnId,
           'item_id': cartItem.item.id,
@@ -111,6 +134,11 @@ class OrderDao {
           'gross_price': cartItem.unitPrice,
           'amount': cartItem.totalPrice,
           'gross_amount': cartItem.totalPrice,
+          'is_disc_exempt': cartItem.item.isDiscountExempt ? 1 : 0,
+          'order_type_id': order.orderTypeId,
+          'vat_sales': lineVatableSales,
+          'vat_amount': lineVatAmount,
+          'vat_exempt_sales': lineVatExemptSales,
         });
 
         // Deduct Stock Quantity
@@ -121,7 +149,7 @@ class OrderDao {
             SET quantity = quantity - ?,
                 updated_at = ?
             WHERE item_id = ?
-          ''',
+            ''',
             [
               cartItem.quantity,
               now,
@@ -131,7 +159,7 @@ class OrderDao {
         }
       }
 
-      // 4. Insert Payment Record
+      // 5. Insert Payment Record
       await txn.insert(SchemaConstants.payment, {
         'sale_transaction_id': txnId,
         'cashier_id': order.cashierId,
@@ -157,7 +185,7 @@ class OrderDao {
       ejBuffer.writeln('  Change Given   : ₱${changeGiven.toStringAsFixed(2)}');
       ejBuffer.writeln('========================================');
 
-      // 5. Save Electronic Journal (EJ) Entry
+      // 6. Save Electronic Journal (EJ) Entry
       await txn.insert(SchemaConstants.electronicJournal, {
         'sale_transaction_id': txnId,
         'cashier_id': order.cashierId,
@@ -175,6 +203,7 @@ class OrderDao {
   }) async {
     final db = await _databaseHelper.database;
 
+    // Fixed u.username -> u.name
     return await db.rawQuery(
       '''
       SELECT
@@ -184,7 +213,7 @@ class OrderDao {
         st.net_amount,
         st.transaction_date,
         st.status,
-        u.username AS cashier_name,
+        u.name AS cashier_name,
         ot.name AS order_type_name,
         p.cash_tendered,
         p.change_given,
@@ -217,7 +246,7 @@ class OrderDao {
       FROM ${SchemaConstants.transactionLine} tl
       LEFT JOIN ${SchemaConstants.saleTransaction} st ON tl.sale_transaction_id = st.id
       LEFT JOIN ${SchemaConstants.salesOrderItem} soi ON soi.sales_order_id = st.sales_order_id AND soi.item_id = tl.item_id
-      WHERE tl.sales_transaction_id = ?
+      WHERE tl.sale_transaction_id = ?
       ''',
       [transactionId],
     );
@@ -256,41 +285,58 @@ class OrderDao {
 
       final txnData = txnResults.first;
       final salesOrderId = txnData['sales_order_id'] as int;
-
       final now = DateTime.now().toIso8601String();
 
+      // 1. Mark Transaction & Order as Voided
       await txn.update(
         SchemaConstants.saleTransaction,
         {
           'status': 2,
-          'updated_at': now,
+          'is_voided': 1,
+          'posted_at': now,
         },
         where: 'id = ?',
         whereArgs: [transactionId],
       );
 
+      await txn.update(
+        SchemaConstants.salesOrder,
+        {
+          'payment_status': 2,
+          'remarks': 'VOIDED: $reason',
+          'updated_at': now,
+        },
+        where: 'id = ?',
+        whereArgs: [salesOrderId],
+      );
+
+      // 2. Fetch lines using standardized sale_transaction_id
       final lineItems = await txn.query(
         SchemaConstants.transactionLine,
-        where: 'sales_transaction_id = ?',
+        where: 'sale_transaction_id = ?',
         whereArgs: [transactionId],
       );
 
+      // 3. Restore Stock with null-safety
       for (final line in lineItems) {
-        final itemId = line['item_id'] as int;
+        final itemId = line['item_id'] as int?;
         final qtySold = (line['quantity'] as num).toDouble();
 
-        await txn.rawUpdate(
-          '''
-          UPDATE ${SchemaConstants.stock}
-          SET quantity = quantity + ?,
-              remarks = ?,
-              updated_at = ?
-          WHERE item_id = ?
-        ''',
-          [qtySold, 'RESTORED: Void Txn #$transactionId', now, itemId],
-        );
+        if (itemId != null) {
+          await txn.rawUpdate(
+            '''
+            UPDATE ${SchemaConstants.stock}
+            SET quantity = quantity + ?,
+                remarks = ?,
+                updated_at = ?
+            WHERE item_id = ?
+            ''',
+            [qtySold, 'RESTORED: Void Txn #$transactionId', now, itemId],
+          );
+        }
       }
 
+      // 4. Log to Electronic Journal
       final ejContent =
           '''
 ========================================
