@@ -4,12 +4,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:suki_pos/core/utils/image_storage_service.dart';
+import 'package:suki_pos/domain/entities/maintenance/category.dart';
 import 'package:suki_pos/domain/entities/maintenance/item.dart';
 import 'package:suki_pos/domain/entities/maintenance/option_group.dart';
 import 'package:suki_pos/domain/entities/orders/cart_item.dart';
 import 'package:suki_pos/domain/entities/orders/tax_discount_breakdown.dart';
 import 'package:suki_pos/presentation/auth/bloc/auth_bloc.dart';
 import 'package:suki_pos/presentation/maintenance/category/bloc/category_bloc.dart';
+import 'package:suki_pos/presentation/maintenance/department/bloc/department_bloc.dart';
 import 'package:suki_pos/presentation/maintenance/item/bloc/item_bloc.dart';
 import 'package:suki_pos/presentation/maintenance/item/bloc/item_event.dart';
 import 'package:suki_pos/presentation/maintenance/item/bloc/item_state.dart';
@@ -43,6 +45,7 @@ class SalesEntryPage extends StatefulWidget {
 }
 
 class _SalesEntryPageState extends State<SalesEntryPage> {
+  int? _selectedDepartmentId;
   int? _selectedCategoryId;
   int? _selectedOrderTypeId;
   final TextEditingController _searchController = TextEditingController();
@@ -53,6 +56,7 @@ class _SalesEntryPageState extends State<SalesEntryPage> {
     super.initState();
     context.read<ItemBloc>().add(LoadItems());
     context.read<CategoryBloc>().add(GetCategoriesEvent());
+    context.read<DepartmentBloc>().add(GetDepartmentsEvent());
     context.read<OptionGroupCubit>().loadOptionGroups();
     context.read<OrderTypeCubit>().loadOrderTypes();
 
@@ -207,15 +211,30 @@ class _SalesEntryPageState extends State<SalesEntryPage> {
     );
   }
 
-  List<Item> _filteredItems(List<Item> items) {
-    var filtered = _selectedCategoryId == null
-        ? items
-        : items.where((i) => i.categoryId == _selectedCategoryId).toList();
-
-    if (_searchQuery.isNotEmpty) {
-      filtered = filtered.where((i) => i.name.toLowerCase().contains(_searchQuery)).toList();
+  List<Item> _filteredItems(List<Item> items, List<Category> allCategories) {
+    Set<int>? validCategoryIds;
+    if (_selectedDepartmentId != null) {
+      validCategoryIds = allCategories
+          .where((cat) => cat.departmentId == _selectedDepartmentId)
+          .map((cat) => cat.id)
+          .toSet();
     }
-    return filtered;
+
+    return items.where((item) {
+      if (validCategoryIds != null && !validCategoryIds.contains(item.categoryId)) {
+        return false;
+      }
+
+      if (_selectedCategoryId != null && item.categoryId != _selectedCategoryId) {
+        return false;
+      }
+
+      if (_searchQuery.isNotEmpty && !item.name.toLowerCase().contains(_searchQuery)) {
+        return false;
+      }
+
+      return true;
+    }).toList();
   }
 
   @override
@@ -224,7 +243,8 @@ class _SalesEntryPageState extends State<SalesEntryPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Sales Entry'),
+        backgroundColor: theme.primaryColor,
+        title: Text('Sales Entry', style: TextStyle(color: theme.colorScheme.onPrimary)),
         actions: [
           // Cart icon + badge, shown only on mobile widths (search/order-type live in the body).
           Builder(
@@ -291,7 +311,16 @@ class _SalesEntryPageState extends State<SalesEntryPage> {
     return Column(
       children: [
         _buildControlsBar(theme, isMobile: true),
-        _buildCategoryChips(theme),
+        Padding(
+          padding: const EdgeInsets.only(right: 12, bottom: 12, left: 12),
+          child: Row(
+            children: [
+              Expanded(child: _buildDepartmentDropdown(theme)),
+              const SizedBox(width: 12),
+              Expanded(child: _buildCategoryDropdown(theme)),
+            ],
+          ),
+        ),
         const Divider(height: 1),
         Expanded(child: _buildItemGrid(theme, crossAxisExtent: 180)),
         _buildMobileCartSummaryBar(theme),
@@ -311,7 +340,16 @@ class _SalesEntryPageState extends State<SalesEntryPage> {
             child: Column(
               children: [
                 _buildControlsBar(theme, isMobile: false),
-                _buildCategoryChips(theme),
+                Padding(
+                  padding: const EdgeInsets.only(right: 12, bottom: 12, left: 12),
+                  child: Row(
+                    children: [
+                      Expanded(child: _buildDepartmentDropdown(theme)),
+                      const SizedBox(width: 12),
+                      Expanded(child: _buildCategoryDropdown(theme)),
+                    ],
+                  ),
+                ),
                 const Divider(height: 1),
                 Expanded(child: _buildItemGrid(theme, crossAxisExtent: isTablet ? 170 : 200)),
               ],
@@ -395,7 +433,7 @@ class _SalesEntryPageState extends State<SalesEntryPage> {
             ),
             child: DropdownButtonHideUnderline(
               child: DropdownButton<int>(
-                value: state.orderTypes.first.id,
+                value: _selectedOrderTypeId ?? 1,
                 isExpanded: true,
                 icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 22),
                 borderRadius: BorderRadius.circular(12),
@@ -407,6 +445,9 @@ class _SalesEntryPageState extends State<SalesEntryPage> {
                 ),
                 onChanged: (value) {
                   if (value != null) {
+                    setState(() {
+                      _selectedOrderTypeId = (value == null || value == 0) ? null : value;
+                    });
                     context.read<CartCubit>().setOrderType(value);
                   }
                 },
@@ -419,7 +460,7 @@ class _SalesEntryPageState extends State<SalesEntryPage> {
                       style: TextStyle(color: Color(0xFF9CA3AF), fontWeight: FontWeight.w400),
                     ),
                   ),
-                  ...state.orderTypes.map(
+                  ...([...state.orderTypes]..sort((a, b) => a.id.compareTo(b.id))).map(
                     (orderType) => DropdownMenuItem<int>(
                       value: orderType.id,
                       child: Text(orderType.name.toUpperCase()),
@@ -455,39 +496,134 @@ class _SalesEntryPageState extends State<SalesEntryPage> {
   }
 
   // ---------------------------------------------------------------------
-  // CATEGORY FILTER CHIPS
+  // DEPARTMENT AND CATEGORY FILTER DROPDOWN
   // ---------------------------------------------------------------------
 
-  Widget _buildCategoryChips(ThemeData theme) {
+  Widget _buildDepartmentDropdown(ThemeData theme) {
+    return BlocBuilder<DepartmentBloc, DepartmentState>(
+      builder: (context, state) {
+        if (state is! DepartmentLoaded) return const SizedBox.shrink();
+
+        return Container(
+          height: 48,
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.grey.shade300),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.04),
+                blurRadius: 6,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<int>(
+              value: _selectedDepartmentId ?? 0,
+              isExpanded: true,
+              icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 22),
+              borderRadius: BorderRadius.circular(12),
+              dropdownColor: Colors.white,
+              style: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w500,
+                color: Color(0xFF1F2937),
+              ),
+              onChanged: (value) {
+                setState(() {
+                  _selectedDepartmentId = (value == null || value == 0) ? null : value;
+                  _selectedCategoryId = null;
+                });
+              },
+              items: [
+                const DropdownMenuItem<int>(
+                  value: 0,
+                  child: Text(
+                    'Select Department',
+                    style: TextStyle(color: Color(0xFF9CA3AF), fontWeight: FontWeight.w400),
+                  ),
+                ),
+                ...state.departments.map(
+                  (dept) => DropdownMenuItem<int>(
+                    value: dept.id,
+                    child: Text(dept.name.toUpperCase()),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildCategoryDropdown(ThemeData theme) {
     return BlocBuilder<CategoryBloc, CategoryState>(
       builder: (context, state) {
         if (state is! CategoryLoaded) return const SizedBox.shrink();
 
-        return SizedBox(
-          height: 44,
-          child: ListView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-            children: [
-              _buildChip(
-                theme,
-                label: 'All Items',
-                selected: _selectedCategoryId == null,
-                onTap: () => setState(() => _selectedCategoryId = null),
-              ),
-              const SizedBox(width: 8),
-              ...state.categories.map(
-                (cat) => Padding(
-                  padding: const EdgeInsets.only(right: 8.0),
-                  child: _buildChip(
-                    theme,
-                    label: cat.name,
-                    selected: _selectedCategoryId == cat.id,
-                    onTap: () => setState(() => _selectedCategoryId = cat.id),
-                  ),
-                ),
+        final visibleCategories = state.categories.where((cat) {
+          if (_selectedDepartmentId != null && cat.departmentId != _selectedDepartmentId) {
+            return false;
+          }
+          return true;
+        }).toList();
+
+        final isValidSelection = visibleCategories.any((cat) => cat.id == _selectedCategoryId);
+        final activeValue = isValidSelection ? _selectedCategoryId : 0;
+
+        return Container(
+          height: 48,
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.grey.shade300),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.04),
+                blurRadius: 6,
+                offset: const Offset(0, 2),
               ),
             ],
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<int>(
+              value: activeValue,
+              isExpanded: true,
+              icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 22),
+              borderRadius: BorderRadius.circular(12),
+              dropdownColor: Colors.white,
+              style: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w500,
+                color: Color(0xFF1F2937),
+              ),
+              onChanged: (value) {
+                if (value != null) {
+                  setState(() {
+                    _selectedCategoryId = (value == null) || value == 0 ? null : value;
+                  });
+                }
+              },
+              items: [
+                const DropdownMenuItem<int>(
+                  value: 0,
+                  child: Text(
+                    'All Categories',
+                    style: TextStyle(color: Color(0xFF9CA3AF), fontWeight: FontWeight.w400),
+                  ),
+                ),
+                ...visibleCategories.map(
+                  (cat) => DropdownMenuItem<int>(
+                    value: cat.id,
+                    child: Text(cat.name.toUpperCase()),
+                  ),
+                ),
+              ],
+            ),
           ),
         );
       },
@@ -516,95 +652,101 @@ class _SalesEntryPageState extends State<SalesEntryPage> {
   // ---------------------------------------------------------------------
 
   Widget _buildItemGrid(ThemeData theme, {required double crossAxisExtent}) {
-    return BlocBuilder<ItemBloc, ItemState>(
-      builder: (context, state) {
-        if (state is ItemLoading) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        if (state is ItemLoaded) {
-          final items = _filteredItems(state.items);
+    return BlocBuilder<CategoryBloc, CategoryState>(
+      builder: (context, categoryState) {
+        final allCategories = categoryState is CategoryLoaded ? categoryState.categories : <Category>[];
 
-          if (items.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.search_off, size: 48, color: Colors.grey[400]),
-                  const SizedBox(height: 8),
-                  Text(
-                    _searchQuery.isNotEmpty
-                        ? 'No items match "${_searchController.text}"'
-                        : 'No items in this category.',
-                    style: TextStyle(color: Colors.grey[600]),
-                  ),
-                ],
-              ),
-            );
-          }
+        return BlocBuilder<ItemBloc, ItemState>(
+          builder: (context, itemState) {
+            if (itemState is ItemLoading) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            if (itemState is ItemLoaded) {
+              final items = _filteredItems(itemState.items, allCategories);
 
-          return GridView.builder(
-            padding: const EdgeInsets.all(12),
-            gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
-              maxCrossAxisExtent: crossAxisExtent,
-              childAspectRatio: 0.72,
-              crossAxisSpacing: 12,
-              mainAxisSpacing: 12,
-            ),
-            itemCount: items.length,
-            itemBuilder: (context, idx) {
-              final item = items[idx];
-              final defaultPrice = item.prices.isNotEmpty ? item.prices.first.price : 0.0;
-
-              return Card(
-                elevation: 2,
-                clipBehavior: Clip.antiAlias,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                child: InkWell(
-                  onTap: () => AddToCartModal.show(context, item: item),
+              if (items.isEmpty) {
+                return Center(
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      AspectRatio(
-                        aspectRatio: 1.1,
-                        child: _buildProductCardImage(theme, item),
-                      ),
-                      Expanded(
-                        child: Padding(
-                          padding: const EdgeInsets.all(10.0),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                item.name,
-                                style: GoogleFonts.inter(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                  color: const Color(0xFF1E293B),
-                                ),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              Text(
-                                '₱${defaultPrice.toStringAsFixed(2)}',
-                                style: GoogleFonts.inter(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.bold,
-                                  color: theme.colorScheme.primary,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
+                      Icon(Icons.search_off, size: 48, color: Colors.grey[400]),
+                      const SizedBox(height: 8),
+                      Text(
+                        _searchQuery.isNotEmpty
+                            ? 'No items match "${_searchController.text}"'
+                            : 'No items in this category.',
+                        style: TextStyle(color: Colors.grey[600]),
                       ),
                     ],
                   ),
+                );
+              }
+
+              return GridView.builder(
+                padding: const EdgeInsets.all(12),
+                gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+                  maxCrossAxisExtent: crossAxisExtent,
+                  childAspectRatio: 0.72,
+                  crossAxisSpacing: 12,
+                  mainAxisSpacing: 12,
                 ),
+                itemCount: items.length,
+                itemBuilder: (context, idx) {
+                  final item = items[idx];
+                  final defaultPrice = item.prices.isNotEmpty ? item.prices.first.price : 0.0;
+
+                  return Card(
+                    elevation: 2,
+                    clipBehavior: Clip.antiAlias,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    child: InkWell(
+                      onTap: () => AddToCartModal.show(context, item: item),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          AspectRatio(
+                            aspectRatio: 1.1,
+                            child: _buildProductCardImage(theme, item),
+                          ),
+                          Expanded(
+                            child: Padding(
+                              padding: const EdgeInsets.all(10.0),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    item.name,
+                                    style: GoogleFonts.inter(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                      color: const Color(0xFF1E293B),
+                                    ),
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  Text(
+                                    '₱${defaultPrice.toStringAsFixed(2)}',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.bold,
+                                      color: theme.colorScheme.primary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
               );
-            },
-          );
-        }
-        return const Center(child: Text('No items available.'));
+            }
+            return const Center(child: Text('No items available.'));
+          },
+        );
       },
     );
   }
