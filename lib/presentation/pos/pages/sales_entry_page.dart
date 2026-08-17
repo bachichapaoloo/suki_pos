@@ -26,6 +26,7 @@ import 'package:suki_pos/presentation/pos/bloc/shift_state.dart';
 import 'package:suki_pos/presentation/pos/widgets/add_to_cart_modal.dart';
 import 'package:suki_pos/presentation/pos/widgets/cart_line_item_tile.dart';
 import 'package:suki_pos/presentation/pos/widgets/change_fund_dialog.dart';
+import 'package:suki_pos/presentation/pos/widgets/confirmation_dialog.dart';
 import 'package:suki_pos/presentation/pos/widgets/discount_selection_dialog.dart';
 import 'package:suki_pos/presentation/pos/widgets/item_detail_modal_dialog.dart';
 import 'package:suki_pos/presentation/pos/widgets/payment_dialog.dart';
@@ -103,6 +104,39 @@ class _SalesEntryPageState extends State<SalesEntryPage> {
           },
         ),
       );
+    }
+  }
+
+  Future<void> _handleBackNavigation(BuildContext context) async {
+    final cart = context.read<CartCubit>().state;
+
+    if (cart.items.isNotEmpty) {
+      // Single button alert:
+      await ConfirmationDialog.show(
+        context,
+        title: 'Active Order in Cart',
+        message: 'You have items in your cart. Please complete the transaction or clear the cart before leaving.',
+        variant: DialogVariant.warning,
+        confirmLabel: 'OK',
+        showCancel: false,
+        contentAlignment: TextAlign.center,
+      );
+      return;
+    }
+
+    // Confirmation dialog:
+    final shouldExit = await ConfirmationDialog.show(
+      context,
+      title: 'Exit Sales Entry',
+      message: 'Are you sure you want to return to the previous screen?',
+      confirmLabel: 'Exit',
+      confirmColor: Colors.red.shade600,
+      variant: DialogVariant.danger,
+      contentAlignment: TextAlign.center,
+    );
+
+    if (shouldExit == true && mounted) {
+      Navigator.of(context).pop();
     }
   }
 
@@ -241,63 +275,70 @@ class _SalesEntryPageState extends State<SalesEntryPage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: theme.primaryColor,
-        title: Text('Sales Entry', style: TextStyle(color: theme.colorScheme.onPrimary)),
-        actions: [
-          // Cart icon + badge, shown only on mobile widths (search/order-type live in the body).
-          Builder(
-            builder: (context) {
-              final isMobile = MediaQuery.of(context).size.width < _Breakpoints.mobile;
-              if (!isMobile) return const SizedBox.shrink();
-              return BlocBuilder<CartCubit, CartState>(
-                builder: (context, cartState) {
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: Stack(
-                      clipBehavior: Clip.none,
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.shopping_cart_outlined),
-                          tooltip: 'View Cart',
-                          onPressed: cartState.items.isEmpty ? null : () => _openMobileCartSheet(context),
-                        ),
-                        if (cartState.totalItemCount > 0)
-                          Positioned(
-                            right: 4,
-                            top: 4,
-                            child: Container(
-                              padding: const EdgeInsets.all(4),
-                              decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
-                              constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
-                              child: Text(
-                                '${cartState.totalItemCount}',
-                                style: const TextStyle(color: Colors.white, fontSize: 10),
-                                textAlign: TextAlign.center,
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        _handleBackNavigation(context);
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          backgroundColor: theme.primaryColor,
+          title: Text('Sales Entry', style: TextStyle(color: theme.colorScheme.onPrimary)),
+          actions: [
+            // Cart icon + badge, shown only on mobile widths (search/order-type live in the body).
+            Builder(
+              builder: (context) {
+                final isMobile = MediaQuery.of(context).size.width < _Breakpoints.mobile;
+                if (!isMobile) return const SizedBox.shrink();
+                return BlocBuilder<CartCubit, CartState>(
+                  builder: (context, cartState) {
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.shopping_cart_outlined),
+                            tooltip: 'View Cart',
+                            onPressed: cartState.items.isEmpty ? null : () => _openMobileCartSheet(context),
+                          ),
+                          if (cartState.totalItemCount > 0)
+                            Positioned(
+                              right: 4,
+                              top: 4,
+                              child: Container(
+                                padding: const EdgeInsets.all(4),
+                                decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
+                                constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                                child: Text(
+                                  '${cartState.totalItemCount}',
+                                  style: const TextStyle(color: Colors.white, fontSize: 10),
+                                  textAlign: TextAlign.center,
+                                ),
                               ),
                             ),
-                          ),
-                      ],
-                    ),
-                  );
-                },
-              );
+                        ],
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
+          ],
+        ),
+        body: SafeArea(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final isMobile = constraints.maxWidth < _Breakpoints.mobile;
+              final isTablet = !isMobile && constraints.maxWidth < _Breakpoints.tablet;
+
+              if (isMobile) {
+                return _buildMobileLayout(theme);
+              }
+              return _buildWideLayout(theme, isTablet: isTablet);
             },
           ),
-        ],
-      ),
-      body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final isMobile = constraints.maxWidth < _Breakpoints.mobile;
-            final isTablet = !isMobile && constraints.maxWidth < _Breakpoints.tablet;
-
-            if (isMobile) {
-              return _buildMobileLayout(theme);
-            }
-            return _buildWideLayout(theme, isTablet: isTablet);
-          },
         ),
       ),
     );

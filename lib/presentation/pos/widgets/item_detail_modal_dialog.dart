@@ -1,13 +1,22 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:suki_pos/core/utils/image_storage_service.dart';
 import 'package:suki_pos/domain/entities/maintenance/item.dart';
 import 'package:suki_pos/domain/entities/maintenance/option_group.dart';
 import 'package:suki_pos/domain/entities/maintenance/option_value.dart';
 import 'package:suki_pos/domain/entities/orders/cart_item.dart';
+import 'package:suki_pos/presentation/pos/widgets/confirmation_dialog.dart';
 
 class ItemDetailModalDialog extends StatefulWidget {
+  const ItemDetailModalDialog({
+    super.key,
+    required this.item,
+    required this.optionGroups,
+    this.existingCartItem,
+    required this.onConfirm,
+  });
   final Item item;
   final List<OptionGroup> optionGroups;
   final CartItem? existingCartItem;
@@ -18,13 +27,29 @@ class ItemDetailModalDialog extends StatefulWidget {
   })
   onConfirm;
 
-  const ItemDetailModalDialog({
-    super.key,
-    required this.item,
-    required this.optionGroups,
-    this.existingCartItem,
-    required this.onConfirm,
-  });
+  static Future<void> show(
+    BuildContext context, {
+    required Item item,
+    required List<OptionGroup> optionGroups,
+    CartItem? existingCartItem,
+    required Function({
+      required List<OptionValue> selectedOptions,
+      required int quantity,
+      String? notes,
+    })
+    onConfirm,
+  }) {
+    return showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => ItemDetailModalDialog(
+        item: item,
+        optionGroups: optionGroups,
+        existingCartItem: existingCartItem,
+        onConfirm: onConfirm,
+      ),
+    );
+  }
 
   @override
   State<ItemDetailModalDialog> createState() => _ItemDetailModalDialogState();
@@ -60,10 +85,10 @@ class _ItemDetailModalDialogState extends State<ItemDetailModalDialog> {
     setState(() {
       final groupId = group.id!;
       if (group.selectionType == 0) {
-        // Single Select (Radio)
+        // Single Select (Radio behavior)
         _selectedSelections[groupId] = [val];
       } else {
-        // Multi Select (Checkbox)
+        // Multi Select (Checkbox behavior)
         final current = _selectedSelections[groupId] ?? [];
         if (current.any((v) => v.id == val.id)) {
           current.removeWhere((v) => v.id == val.id);
@@ -80,7 +105,11 @@ class _ItemDetailModalDialogState extends State<ItemDetailModalDialog> {
       final selected = _selectedSelections[group.id!] ?? [];
       if (group.isRequired && selected.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Please select a required option for ${group.name}')),
+          SnackBar(
+            content: Text('Please select a required option for "${group.name}".'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+            behavior: SnackBarBehavior.floating,
+          ),
         );
         return false;
       }
@@ -90,7 +119,12 @@ class _ItemDetailModalDialogState extends State<ItemDetailModalDialog> {
 
   double get _computedUnitPrice {
     final basePrice = widget.item.prices.isNotEmpty
-        ? widget.item.prices.firstWhere((p) => p.priceLevel == 'default', orElse: () => widget.item.prices.first).price
+        ? widget.item.prices
+              .firstWhere(
+                (p) => p.priceLevel.toLowerCase() == 'default',
+                orElse: () => widget.item.prices.first,
+              )
+              .price
         : widget.item.costPrice;
 
     final optionsDelta = _selectedSelections.values
@@ -103,173 +137,311 @@ class _ItemDetailModalDialogState extends State<ItemDetailModalDialog> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     final isEditing = widget.existingCartItem != null;
     final allSelectedValues = _selectedSelections.values.expand((list) => list).toList();
+    final totalPrice = _computedUnitPrice * _quantity;
 
-    return AlertDialog(
-      title: Row(
+    return ConfirmationDialog(
+      title: isEditing ? 'Edit Item Details' : 'Customize Item',
+      width: 520,
+      maxHeight: 640,
+      showCloseButton: true,
+      showDividers: true,
+      confirmLabel: isEditing ? 'Update Cart' : 'Add to Cart',
+      cancelLabel: 'Cancel',
+      onCancel: () => Navigator.of(context).pop(),
+      onConfirm: () {
+        if (_validate()) {
+          widget.onConfirm(
+            selectedOptions: allSelectedValues,
+            quantity: _quantity,
+            notes: _notesController.text.trim().isEmpty ? null : _notesController.text.trim(),
+          );
+          Navigator.of(context).pop();
+        }
+      },
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (widget.item.displayImage != null && widget.item.displayImage!.isNotEmpty) ...[
-            FutureBuilder<String?>(
-              future: ImageStorageService.resolveImagePath(widget.item.displayImage),
-              builder: (_, snap) {
-                final path = snap.data;
-                if (path == null) return const SizedBox.shrink();
-                return Row(
-                  mainAxisSize: MainAxisSize.min,
+          // 1. Item Header Overview (Image, Name & Dynamic Price Badge)
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
+            ),
+            child: Row(
+              children: [
+                if (widget.item.displayImage != null && widget.item.displayImage!.isNotEmpty)
+                  FutureBuilder<String?>(
+                    future: ImageStorageService.resolveImagePath(widget.item.displayImage),
+                    builder: (_, snap) {
+                      final path = snap.data;
+                      if (path == null) return _buildFallbackThumbnail(colorScheme);
+                      return ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.file(
+                          File(path),
+                          width: 48,
+                          height: 48,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => _buildFallbackThumbnail(colorScheme),
+                        ),
+                      );
+                    },
+                  )
+                else
+                  _buildFallbackThumbnail(colorScheme),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        widget.item.name,
+                        style: GoogleFonts.inter(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: colorScheme.onSurface,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      Text(
+                        'Base: ₱${widget.item.prices.first.price.toStringAsFixed(2)}',
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: Image.file(
-                        File(path),
-                        width: 44,
-                        height: 44,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => const Icon(Icons.fastfood_outlined, size: 36),
+                    Text(
+                      'Total',
+                      style: GoogleFonts.inter(fontSize: 11, color: colorScheme.onSurfaceVariant),
+                    ),
+                    Text(
+                      '₱${totalPrice.toStringAsFixed(2)}',
+                      style: GoogleFonts.inter(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w800,
+                        color: colorScheme.primary,
                       ),
                     ),
-                    const SizedBox(width: 12),
                   ],
-                );
-              },
-            ),
-          ],
-          Expanded(
-            child: Text(
-              isEditing ? 'Edit ${widget.item.name}' : widget.item.name,
-              style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-              overflow: TextOverflow.ellipsis,
+                ),
+              ],
             ),
           ),
-          const SizedBox(width: 8),
-          Text(
-            '₱${(_computedUnitPrice * _quantity).toStringAsFixed(2)}',
-            style: theme.textTheme.titleLarge?.copyWith(
-              color: theme.colorScheme.primary,
-              fontWeight: FontWeight.bold,
+          const SizedBox(height: 14),
+
+          // 2. Quantity Stepper
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            decoration: BoxDecoration(
+              color: colorScheme.surface,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.6)),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Quantity',
+                  style: GoogleFonts.inter(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: colorScheme.onSurface,
+                  ),
+                ),
+                Row(
+                  children: [
+                    IconButton.filledTonal(
+                      icon: const Icon(Icons.remove, size: 18),
+                      visualDensity: VisualDensity.compact,
+                      onPressed: _quantity > 1 ? () => setState(() => _quantity--) : null,
+                    ),
+                    Container(
+                      constraints: const BoxConstraints(minWidth: 40),
+                      alignment: Alignment.center,
+                      child: Text(
+                        '$_quantity',
+                        style: GoogleFonts.inter(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: colorScheme.onSurface,
+                        ),
+                      ),
+                    ),
+                    IconButton.filledTonal(
+                      icon: const Icon(Icons.add, size: 18),
+                      visualDensity: VisualDensity.compact,
+                      onPressed: () => setState(() => _quantity++),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+
+          // 3. Option Groups & Modifier Selections
+          if (widget.optionGroups.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 16.0),
+              child: Center(
+                child: Text(
+                  'No customizable options for this item.',
+                  style: GoogleFonts.inter(fontSize: 13, color: colorScheme.onSurfaceVariant),
+                ),
+              ),
+            )
+          else
+            ...widget.optionGroups.map((group) {
+              final selectedForGroup = _selectedSelections[group.id!] ?? [];
+              final isSingleSelect = group.selectionType == 0;
+
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12.0),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: colorScheme.surface,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Group Header
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
+                        child: Row(
+                          children: [
+                            Text(
+                              group.name,
+                              style: GoogleFonts.inter(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                                color: colorScheme.onSurface,
+                              ),
+                            ),
+                            if (group.isRequired)
+                              Text(
+                                ' * (Required)',
+                                style: GoogleFonts.inter(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: colorScheme.error,
+                                ),
+                              )
+                            else
+                              Text(
+                                ' (Optional)',
+                                style: GoogleFonts.inter(
+                                  fontSize: 12,
+                                  color: colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                      const Divider(height: 1),
+
+                      // Option Values (Radio for single select, Checkbox for multi select)
+                      ...group.values.map((val) {
+                        final isSelected = selectedForGroup.any((v) => v.id == val.id);
+                        final priceDeltaText = val.priceDelta > 0
+                            ? '+₱${val.priceDelta.toStringAsFixed(2)}'
+                            : (val.priceDelta < 0 ? '-₱${val.priceDelta.abs().toStringAsFixed(2)}' : null);
+
+                        if (isSingleSelect) {
+                          return RadioListTile<int>(
+                            dense: true,
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 10),
+                            value: val.id!,
+                            groupValue: selectedForGroup.isNotEmpty ? selectedForGroup.first.id : null,
+                            onChanged: (_) => _onOptionSelected(group, val),
+                            title: Text(
+                              val.alias?.isNotEmpty == true ? val.alias! : val.alias!,
+                              style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w500),
+                            ),
+                            secondary: priceDeltaText != null
+                                ? Text(
+                                    priceDeltaText,
+                                    style: GoogleFonts.inter(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: colorScheme.primary,
+                                    ),
+                                  )
+                                : null,
+                          );
+                        }
+
+                        return CheckboxListTile(
+                          dense: true,
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 10),
+                          value: isSelected,
+                          onChanged: (_) => _onOptionSelected(group, val),
+                          title: Text(
+                            val.alias?.isNotEmpty == true ? val.alias! : val.alias!,
+                            style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w500),
+                          ),
+                          secondary: priceDeltaText != null
+                              ? Text(
+                                  priceDeltaText,
+                                  style: GoogleFonts.inter(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: colorScheme.primary,
+                                  ),
+                                )
+                              : null,
+                        );
+                      }),
+                    ],
+                  ),
+                ),
+              );
+            }),
+
+          const SizedBox(height: 4),
+
+          // 4. Special Instructions & Notes
+          TextField(
+            controller: _notesController,
+            maxLines: 2,
+            style: GoogleFonts.inter(fontSize: 13),
+            decoration: InputDecoration(
+              labelText: 'Special Instructions / Notes',
+              hintText: 'e.g. Less ice, no sugar, extra sauce...',
+              alignLabelWithHint: true,
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              isDense: true,
             ),
           ),
         ],
       ),
-      content: SizedBox(
-        width: 520,
-        height: 480,
-        child: Column(
-          children: [
-            // Quantity Selector
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text('Quantity:', style: TextStyle(fontWeight: FontWeight.w600)),
-                  Row(
-                    children: [
-                      IconButton.filledTonal(
-                        icon: const Icon(Icons.remove),
-                        onPressed: _quantity > 1 ? () => setState(() => _quantity--) : null,
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                        child: Text(
-                          '$_quantity',
-                          style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                      IconButton.filledTonal(
-                        icon: const Icon(Icons.add),
-                        onPressed: () => setState(() => _quantity++),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 12),
+    );
+  }
 
-            // Option Groups (Modifiers)
-            Expanded(
-              child: widget.optionGroups.isEmpty
-                  ? const Center(child: Text('No customizable options for this item.'))
-                  : ListView.builder(
-                      itemCount: widget.optionGroups.length,
-                      itemBuilder: (context, index) {
-                        final group = widget.optionGroups[index];
-                        final selectedForGroup = _selectedSelections[group.id!] ?? [];
-
-                        return Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 6.0),
-                              child: Row(
-                                children: [
-                                  Text(
-                                    group.name,
-                                    style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
-                                  ),
-                                  if (group.isRequired)
-                                    Text(
-                                      ' *',
-                                      style: TextStyle(color: theme.colorScheme.error, fontWeight: FontWeight.bold),
-                                    ),
-                                ],
-                              ),
-                            ),
-                            ...group.values.map((val) {
-                              final isSelected = selectedForGroup.any((v) => v.id == val.id);
-
-                              return CheckboxListTile(
-                                dense: true,
-                                title: Text(val.alias ?? ''),
-                                subtitle: val.priceDelta != 0 ? Text('+₱${val.priceDelta.toStringAsFixed(2)}') : null,
-                                value: isSelected,
-                                onChanged: (_) => _onOptionSelected(group, val),
-                              );
-                            }),
-                            const Divider(),
-                          ],
-                        );
-                      },
-                    ),
-            ),
-            const SizedBox(height: 8),
-
-            // Item Notes
-            TextField(
-              controller: _notesController,
-              decoration: const InputDecoration(
-                labelText: 'Item Special Instructions / Notes',
-                border: OutlineInputBorder(),
-                isDense: true,
-              ),
-            ),
-          ],
-        ),
+  Widget _buildFallbackThumbnail(ColorScheme colorScheme) {
+    return Container(
+      width: 48,
+      height: 48,
+      decoration: BoxDecoration(
+        color: colorScheme.primaryContainer.withValues(alpha: 0.4),
+        borderRadius: BorderRadius.circular(8),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(
-          onPressed: () {
-            if (_validate()) {
-              widget.onConfirm(
-                selectedOptions: allSelectedValues,
-                quantity: _quantity,
-                notes: _notesController.text.trim().isEmpty ? null : _notesController.text.trim(),
-              );
-              Navigator.of(context).pop();
-            }
-          },
-          child: Text(isEditing ? 'Update Cart' : 'Add to Cart'),
-        ),
-      ],
+      child: Icon(Icons.fastfood_outlined, size: 24, color: colorScheme.primary),
     );
   }
 }

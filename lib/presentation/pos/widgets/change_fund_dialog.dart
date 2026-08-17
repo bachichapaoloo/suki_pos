@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:suki_pos/presentation/pos/widgets/confirmation_dialog.dart';
 
 class ChangeFundDialog extends StatefulWidget {
   final Function(double amount) onConfirm;
@@ -29,24 +30,16 @@ class _ChangeFundDialogState extends State<ChangeFundDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Row(
-        children: [
-          Icon(Icons.monetization_on_outlined, color: Color(0xFF355C8F)),
-          SizedBox(width: 8),
-          Text('Enter Change Fund'),
-        ],
-      ),
-      content: SizedBox(
-        width: 360,
+    return ConfirmationDialog(
+      title: 'Enter Change Fund',
+      body: SizedBox(
+        width: 400,
         child: Form(
           key: _formKey,
           child: Column(
             mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              const Text('Declare starting cash float to open the POS register shift:'),
-              const SizedBox(height: 16),
               TextFormField(
                 controller: _amountController,
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -67,22 +60,12 @@ class _ChangeFundDialogState extends State<ChangeFundDialog> {
           ),
         ),
       ),
-      actions: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.end,
-          children: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Cancel'),
-            ),
-            const SizedBox(width: 8),
-            FilledButton(
-              onPressed: _submit,
-              child: const Text('Open Register Shift'),
-            ),
-          ],
-        ),
-      ],
+      confirmLabel: 'Open Register Shift',
+      onConfirm: _submit,
+      variant: DialogVariant.info,
+      contentAlignment: TextAlign.center,
+      showCancel: true,
+      onCancel: () => Navigator.of(context).pop(),
     );
   }
 }
