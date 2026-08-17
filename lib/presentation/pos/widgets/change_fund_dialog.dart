@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:suki_pos/core/enums/enums.dart';
 import 'package:suki_pos/presentation/pos/widgets/confirmation_dialog.dart';
 
 class ChangeFundDialog extends StatefulWidget {

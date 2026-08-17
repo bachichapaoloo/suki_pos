@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-
-enum MainTab { home, sales, inventory, reports }
+import 'package:suki_pos/core/enums/enums.dart';
 
 class MainLayout extends StatelessWidget {
   const MainLayout({

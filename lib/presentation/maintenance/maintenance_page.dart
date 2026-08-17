@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:suki_pos/core/enums/enums.dart';
 import 'package:suki_pos/presentation/widgets/main_layout.dart';
 
 class MaintenancePage extends StatelessWidget {

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-
-enum DiscountType { percentage, fixed }
+import 'package:suki_pos/core/enums/enums.dart';
 
 class DiscountSelectionDialog extends StatefulWidget {
   final double currentPercentage;

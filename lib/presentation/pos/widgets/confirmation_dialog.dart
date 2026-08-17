@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
-
-enum DialogVariant { info, warning, danger, success }
+import 'package:suki_pos/core/enums/enums.dart';
 
 class ConfirmationDialog extends StatelessWidget {
   const ConfirmationDialog({

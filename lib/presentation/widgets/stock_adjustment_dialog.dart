@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/widgets.dart';
+import 'package:suki_pos/core/enums/enums.dart';
 import 'package:suki_pos/domain/entities/inventory/stock_with_item.dart';
-
-enum AdjustmentType { stockIn, stockOut }
 
 class StockAdjustmentDialog extends StatefulWidget {
   final StockWithItem stockItem;
