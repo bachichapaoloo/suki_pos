@@ -69,7 +69,7 @@ class DiscountDao {
     final db = await _databaseHelper.database;
     return await db.update(
           SchemaConstants.discount,
-          {'active': isActive ? 1 : 0},
+          {'is_active': isActive ? 1 : 0},
           where: 'id = ?',
           whereArgs: [id],
         ) ==

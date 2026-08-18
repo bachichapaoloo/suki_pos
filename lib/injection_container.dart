@@ -1,6 +1,7 @@
 import 'package:get_it/get_it.dart';
 import 'package:suki_pos/core/database/database_helper.dart';
 import 'package:suki_pos/data/dao/department_dao.dart';
+import 'package:suki_pos/data/dao/discount_dao.dart';
 import 'package:suki_pos/data/dao/item_dao.dart';
 import 'package:suki_pos/data/dao/option_group_dao.dart';
 import 'package:suki_pos/data/dao/order_dao.dart';
@@ -14,6 +15,7 @@ import 'package:suki_pos/data/repositories/auth/auth_repository_impl.dart';
 import 'package:suki_pos/data/repositories/inventory/stock_repository_impl.dart';
 import 'package:suki_pos/data/repositories/maintenance/category_repository_impl.dart';
 import 'package:suki_pos/data/repositories/maintenance/department_repository_impl.dart';
+import 'package:suki_pos/data/repositories/maintenance/discount_repository_impl.dart';
 import 'package:suki_pos/data/repositories/maintenance/item_repository_impl.dart';
 import 'package:suki_pos/data/repositories/maintenance/option_group_repository_impl.dart';
 import 'package:suki_pos/data/repositories/maintenance/order_type_repository_impl.dart';
@@ -25,6 +27,7 @@ import 'package:suki_pos/domain/repositories/auth/auth_repository.dart';
 import 'package:suki_pos/domain/repositories/inventory/stock_repository.dart';
 import 'package:suki_pos/domain/repositories/maintenance/category_repository.dart';
 import 'package:suki_pos/domain/repositories/maintenance/department_repository.dart';
+import 'package:suki_pos/domain/repositories/maintenance/discount_repository.dart' show DiscountRepository;
 import 'package:suki_pos/domain/repositories/maintenance/item_repository.dart';
 import 'package:suki_pos/domain/repositories/maintenance/option_group_repository.dart';
 import 'package:suki_pos/domain/repositories/maintenance/order_type_repository.dart';
@@ -51,6 +54,7 @@ import 'package:suki_pos/presentation/auth/bloc/auth_bloc.dart';
 import 'package:suki_pos/presentation/inventory/stock_cubit.dart';
 import 'package:suki_pos/presentation/maintenance/category/bloc/category_bloc.dart';
 import 'package:suki_pos/presentation/maintenance/department/bloc/department_bloc.dart';
+import 'package:suki_pos/presentation/maintenance/discount/bloc/discount_bloc.dart';
 import 'package:suki_pos/presentation/maintenance/item/bloc/item_bloc.dart';
 import 'package:suki_pos/presentation/maintenance/option_group/bloc/option_group_cubit.dart';
 import 'package:suki_pos/presentation/maintenance/order_type/bloc/order_type_cubit.dart';
@@ -139,6 +143,11 @@ Future<void> init() async {
         deleteOrderType: sl(),
       ),
     )
+    ..registerFactory<DiscountBloc>(
+      () => DiscountBloc(
+        discountRepository: sl(),
+      ),
+    )
     //! Domain - Use Cases
     ..registerLazySingleton(() => GetDepartments(sl()))
     ..registerLazySingleton(() => SaveDepartment(sl()))
@@ -206,6 +215,9 @@ Future<void> init() async {
     ..registerLazySingleton<OrderTypeRepository>(
       () => OrderTypeRepositoryImpl(orderTypeDao: sl()),
     )
+    ..registerLazySingleton<DiscountRepository>(
+      () => DiscountRepositoryImpl(sl()),
+    )
     //! DAOs
     ..registerLazySingleton(() => DepartmentDao(sl()))
     ..registerLazySingleton(() => ItemDao(sl()))
@@ -214,7 +226,8 @@ Future<void> init() async {
     ..registerLazySingleton(() => OptionGroupDao(sl()))
     ..registerLazySingleton(() => OrderDao(sl()))
     ..registerLazySingleton(() => OrderTypeDao(sl()))
-    ..registerLazySingleton(() => ShiftDao(sl()));
+    ..registerLazySingleton(() => ShiftDao(sl()))
+    ..registerLazySingleton(() => DiscountDao(sl()));
 
   //! Core
   final dbHelper = DatabaseHelper();

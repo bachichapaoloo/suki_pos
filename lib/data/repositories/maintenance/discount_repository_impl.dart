@@ -5,7 +5,7 @@ import 'package:suki_pos/domain/entities/maintenance/discount.dart';
 import 'package:suki_pos/domain/entities/maintenance/discount_type.dart';
 import 'package:suki_pos/domain/repositories/maintenance/discount_repository.dart';
 
-abstract class DiscountRepositoryImpl implements DiscountRepository {
+class DiscountRepositoryImpl implements DiscountRepository {
   const DiscountRepositoryImpl(this.discountDao);
   final DiscountDao discountDao;
 

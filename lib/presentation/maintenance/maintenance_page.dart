@@ -39,15 +39,6 @@ class MaintenancePage extends StatelessWidget {
                 color: const Color(0xFF1E293B),
               ),
             ),
-            const SizedBox(height: 16),
-            _buildMobileActionCard(
-              context,
-              'Items',
-              Icons.category_outlined,
-              const Color(0xFF355C8F),
-              Colors.white,
-              route: '/maintenance/items',
-            ),
             const SizedBox(height: 12),
             _buildMobileActionCard(
               context,
@@ -66,7 +57,25 @@ class MaintenancePage extends StatelessWidget {
               Colors.white,
               route: '/maintenance/categories',
             ),
+            const SizedBox(height: 16),
+            _buildMobileActionCard(
+              context,
+              'Items',
+              Icons.category_outlined,
+              const Color(0xFF355C8F),
+              Colors.white,
+              route: '/maintenance/items',
+            ),
             const SizedBox(height: 32),
+            _buildMobileActionCard(
+              context,
+              'Discounts',
+              Icons.discount_outlined,
+              const Color(0xFFA5DDF1),
+              const Color(0xFF0369A1),
+              route: '/maintenance/discounts',
+            ),
+            const SizedBox(height: 12),
             Text(
               'System Config',
               style: GoogleFonts.inter(
@@ -195,17 +204,6 @@ class MaintenancePage extends StatelessWidget {
             const SizedBox(height: 24),
             Row(
               children: [
-                Expanded(
-                  child: _buildDesktopActionCard(
-                    context,
-                    title: 'Items',
-                    subtitle: 'Manage products and services',
-                    icon: Icons.category_outlined,
-                    iconBg: const Color(0xFF355C8F),
-                    iconColor: Colors.white,
-                    route: '/maintenance/items',
-                  ),
-                ),
                 const SizedBox(width: 24),
                 Expanded(
                   child: _buildDesktopActionCard(
@@ -228,6 +226,30 @@ class MaintenancePage extends StatelessWidget {
                     iconBg: const Color(0xFF355C8F),
                     iconColor: Colors.white,
                     route: '/maintenance/categories',
+                  ),
+                ),
+                const SizedBox(width: 24),
+                Expanded(
+                  child: _buildDesktopActionCard(
+                    context,
+                    title: 'Items',
+                    subtitle: 'Manage products and services',
+                    icon: Icons.category_outlined,
+                    iconBg: const Color(0xFF355C8F),
+                    iconColor: Colors.white,
+                    route: '/maintenance/items',
+                  ),
+                ),
+                const SizedBox(width: 24),
+                Expanded(
+                  child: _buildDesktopActionCard(
+                    context,
+                    title: 'Discounts',
+                    subtitle: 'Manage discounts',
+                    icon: Icons.discount_outlined,
+                    iconBg: const Color(0xFF355C8F),
+                    iconColor: Colors.white,
+                    route: '/maintenance/discounts',
                   ),
                 ),
               ],

@@ -20,6 +20,8 @@ import 'package:suki_pos/presentation/maintenance/category/bloc/category_bloc.da
 import 'package:suki_pos/presentation/maintenance/category/pages/category_list_page.dart';
 import 'package:suki_pos/presentation/maintenance/department/bloc/department_bloc.dart';
 import 'package:suki_pos/presentation/maintenance/department/pages/department_list_page.dart';
+import 'package:suki_pos/presentation/maintenance/discount/bloc/discount_bloc.dart';
+import 'package:suki_pos/presentation/maintenance/discount/pages/discount_list_page.dart';
 import 'package:suki_pos/presentation/maintenance/item/bloc/item_bloc.dart';
 import 'package:suki_pos/presentation/maintenance/item/pages/item_list_page.dart';
 import 'package:suki_pos/presentation/maintenance/maintenance_page.dart';
@@ -61,6 +63,7 @@ class MainApp extends StatelessWidget {
         BlocProvider(create: (_) => di.sl<DepartmentBloc>()),
         BlocProvider(create: (_) => di.sl<CategoryBloc>()),
         BlocProvider(create: (_) => di.sl<ItemBloc>()),
+        BlocProvider(create: (_) => di.sl<DiscountBloc>()),
         BlocProvider(create: (_) => di.sl<RoleBloc>()),
         BlocProvider(create: (_) => di.sl<UserBloc>()),
         BlocProvider(create: (_) => di.sl<AuthBloc>()),
@@ -93,6 +96,7 @@ class MainApp extends StatelessWidget {
           '/maintenance/departments': (context) => const DepartmentListPage(),
           '/maintenance/categories': (context) => const CategoryListPage(),
           '/maintenance/items': (context) => const ItemListPage(),
+          '/maintenance/discounts': (context) => const DiscountListPage(),
           '/admin': (context) => const AdminPage(),
           '/admin/users': (context) => const UserListPage(),
           '/admin/roles': (context) => const RoleListPage(),
