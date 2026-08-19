@@ -6,7 +6,7 @@ import 'package:suki_pos/presentation/pos/bloc/shift_cubit.dart';
 import 'package:suki_pos/presentation/pos/bloc/shift_state.dart';
 import 'package:suki_pos/presentation/pos/widgets/change_fund_dialog.dart';
 import 'package:suki_pos/presentation/pos/widgets/tender_declaration_dialog.dart';
-import 'package:suki_pos/presentation/pos/widgets/x_readomg_report_dialog.dart';
+import 'package:suki_pos/presentation/pos/widgets/x_reading_report_dialog.dart';
 import 'package:suki_pos/presentation/pos/widgets/z_reading_report_dialog.dart';
 
 class SalesReadingPage extends StatefulWidget {

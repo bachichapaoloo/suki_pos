@@ -11,6 +11,8 @@ import 'package:suki_pos/domain/entities/orders/tax_discount_breakdown.dart';
 import 'package:suki_pos/presentation/auth/bloc/auth_bloc.dart';
 import 'package:suki_pos/presentation/maintenance/category/bloc/category_bloc.dart';
 import 'package:suki_pos/presentation/maintenance/department/bloc/department_bloc.dart';
+import 'package:suki_pos/presentation/maintenance/discount/bloc/discount_bloc.dart';
+import 'package:suki_pos/presentation/maintenance/discount/bloc/discount_event.dart';
 import 'package:suki_pos/presentation/maintenance/item/bloc/item_bloc.dart';
 import 'package:suki_pos/presentation/maintenance/item/bloc/item_event.dart';
 import 'package:suki_pos/presentation/maintenance/item/bloc/item_state.dart';
@@ -57,6 +59,7 @@ class _SalesEntryPageState extends State<SalesEntryPage> {
     context.read<DepartmentBloc>().add(GetDepartmentsEvent());
     context.read<OptionGroupCubit>().loadOptionGroups();
     context.read<OrderTypeCubit>().loadOrderTypes();
+    context.read<DiscountBloc>().add(GetDiscountsEvent());
 
     _searchController.addListener(() {
       final query = _searchController.text.trim().toLowerCase();
@@ -300,7 +303,7 @@ class _SalesEntryPageState extends State<SalesEntryPage> {
                             tooltip: 'View Cart',
                             onPressed: cartState.items.isEmpty ? null : () => _openMobileCartSheet(context),
                           ),
-                          if (cartState.totalItemCount > 0)
+                          if (cartState.items.isNotEmpty)
                             Positioned(
                               right: 4,
                               top: 4,
@@ -309,7 +312,7 @@ class _SalesEntryPageState extends State<SalesEntryPage> {
                                 decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
                                 constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
                                 child: Text(
-                                  '${cartState.totalItemCount}',
+                                  '${cartState.items.length}',
                                   style: const TextStyle(color: Colors.white, fontSize: 10),
                                   textAlign: TextAlign.center,
                                 ),
@@ -854,7 +857,7 @@ class _SalesEntryPageState extends State<SalesEntryPage> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    'Current Cart (${cartState.totalItemCount})',
+                    'Current Cart (${cartState.items.length})',
                     style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
                   ),
                   IconButton(
@@ -965,11 +968,13 @@ class _SalesEntryPageState extends State<SalesEntryPage> {
                         child: OutlinedButton.icon(
                           icon: const Icon(Icons.discount_outlined),
                           label: Text(
-                            cartState.manualDiscountPercentage > 0
-                                ? '${cartState.manualDiscountPercentage.toInt()}% Off'
-                                : (cartState.manualDiscountFixed > 0
-                                      ? '₱${cartState.manualDiscountFixed.toStringAsFixed(0)} Off'
-                                      : 'Discount'),
+                            cartState.appliedDiscount != null
+                                ? cartState.appliedDiscount!.name
+                                : (cartState.manualDiscountPercentage > 0
+                                      ? '${cartState.manualDiscountPercentage.toInt()}% Off'
+                                      : (cartState.manualDiscountFixed > 0
+                                            ? '₱${cartState.manualDiscountFixed.toStringAsFixed(0)} Off'
+                                            : 'Discount')),
                           ),
                           onPressed: cartState.items.isEmpty
                               ? null
@@ -977,8 +982,10 @@ class _SalesEntryPageState extends State<SalesEntryPage> {
                                   showDialog(
                                     context: context,
                                     builder: (_) => DiscountSelectionDialog(
+                                      currentDiscount: cartState.appliedDiscount,
                                       currentPercentage: cartState.manualDiscountPercentage,
                                       currentFixed: cartState.manualDiscountFixed,
+                                      onApplyDiscount: (d) => context.read<CartCubit>().applyDiscount(d),
                                       onApplyPercentage: (p) => context.read<CartCubit>().applyDiscountPercentage(p),
                                       onApplyFixed: (a) => context.read<CartCubit>().applyDiscountFixed(a),
                                       onRemoveDiscount: () => context.read<CartCubit>().removeDiscount(),
@@ -1048,7 +1055,7 @@ class _SalesEntryPageState extends State<SalesEntryPage> {
                       const Icon(Icons.shopping_cart, color: Colors.white),
                       const SizedBox(width: 8),
                       Text(
-                        '${cartState.totalItemCount} item${cartState.totalItemCount == 1 ? '' : 's'}',
+                        '${cartState.items.length} item${cartState.items.length == 1 ? '' : 's'}',
                         style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
                       ),
                     ],

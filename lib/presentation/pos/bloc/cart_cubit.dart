@@ -1,5 +1,6 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:suki_pos/core/error/failures.dart';
+import 'package:suki_pos/domain/entities/maintenance/discount.dart';
 import 'package:suki_pos/domain/entities/maintenance/item.dart';
 import 'package:suki_pos/domain/entities/maintenance/option_value.dart';
 import 'package:suki_pos/domain/entities/orders/cart_item.dart';
@@ -71,9 +72,30 @@ class CartCubit extends Cubit<CartState> {
     emit(state.copyWith(items: updatedList));
   }
 
+  void applyDiscount(Discount discount) {
+    if (discount.isPercentage) {
+      emit(
+        state.copyWith(
+          appliedDiscount: discount,
+          manualDiscountPercentage: discount.percentage ?? 0.0,
+          manualDiscountFixed: 0.0,
+        ),
+      );
+    } else {
+      emit(
+        state.copyWith(
+          appliedDiscount: discount,
+          manualDiscountFixed: discount.fixedAmount ?? 0.0,
+          manualDiscountPercentage: 0.0,
+        ),
+      );
+    }
+  }
+
   void applyDiscountPercentage(double percent) {
     emit(
       state.copyWith(
+        clearAppliedDiscount: true,
         manualDiscountPercentage: percent,
         manualDiscountFixed: 0.0,
       ),
@@ -83,6 +105,7 @@ class CartCubit extends Cubit<CartState> {
   void applyDiscountFixed(double amount) {
     emit(
       state.copyWith(
+        clearAppliedDiscount: true,
         manualDiscountFixed: amount,
         manualDiscountPercentage: 0.0,
       ),
@@ -92,6 +115,7 @@ class CartCubit extends Cubit<CartState> {
   void removeDiscount() {
     emit(
       state.copyWith(
+        clearAppliedDiscount: true,
         manualDiscountPercentage: 0.0,
         manualDiscountFixed: 0.0,
       ),

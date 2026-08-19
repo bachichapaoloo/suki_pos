@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/widgets.dart';
 import 'package:suki_pos/core/enums/enums.dart';
 import 'package:suki_pos/domain/entities/inventory/stock_with_item.dart';
+import 'package:suki_pos/presentation/pos/widgets/confirmation_dialog.dart';
 
 class StockAdjustmentDialog extends StatefulWidget {
   final StockWithItem stockItem;
@@ -37,8 +37,9 @@ class _StockAdjustmentDialogState extends State<StockAdjustmentDialog> {
       final remarks = _remarksController.text.trim().isEmpty
           ? (_type == AdjustmentType.stockIn ? 'Stock Receiving' : 'Spoiled / Damaged')
           : _remarksController.text.trim();
+
       widget.onConfirm(delta, remarks);
-      Navigator.of(context).pop;
+      Navigator.of(context).pop();
     }
   }
 
@@ -47,24 +48,29 @@ class _StockAdjustmentDialogState extends State<StockAdjustmentDialog> {
     final theme = Theme.of(context);
     final unitLabel = widget.stockItem.unitName ?? 'units';
 
-    return AlertDialog(
-      title: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Stock Adjustment', style: theme.textTheme.titleLarge),
-          Text(
-            '${widget.stockItem.itemName} (${widget.stockItem.itemCode})',
-            style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.outline),
-          ),
-        ],
-      ),
-      content: SizedBox(
-        width: 400,
+    return ConfirmationDialog(
+      title: 'Stock Adjustment',
+      variant: DialogVariant.info,
+      confirmLabel: 'Confirm Adjustment',
+      cancelLabel: 'Cancel',
+      onConfirm: _submit,
+      onCancel: () => Navigator.of(context).pop(),
+      body: SizedBox(
+        width: 420,
         child: Form(
           key: _formKey,
           child: Column(
             mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              Text(
+                '${widget.stockItem.itemName} (${widget.stockItem.itemCode})',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.outline,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 12),
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
@@ -86,7 +92,7 @@ class _StockAdjustmentDialogState extends State<StockAdjustmentDialog> {
               SegmentedButton<AdjustmentType>(
                 segments: const [
                   ButtonSegment(
-                    value: AdjustmentType.stockOut,
+                    value: AdjustmentType.stockIn, // 👈 Fixed: was stockOut
                     label: Text('Stock-In (+)'),
                     icon: Icon(Icons.add_circle_outline),
                   ),
@@ -121,7 +127,7 @@ class _StockAdjustmentDialogState extends State<StockAdjustmentDialog> {
               TextFormField(
                 controller: _remarksController,
                 decoration: const InputDecoration(
-                  labelText: 'Remarks / Refernce (PO#, Reason)',
+                  labelText: 'Remarks / Reference (PO#, Reason)', // 👈 Fixed: typo
                   border: OutlineInputBorder(),
                 ),
               ),
@@ -129,16 +135,6 @@ class _StockAdjustmentDialogState extends State<StockAdjustmentDialog> {
           ),
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop,
-          child: const Text('Cancel'),
-        ),
-        FilledButton(
-          onPressed: _submit,
-          child: const Text('Confirm Adjustment'),
-        ),
-      ],
     );
   }
 }

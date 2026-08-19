@@ -47,7 +47,7 @@ class CustomFormDialog extends StatelessWidget {
         child: Dialog(
           backgroundColor: colorScheme.surface,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(24),
+            borderRadius: BorderRadius.circular(12),
           ),
           child: SingleChildScrollView(
             child: Padding(

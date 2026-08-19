@@ -1,14 +1,23 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:suki_pos/core/enums/enums.dart';
+import 'package:suki_pos/domain/entities/maintenance/discount.dart' as domain;
+import 'package:suki_pos/presentation/maintenance/discount/bloc/discount_bloc.dart';
+import 'package:suki_pos/presentation/maintenance/discount/bloc/discount_state.dart';
+import 'package:suki_pos/presentation/pos/widgets/confirmation_dialog.dart';
 
 class DiscountSelectionDialog extends StatefulWidget {
+  final domain.Discount? currentDiscount;
   final double currentPercentage;
   final double currentFixed;
+  final Function(domain.Discount discount) onApplyDiscount;
   final Function(double percent) onApplyPercentage;
   final Function(double amount) onApplyFixed;
   final VoidCallback onRemoveDiscount;
 
   const DiscountSelectionDialog({
+    required this.onApplyDiscount,
+    required this.currentDiscount,
     required this.currentPercentage,
     required this.currentFixed,
     required this.onApplyPercentage,
@@ -63,28 +72,91 @@ class _DiscountSelectionDialogState extends State<DiscountSelectionDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final hasActiveDiscount = widget.currentDiscount != null || widget.currentPercentage > 0 || widget.currentFixed > 0;
 
-    return AlertDialog(
-      title: const Text('Apply Manual Discount'),
-      content: SizedBox(
-        width: 380,
+    return ConfirmationDialog(
+      title: 'Apply Discount',
+      variant: DialogVariant.info,
+      confirmLabel: 'Apply',
+      cancelLabel: 'Cancel',
+      // Custom content widget:
+      body: SizedBox(
+        width: 420,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Quick Percentage', style: theme.textTheme.labelLarge),
-            const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [5.0, 10.0, 15.0, 20.0].map((p) {
-                return ActionChip(
-                  label: Text('${p.toInt()}%'),
-                  onPressed: () => _applyQuickPercent(p),
-                );
-              }).toList(),
+            // 1. Configured Store Discounts
+            Text(
+              'STORE DISCOUNTS',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color: Colors.grey[700],
+                letterSpacing: 0.5,
+              ),
             ),
-            const Divider(height: 24),
+            const SizedBox(height: 8),
+
+            BlocBuilder<DiscountBloc, DiscountState>(
+              builder: (context, state) {
+                if (state is DiscountLoading) {
+                  return const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(12),
+                      child: CircularProgressIndicator(),
+                    ),
+                  );
+                }
+                if (state is DiscountLoaded) {
+                  final activeDiscounts = state.discounts.where((d) => d.isActive).toList();
+                  if (activeDiscounts.isEmpty) {
+                    return const Text(
+                      'No active discounts configured.',
+                      style: TextStyle(color: Colors.grey, fontSize: 13),
+                    );
+                  }
+                  return Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: activeDiscounts.map((discount) {
+                      final isSelected = widget.currentDiscount?.id == discount.id;
+                      final rateText = discount.isPercentage
+                          ? '${discount.percentage?.toStringAsFixed(0)}%'
+                          : '₱${discount.fixedAmount?.toStringAsFixed(0)}';
+
+                      return ChoiceChip(
+                        label: Text('${discount.name} ($rateText)'),
+                        selected: isSelected,
+                        onSelected: (_) {
+                          widget.onApplyDiscount(discount);
+                          Navigator.of(context).pop();
+                        },
+                      );
+                    }).toList(),
+                  );
+                }
+                return const SizedBox.shrink();
+              },
+            ),
+
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 16),
+              child: Divider(height: 1),
+            ),
+
+            // 2. Manual Custom Input
+            Text(
+              'MANUAL OVERRIDE',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color: Colors.grey[700],
+                letterSpacing: 0.5,
+              ),
+            ),
+            const SizedBox(height: 8),
+
             Form(
               key: _formKey,
               child: Column(
@@ -97,7 +169,7 @@ class _DiscountSelectionDialogState extends State<DiscountSelectionDialog> {
                     selected: {_type},
                     onSelectionChanged: (set) => setState(() => _type = set.first),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 12),
                   TextFormField(
                     controller: _amountController,
                     keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -120,27 +192,31 @@ class _DiscountSelectionDialogState extends State<DiscountSelectionDialog> {
                 ],
               ),
             ),
+
+            // 3. Remove Discount Option
+            if (hasActiveDiscount) ...[
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.red[700],
+                    side: BorderSide(color: Colors.red[300]!),
+                  ),
+                  icon: const Icon(Icons.delete_outline, size: 18),
+                  label: const Text('Remove Current Discount'),
+                  onPressed: () {
+                    widget.onRemoveDiscount();
+                    Navigator.of(context).pop();
+                  },
+                ),
+              ),
+            ],
           ],
         ),
       ),
-      actions: [
-        if (widget.currentPercentage > 0 || widget.currentFixed > 0)
-          TextButton(
-            onPressed: () {
-              widget.onRemoveDiscount();
-              Navigator.of(context).pop();
-            },
-            child: Text('Remove Discount', style: TextStyle(color: theme.colorScheme.error)),
-          ),
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(
-          onPressed: _submitCustom,
-          child: const Text('Apply'),
-        ),
-      ],
+      onConfirm: _submitCustom,
+      onCancel: () => Navigator.of(context).pop(),
     );
   }
 }

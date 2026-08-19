@@ -2,6 +2,7 @@ analyzer:
   errors:
     always_put_required_named_parameters_first: ignore
     avoid_redundant_argument_values: ignore
+    cascade_invocations: ignore
     discarded_futures: ignore
     inference_failure_on_function_return_type: ignore
     lines_longer_than_80_chars: ignore

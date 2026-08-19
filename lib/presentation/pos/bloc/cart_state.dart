@@ -1,14 +1,16 @@
 import 'package:equatable/equatable.dart';
+import 'package:suki_pos/domain/entities/maintenance/discount.dart';
 import 'package:suki_pos/domain/entities/orders/cart_item.dart';
 import 'package:suki_pos/domain/entities/orders/tax_discount_breakdown.dart';
 import 'package:suki_pos/services/cart_calculator.dart';
 
 class CartState extends Equatable {
   final List<CartItem> items;
-  final int orderTypeId; // 1 = Dine-In, 2 = Take-Out
+  final int orderTypeId;
   final int guestCount;
   final double manualDiscountPercentage;
   final double manualDiscountFixed;
+  final Discount? appliedDiscount;
   final String? remarks;
   final bool isSubmitting;
   final String? errorMessage;
@@ -20,6 +22,7 @@ class CartState extends Equatable {
     this.guestCount = 1,
     this.manualDiscountPercentage = 0.0,
     this.manualDiscountFixed = 0.0,
+    this.appliedDiscount,
     this.remarks,
     this.isSubmitting = false,
     this.errorMessage,
@@ -31,9 +34,8 @@ class CartState extends Equatable {
     items: items,
     manualDiscountPercentage: manualDiscountPercentage,
     manualDiscountFixed: manualDiscountFixed,
+    appliedDiscount: appliedDiscount,
   );
-
-  int get totalItemCount => items.fold(0, (sum, item) => sum + item.quantity);
 
   CartState copyWith({
     List<CartItem>? items,
@@ -41,6 +43,8 @@ class CartState extends Equatable {
     int? guestCount,
     double? manualDiscountPercentage,
     double? manualDiscountFixed,
+    Discount? appliedDiscount,
+    bool clearAppliedDiscount = false,
     String? remarks,
     bool? isSubmitting,
     String? errorMessage,
@@ -52,6 +56,7 @@ class CartState extends Equatable {
       guestCount: guestCount ?? this.guestCount,
       manualDiscountPercentage: manualDiscountPercentage ?? this.manualDiscountPercentage,
       manualDiscountFixed: manualDiscountFixed ?? this.manualDiscountFixed,
+      appliedDiscount: clearAppliedDiscount ? null : (appliedDiscount ?? this.appliedDiscount),
       remarks: remarks ?? this.remarks,
       isSubmitting: isSubmitting ?? this.isSubmitting,
       errorMessage: errorMessage,
@@ -66,6 +71,7 @@ class CartState extends Equatable {
     guestCount,
     manualDiscountPercentage,
     manualDiscountFixed,
+    appliedDiscount,
     remarks,
     isSubmitting,
     errorMessage,
