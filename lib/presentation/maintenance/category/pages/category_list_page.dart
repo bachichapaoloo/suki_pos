@@ -5,7 +5,8 @@ import 'package:suki_pos/core/enums/enums.dart';
 import 'package:suki_pos/domain/entities/maintenance/category.dart';
 import 'package:suki_pos/presentation/maintenance/category/bloc/category_bloc.dart';
 import 'package:suki_pos/presentation/maintenance/category/widgets/category_form_dialog.dart';
-import 'package:suki_pos/presentation/widgets/main_layout.dart';
+import 'package:suki_pos/presentation/pos/widgets/confirmation_dialog.dart';
+import 'package:suki_pos/presentation/widgets/responsive_data_page.dart';
 
 class CategoryListPage extends StatefulWidget {
   const CategoryListPage({super.key});
@@ -15,6 +16,8 @@ class CategoryListPage extends StatefulWidget {
 }
 
 class _CategoryListPageState extends State<CategoryListPage> {
+  String _searchQuery = '';
+
   @override
   void initState() {
     super.initState();
@@ -33,98 +36,22 @@ class _CategoryListPageState extends State<CategoryListPage> {
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return MainLayout(
-      currentTab: MainTab.inventory,
-      mobileAppBar: AppBar(
-        title: const Text('Categories'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.add_rounded),
-            onPressed: () => _showFormDialog(),
-          ),
-        ],
-      ),
-      desktopHeader: Container(
-        height: 80,
-        padding: const EdgeInsets.symmetric(horizontal: 32),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          border: Border(bottom: BorderSide(color: Colors.grey[200]!)),
-        ),
-        child: Row(
-          children: [
-            // Breadcrumb
-            Row(
-              children: [
-                InkWell(
-                  onTap: () => Navigator.of(context).pushReplacementNamed('/maintenance'),
-                  borderRadius: BorderRadius.circular(4),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.arrow_back, size: 20, color: Color(0xFF355C8F)),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Maintenance Hub',
-                        style: GoogleFonts.inter(
-                          fontSize: 14,
-                          color: const Color(0xFF355C8F),
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Container(width: 1, height: 24, color: Colors.grey[300]),
-                const SizedBox(width: 16),
-              ],
-            ),
-            Text(
-              'Categories',
-              style: GoogleFonts.inter(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: const Color(0xFF1E293B),
-              ),
-            ),
-            const Spacer(),
-            IconButton(
-              onPressed: () => _showFormDialog(),
-              icon: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: const BoxDecoration(
-                  color: Color(0xFF355C8F),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.add, color: Colors.white, size: 24),
-              ),
-            ),
-            const SizedBox(width: 16),
-            IconButton(
-              onPressed: () => Navigator.of(context).pushReplacementNamed('/login'),
-              icon: const Icon(Icons.logout, color: Colors.grey),
-            ),
-          ],
-        ),
-      ),
-      desktopBody: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.grey[200]!),
-          ),
-          child: _buildBodyContent(),
-        ),
-      ),
-      mobileBody: _buildBodyContent(),
+  Future<void> _confirmDelete(Category category) async {
+    final confirmed = await ConfirmationDialog.show(
+      context,
+      title: 'Delete Category',
+      message: 'Are you sure you want to delete "${category.name}"?',
+      confirmLabel: 'Delete',
+      variant: DialogVariant.danger,
     );
+
+    if (confirmed == true && mounted) {
+      context.read<CategoryBloc>().add(DeleteCategoryEvent(category.id));
+    }
   }
 
-  Widget _buildBodyContent() {
+  @override
+  Widget build(BuildContext context) {
     return BlocConsumer<CategoryBloc, CategoryState>(
       listener: (context, state) {
         if (state is CategorySuccess) {
@@ -141,49 +68,200 @@ class _CategoryListPageState extends State<CategoryListPage> {
         }
       },
       builder: (context, state) {
-        if (state is CategoryLoading) {
-          return const Center(child: CircularProgressIndicator());
-        } else if (state is CategoryLoaded) {
-          if (state.categories.isEmpty) {
-            return const Center(child: Text('No categories found.'));
-          }
-          return ListView.separated(
-            itemCount: state.categories.length,
-            separatorBuilder: (context, index) => const Divider(),
-            itemBuilder: (context, index) {
-              final category = state.categories[index];
-              return ListTile(
-                title: Text(
-                  category.name,
-                  style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
-                ),
-                subtitle: Text(category.code ?? 'No Code'),
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.edit_rounded),
-                      onPressed: () => _showFormDialog(category),
-                    ),
-                    IconButton(
-                      icon: const Icon(
-                        Icons.delete_rounded,
-                        color: Colors.red,
-                      ),
-                      onPressed: () {
-                        context.read<CategoryBloc>().add(
-                          DeleteCategoryEvent(category.id),
-                        );
-                      },
-                    ),
-                  ],
-                ),
-              );
-            },
-          );
+        final isLoading = state is CategoryLoading;
+        List<Category> categories = [];
+        String? errorMessage;
+
+        if (state is CategoryLoaded) {
+          categories = state.categories;
+        } else if (state is CategoryError) {
+          errorMessage = state.message;
         }
-        return const SizedBox.shrink();
+
+        final filtered = categories.where((cat) {
+          if (_searchQuery.isEmpty) return true;
+          return cat.name.toLowerCase().contains(_searchQuery) ||
+              (cat.code?.toLowerCase().contains(_searchQuery) ?? false) ||
+              (cat.name?.toLowerCase().contains(_searchQuery) ?? false);
+        }).toList();
+
+        return ResponsiveDataPage<Category>(
+          title: 'Categories',
+          parentHubTitle: 'Maintenance Hub',
+          parentHubRoute: '/maintenance',
+          items: filtered,
+          isLoading: isLoading,
+          errorMessage: errorMessage,
+          searchQuery: _searchQuery,
+          searchHint: 'Search categories by name, code or department...',
+          onSearchChanged: (query) {
+            setState(() {
+              _searchQuery = query.trim().toLowerCase();
+            });
+          },
+          onAddNew: () => _showFormDialog(),
+          onRefresh: () async {
+            context.read<CategoryBloc>().add(GetCategoriesEvent());
+          },
+          columns: [
+            ResponsiveTableColumn<Category>(
+              title: 'CATEGORY NAME',
+              flex: 3,
+              cellBuilder: (cat) => Row(
+                children: [
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF355C8F).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.grid_view_rounded, size: 20, color: Color(0xFF355C8F)),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      cat.name,
+                      style: GoogleFonts.inter(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: const Color(0xFF1E293B),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            ResponsiveTableColumn<Category>(
+              title: 'CODE',
+              flex: 2,
+              cellBuilder: (cat) => Text(
+                cat.code?.isNotEmpty == true ? cat.code! : '—',
+                style: GoogleFonts.inter(
+                  fontSize: 14,
+                  color: const Color(0xFF64748B),
+                ),
+              ),
+            ),
+            ResponsiveTableColumn<Category>(
+              title: 'DEPARTMENT',
+              flex: 2,
+              cellBuilder: (cat) => Text(
+                cat.name,
+                style: GoogleFonts.inter(
+                  fontSize: 14,
+                  color: const Color(0xFF1E293B),
+                ),
+              ),
+            ),
+            ResponsiveTableColumn<Category>(
+              title: 'STATUS',
+              flex: 2,
+              cellBuilder: (cat) => _buildStatusBadge(cat.isActive),
+            ),
+            ResponsiveTableColumn<Category>(
+              title: 'ACTIONS',
+              flex: 1,
+              alignment: Alignment.centerRight,
+              cellBuilder: (cat) => Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.edit_outlined, size: 18, color: Color(0xFF64748B)),
+                    tooltip: 'Edit',
+                    onPressed: () => _showFormDialog(cat),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.delete_outline, size: 18, color: Colors.redAccent),
+                    tooltip: 'Delete',
+                    onPressed: () => _confirmDelete(cat),
+                  ),
+                ],
+              ),
+            ),
+          ],
+          mobileCardBuilder: (context, cat) {
+            return Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF355C8F).withOpacity(0.08),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.grid_view_rounded, color: Color(0xFF355C8F), size: 22),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          cat.name,
+                          style: GoogleFonts.inter(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                            color: const Color(0xFF1E293B),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Text(
+                              cat.code ?? 'No code',
+                              style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF64748B)),
+                            ),
+                            ...[
+                              Text(' • ', style: GoogleFonts.inter(color: Colors.grey)),
+                              Text(
+                                cat.name!,
+                                style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF64748B)),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.edit_outlined, size: 20, color: Color(0xFF64748B)),
+                    onPressed: () => _showFormDialog(cat),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.delete_outline, size: 20, color: Colors.redAccent),
+                    onPressed: () => _confirmDelete(cat),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
       },
+    );
+  }
+
+  Widget _buildStatusBadge(bool isActive) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: isActive ? const Color(0xFFDCFCE7) : const Color(0xFFFEE2E2),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(
+        isActive ? 'Active' : 'Inactive',
+        style: GoogleFonts.inter(
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+          color: isActive ? const Color(0xFF15803D) : const Color(0xFFB91C1C),
+        ),
+      ),
     );
   }
 }

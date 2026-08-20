@@ -8,117 +8,204 @@ class ZReadingReportDialog extends StatelessWidget {
 
   const ZReadingReportDialog({super.key, required this.shiftState});
 
+  static const Color primaryBlue = Color(0xFF355C8F);
+  static const Color textDark = Color(0xFF1E293B);
+
   @override
   Widget build(BuildContext context) {
     final dateFormat = DateFormat('yyyy-MM-dd hh:mm a');
     final shift = shiftState.shift;
 
-    return AlertDialog(
-      backgroundColor: const Color(0xFFF1F5F9),
-      contentPadding: const EdgeInsets.all(16),
-      content: SingleChildScrollView(
-        child: Container(
-          width: 340,
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(8),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.08),
-                blurRadius: 12,
-                offset: const Offset(0, 4),
+    return Dialog(
+      backgroundColor: Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 420),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Header
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 20, 16, 16),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFEE2E2),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.lock_clock_rounded, color: Color(0xFFDC2626), size: 22),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'Z-Reading (End of Day)',
+                      style: GoogleFonts.inter(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: textDark,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.close_rounded, color: Color(0xFF64748B), size: 22),
+                  ),
+                ],
               ),
-            ],
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text('SUKIPOS STORE', style: GoogleFonts.roboto(fontSize: 18, fontWeight: FontWeight.bold)),
-              Text(
-                'Z-READING REPORT (END-OF-DAY)',
-                style: GoogleFonts.roboto(fontSize: 12, fontWeight: FontWeight.bold),
+            ),
+            const Divider(height: 1, color: Color(0xFFE2E8F0)),
+            // Thermal Receipt Mock Body
+            Flexible(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(24),
+                child: Container(
+                  padding: const EdgeInsets.all(18),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: Column(
+                    children: [
+                      Text(
+                        'SUKI POS',
+                        style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w800, color: textDark),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Z-READING REPORT (END-OF-DAY)',
+                        style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: const Color(0xFFDC2626)),
+                      ),
+                      Text(
+                        'BIR PERMIT NO: 123456789',
+                        style: GoogleFonts.inter(fontSize: 10, color: const Color(0xFF94A3B8)),
+                      ),
+                      const SizedBox(height: 12),
+                      _receiptDivider(),
+                      const SizedBox(height: 12),
+
+                      _row('Terminal No:', '#01'),
+                      _row('Z-Read Counter:', '#0042'),
+                      _row('Shift Date:', dateFormat.format(shift.startTime)),
+                      _row('EOD Close Date:', dateFormat.format(DateTime.now())),
+
+                      const SizedBox(height: 12),
+                      _receiptDivider(),
+                      const SizedBox(height: 12),
+
+                      _row('Beginning Cash:', '₱${shift.beginningCash.toStringAsFixed(2)}'),
+                      _row('Net Cash Collected:', '₱${shiftState.theoreticalCashSales.toStringAsFixed(2)}'),
+                      _row('Ending Cash Count:', '₱${(shiftState.declaredCash ?? 0.0).toStringAsFixed(2)}', isBold: true),
+                      const Divider(color: Color(0xFFCBD5E1), height: 16),
+                      _row(
+                        'Short / Over:',
+                        '₱${shiftState.variance.toStringAsFixed(2)}',
+                        isBold: true,
+                        color: shiftState.variance < 0 ? const Color(0xFFDC2626) : const Color(0xFF16A34A),
+                      ),
+
+                      const SizedBox(height: 12),
+                      _receiptDivider(),
+                      const SizedBox(height: 12),
+
+                      _row('GROSS SALES:', '₱${shiftState.theoreticalCashSales.toStringAsFixed(2)}', isBold: true),
+                      _row('VATable Sales:', '₱${(shiftState.theoreticalCashSales / 1.12).toStringAsFixed(2)}'),
+                      _row(
+                        'VAT Amount (12%):',
+                        '₱${(shiftState.theoreticalCashSales - (shiftState.theoreticalCashSales / 1.12)).toStringAsFixed(2)}',
+                      ),
+
+                      const SizedBox(height: 16),
+                      Text(
+                        '*** END OF Z-READING REPORT ***\nSTORE CLOSED & AUDIT LOGGED',
+                        style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.bold, color: const Color(0xFF94A3B8)),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
+                ),
               ),
-              Text('BIR PERMIT NO: 123456789', style: GoogleFonts.roboto(fontSize: 10, color: Colors.grey[700])),
-              const SizedBox(height: 8),
-              const Text('------------------------------------------'),
-              const SizedBox(height: 8),
-
-              _row('Terminal No:', '#01'),
-              _row('Z-Read Counter:', '#0042'),
-              _row('Shift Date:', dateFormat.format(shift.startTime)),
-              _row('EOD Close Date:', dateFormat.format(DateTime.now())),
-
-              const SizedBox(height: 8),
-              const Text('------------------------------------------'),
-              const SizedBox(height: 8),
-
-              _row('Beginning Cash:', '₱${shift.beginningCash.toStringAsFixed(2)}'),
-              _row('Net Cash Collected:', '₱${shiftState.theoreticalCashSales.toStringAsFixed(2)}'),
-              _row('Ending Cash Count:', '₱${(shiftState.declaredCash ?? 0.0).toStringAsFixed(2)}', isBold: true),
-              _row(
-                'Short / Over:',
-                '₱${shiftState.variance.toStringAsFixed(2)}',
-                isBold: true,
-                color: shiftState.variance < 0 ? Colors.red : Colors.green,
+            ),
+            const Divider(height: 1, color: Color(0xFFE2E8F0)),
+            // Action Buttons
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  OutlinedButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFF64748B),
+                      side: const BorderSide(color: Color(0xFFCBD5E1)),
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    child: Text('Cancel', style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
+                  ),
+                  const SizedBox(width: 12),
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Printing Z-Reading EOD report...')),
+                      );
+                      Navigator.of(context).pop(true);
+                    },
+                    icon: const Icon(Icons.lock_outline_rounded, size: 18, color: Colors.white),
+                    label: Text('Print Z-Read & Close', style: GoogleFonts.inter(fontWeight: FontWeight.bold, color: Colors.white)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFDC2626),
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      elevation: 0,
+                    ),
+                  ),
+                ],
               ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
-              const SizedBox(height: 8),
-              const Text('------------------------------------------'),
-              const SizedBox(height: 8),
-
-              _row('GROSS SALES:', '₱${shiftState.theoreticalCashSales.toStringAsFixed(2)}', isBold: true),
-              _row('VATable Sales:', '₱${(shiftState.theoreticalCashSales / 1.12).toStringAsFixed(2)}'),
-              _row(
-                'VAT Amount (12%):',
-                '₱${(shiftState.theoreticalCashSales - (shiftState.theoreticalCashSales / 1.12)).toStringAsFixed(2)}',
-              ),
-
-              const SizedBox(height: 16),
-              Text(
-                '*** END OF Z-READING REPORT ***\nSTORE CLOSED & AUDIT LOGGED',
-                style: GoogleFonts.roboto(fontSize: 10, fontWeight: FontWeight.bold),
-                textAlign: TextAlign.center,
-              ),
-            ],
+  Widget _receiptDivider() {
+    return Row(
+      children: List.generate(
+        32,
+        (index) => Expanded(
+          child: Container(
+            color: index % 2 == 0 ? Colors.transparent : const Color(0xFFCBD5E1),
+            height: 1.5,
           ),
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Close'),
-        ),
-        FilledButton.icon(
-          icon: const Icon(Icons.print),
-          label: const Text('Print Z-Read & Close'),
-          onPressed: () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Printing Z-Reading EOD report...')),
-            );
-            Navigator.of(context).pop(true);
-          },
-        ),
-      ],
     );
   }
 
   Widget _row(String label, String value, {bool isBold = false, Color? color}) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2.0),
+      padding: const EdgeInsets.symmetric(vertical: 3.0),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(
             label,
-            style: GoogleFonts.roboto(fontSize: 11, fontWeight: isBold ? FontWeight.bold : FontWeight.normal),
+            style: GoogleFonts.inter(
+              fontSize: 12,
+              fontWeight: isBold ? FontWeight.bold : FontWeight.w500,
+              color: const Color(0xFF475569),
+            ),
           ),
           Text(
             value,
-            style: GoogleFonts.roboto(
-              fontSize: 11,
-              fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
-              color: color,
+            style: GoogleFonts.inter(
+              fontSize: 12,
+              fontWeight: isBold ? FontWeight.bold : FontWeight.w600,
+              color: color ?? textDark,
             ),
           ),
         ],

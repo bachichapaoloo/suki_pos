@@ -16,6 +16,8 @@ class OrderRepositoryImpl implements OrderRepository {
     required int paymentMethodId,
     required double cashTendered,
     required double changeGiven,
+    double manualDiscountPercentage = 0.0,
+    double manualDiscountFixed = 0.0,
   }) async {
     try {
       final orderId = await orderDao.checkoutOrderTransaction(
@@ -23,6 +25,8 @@ class OrderRepositoryImpl implements OrderRepository {
         paymentMethodId: paymentMethodId,
         cashTendered: cashTendered,
         changeGiven: changeGiven,
+        manualDiscountPercentage: manualDiscountPercentage,
+        manualDiscountFixed: manualDiscountFixed,
       );
       return Right(orderId);
     } catch (e) {

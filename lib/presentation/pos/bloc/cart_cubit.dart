@@ -23,7 +23,7 @@ class CartCubit extends Cubit<CartState> {
     String? notes,
   }) {
     final existingIndex = state.items.indexWhere(
-      (c) => c.item.id == item.id && _areOptionsEqual(c.selectedOptions, selectedOptions) && c.notes == notes,
+      (c) => c.item.id == item.id && _areOptionsEqual(c.selectedOptions, selectedOptions) && c.notes == notes && !c.hasItemDiscount && !c.isDiscountExempt,
     );
 
     if (existingIndex != -1) {
@@ -38,12 +38,13 @@ class CartCubit extends Cubit<CartState> {
         selectedOptions: selectedOptions,
         quantity: quantity,
         notes: notes,
+        isDiscountExempt: item.isDiscountExempt,
       );
       emit(state.copyWith(items: [...state.items, newItem]));
     }
   }
 
-  /// Updates an existing line item in the cart (e.g., when editing options or quantity)
+  /// Updates an existing line item in the cart
   void updateCartItem(String cartItemId, CartItem updatedItem) {
     final updatedList = state.items.map((cartItem) {
       return cartItem.id == cartItemId ? updatedItem : cartItem;
@@ -71,6 +72,75 @@ class CartCubit extends Cubit<CartState> {
     final updatedList = state.items.where((item) => item.id != cartItemId).toList();
     emit(state.copyWith(items: updatedList));
   }
+
+  // -------------------------------------------------------------
+  // ITEM-LEVEL DISCOUNT & EXEMPTION FEATURES
+  // -------------------------------------------------------------
+
+  /// Toggles whether a specific item line is exempt from order-level discounts
+  void toggleItemDiscountExempt(String cartItemId) {
+    final updatedList = state.items.map((item) {
+      if (item.id == cartItemId) {
+        return item.copyWith(isDiscountExempt: !item.isDiscountExempt);
+      }
+      return item;
+    }).toList();
+
+    emit(state.copyWith(items: updatedList));
+  }
+
+  /// Toggles 100% complimentary / Free Item on a specific cart line
+  void toggleItemFree(String cartItemId) {
+    final updatedList = state.items.map((item) {
+      if (item.id == cartItemId) {
+        final makeFree = !item.isFreeItem;
+        return item.copyWith(
+          isFreeItem: makeFree,
+          itemDiscountAmount: makeFree ? 0.0 : item.itemDiscountAmount,
+          itemDiscountPercent: makeFree ? 0.0 : item.itemDiscountPercent,
+        );
+      }
+      return item;
+    }).toList();
+
+    emit(state.copyWith(items: updatedList));
+  }
+
+  /// Applies a line-level percentage or fixed amount discount to a specific cart line
+  void applyLineItemDiscount(String cartItemId, {double? percent, double? fixedAmount}) {
+    final updatedList = state.items.map((item) {
+      if (item.id == cartItemId) {
+        return item.copyWith(
+          isFreeItem: false,
+          itemDiscountPercent: percent ?? 0.0,
+          itemDiscountAmount: fixedAmount ?? 0.0,
+        );
+      }
+      return item;
+    }).toList();
+
+    emit(state.copyWith(items: updatedList));
+  }
+
+  /// Clears any line-level discount from a specific cart line
+  void removeItemDiscount(String cartItemId) {
+    final updatedList = state.items.map((item) {
+      if (item.id == cartItemId) {
+        return item.copyWith(
+          isFreeItem: false,
+          itemDiscountAmount: 0.0,
+          itemDiscountPercent: 0.0,
+        );
+      }
+      return item;
+    }).toList();
+
+    emit(state.copyWith(items: updatedList));
+  }
+
+  // -------------------------------------------------------------
+  // ORDER-LEVEL DISCOUNTS & METADATA
+  // -------------------------------------------------------------
 
   void applyDiscount(Discount discount) {
     if (discount.isPercentage) {
@@ -123,13 +193,22 @@ class CartCubit extends Cubit<CartState> {
   }
 
   void setOrderType(int typeId) => emit(state.copyWith(orderTypeId: typeId));
+  void setDiningTable(int? tableId) => emit(state.copyWith(diningTableId: tableId, clearDiningTable: tableId == null));
   void setGuestCount(int count) => emit(state.copyWith(guestCount: count));
+  void setEligibleGuestCount(int count) => emit(state.copyWith(eligibleGuestCount: count));
+  void setRemarks(String remarks) => emit(state.copyWith(remarks: remarks));
+
+  void setSurcharge({required double amount, double percent = 0.0}) {
+    emit(state.copyWith(surchargeAmount: amount, surchargePercent: percent));
+  }
 
   void clearCart() {
     emit(
       CartState(
         orderTypeId: state.orderTypeId,
+        diningTableId: state.diningTableId,
         guestCount: state.guestCount,
+        eligibleGuestCount: state.eligibleGuestCount,
       ),
     );
   }
@@ -143,16 +222,24 @@ class CartCubit extends Cubit<CartState> {
 
     emit(state.copyWith(isSubmitting: true, errorMessage: null));
 
+    final breakdown = state.breakdown;
+
     final order = SalesOrderAggregate(
+      diningTableId: state.diningTableId,
       orderTypeId: state.orderTypeId,
       cashierId: cashierId,
       guestCount: state.guestCount,
+      eligibleGuestCount: state.eligibleGuestCount,
       items: state.items,
+      discountId: state.appliedDiscount?.id,
+      discPercentage: state.manualDiscountPercentage,
+      discFixedAmount: state.manualDiscountFixed,
+      surchargeAmount: state.surchargeAmount,
+      surchargePercent: state.surchargePercent,
       remarks: state.remarks,
       createdAt: DateTime.now(),
     );
 
-    final breakdown = state.breakdown;
     final totalAmount = breakdown.netTotal;
     final changeGiven = cashTendered - totalAmount;
 
@@ -161,6 +248,8 @@ class CartCubit extends Cubit<CartState> {
       paymentMethodId: paymentMethodId,
       cashTendered: cashTendered,
       changeGiven: changeGiven >= 0 ? changeGiven : 0.0,
+      manualDiscountPercentage: state.manualDiscountPercentage,
+      manualDiscountFixed: state.manualDiscountFixed,
     );
 
     return result.fold(
@@ -192,8 +281,8 @@ class CartCubit extends Cubit<CartState> {
                   itemName: item.item.name,
                   barcode: item.item.barcode ?? item.item.itemCode,
                   quantity: item.quantity,
-                  unitPrice: item.unitPrice,
-                  amount: item.totalPrice,
+                  unitPrice: item.effectiveUnitPrice,
+                  amount: item.effectiveTotalPrice,
                   selectedOptions: item.selectedOptions.map((o) => o.alias ?? '').toList(),
                 ),
               )

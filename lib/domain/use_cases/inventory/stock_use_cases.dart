@@ -38,3 +38,13 @@ class UpdateStockQuantity {
     );
   }
 }
+
+class AdjustStock {
+  final StockRepository repository;
+  AdjustStock(this.repository);
+
+  Future<Either<Failure, void>> call(Stock stock) async {
+    return await repository.adjustStock(stock);
+  }
+}
+

@@ -9,6 +9,8 @@ abstract class OrderRepository {
     required int paymentMethodId,
     required double cashTendered,
     required double changeGiven,
+    double manualDiscountPercentage = 0.0,
+    double manualDiscountFixed = 0.0,
   });
 
   Future<Either<Failure, List<TransactionDetail>>> getTransactionHistory({

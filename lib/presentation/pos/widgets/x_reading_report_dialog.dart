@@ -8,108 +8,191 @@ class XReadingReportDialog extends StatelessWidget {
 
   const XReadingReportDialog({super.key, required this.shiftState});
 
+  static const Color primaryBlue = Color(0xFF355C8F);
+  static const Color textDark = Color(0xFF1E293B);
+
   @override
   Widget build(BuildContext context) {
     final dateFormat = DateFormat('yyyy-MM-dd hh:mm a');
     final shift = shiftState.shift;
 
-    return AlertDialog(
-      backgroundColor: const Color(0xFFF1F5F9),
-      contentPadding: const EdgeInsets.all(16),
-      content: SingleChildScrollView(
-        child: Container(
-          width: 340,
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(8),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.08),
-                blurRadius: 12,
-                offset: const Offset(0, 4),
+    return Dialog(
+      backgroundColor: Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 420),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Header
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 20, 16, 16),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE0F2FE),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.receipt_long_rounded, color: Color(0xFF0284C7), size: 22),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'X-Reading Report',
+                      style: GoogleFonts.inter(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: textDark,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.close_rounded, color: Color(0xFF64748B), size: 22),
+                  ),
+                ],
               ),
-            ],
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text('SUKIPOS STORE', style: GoogleFonts.roboto(fontSize: 18, fontWeight: FontWeight.bold)),
-              Text(
-                'X-READING REPORT (MID-DAY)',
-                style: GoogleFonts.roboto(fontSize: 12, fontWeight: FontWeight.bold),
+            ),
+            const Divider(height: 1, color: Color(0xFFE2E8F0)),
+            // Thermal Receipt Mock Body
+            Flexible(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(24),
+                child: Container(
+                  padding: const EdgeInsets.all(18),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: Column(
+                    children: [
+                      Text(
+                        'SUKI POS',
+                        style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w800, color: textDark),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'X-READING REPORT (MID-DAY)',
+                        style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: primaryBlue),
+                      ),
+                      const SizedBox(height: 12),
+                      _receiptDivider(),
+                      const SizedBox(height: 12),
+
+                      _row('Shift ID:', '#${shift.id}'),
+                      _row('Cashier ID:', '#${shift.cashierId}'),
+                      _row('Start Time:', dateFormat.format(shift.startTime)),
+                      _row('Print Time:', dateFormat.format(DateTime.now())),
+
+                      const SizedBox(height: 12),
+                      _receiptDivider(),
+                      const SizedBox(height: 12),
+
+                      _row('Beginning Cash:', '₱${shift.beginningCash.toStringAsFixed(2)}'),
+                      _row('Cash Sales Collected:', '₱${shiftState.theoreticalCashSales.toStringAsFixed(2)}'),
+                      const Divider(color: Color(0xFFCBD5E1), height: 16),
+                      _row('Expected Drawer Cash:', '₱${shiftState.expectedTotalCash.toStringAsFixed(2)}', isBold: true),
+                      _row('Declared Cash Count:', '₱${(shiftState.declaredCash ?? 0.0).toStringAsFixed(2)}', isBold: true),
+                      const Divider(color: Color(0xFFCBD5E1), height: 16),
+                      _row(
+                        'Short / Over:',
+                        '₱${shiftState.variance.toStringAsFixed(2)}',
+                        isBold: true,
+                        color: shiftState.variance < 0 ? const Color(0xFFDC2626) : const Color(0xFF16A34A),
+                      ),
+
+                      const SizedBox(height: 16),
+                      Text(
+                        '*** END OF X-READING REPORT ***',
+                        style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.bold, color: const Color(0xFF94A3B8)),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
+                ),
               ),
-              const SizedBox(height: 8),
-              const Text('------------------------------------------'),
-              const SizedBox(height: 8),
-
-              _row('Shift ID:', '#${shift.id}'),
-              _row('Cashier ID:', '#${shift.cashierId}'),
-              _row('Start Time:', dateFormat.format(shift.startTime)),
-              _row('Print Time:', dateFormat.format(DateTime.now())),
-
-              const SizedBox(height: 8),
-              const Text('------------------------------------------'),
-              const SizedBox(height: 8),
-
-              _row('Beginning Change Fund:', '₱${shift.beginningCash.toStringAsFixed(2)}'),
-              _row('Cash Sales Collected:', '₱${shiftState.theoreticalCashSales.toStringAsFixed(2)}'),
-              const Divider(),
-              _row('Theoretical Drawer Cash:', '₱${shiftState.expectedTotalCash.toStringAsFixed(2)}', isBold: true),
-              _row('Declared Cash Count:', '₱${(shiftState.declaredCash ?? 0.0).toStringAsFixed(2)}', isBold: true),
-              const Divider(),
-              _row(
-                'Short / Over:',
-                '₱${shiftState.variance.toStringAsFixed(2)}',
-                isBold: true,
-                color: shiftState.variance < 0 ? Colors.red : Colors.green,
+            ),
+            const Divider(height: 1, color: Color(0xFFE2E8F0)),
+            // Action Buttons
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  OutlinedButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFF64748B),
+                      side: const BorderSide(color: Color(0xFFCBD5E1)),
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    child: Text('Close', style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
+                  ),
+                  const SizedBox(width: 12),
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Printing X-Reading report...')),
+                      );
+                      Navigator.of(context).pop();
+                    },
+                    icon: const Icon(Icons.print_rounded, size: 18, color: Colors.white),
+                    label: Text('Print X-Read', style: GoogleFonts.inter(fontWeight: FontWeight.bold, color: Colors.white)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: primaryBlue,
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      elevation: 0,
+                    ),
+                  ),
+                ],
               ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
-              const SizedBox(height: 16),
-              Text(
-                '*** END OF X-READING REPORT ***',
-                style: GoogleFonts.roboto(fontSize: 10, fontWeight: FontWeight.bold),
-                textAlign: TextAlign.center,
-              ),
-            ],
+  Widget _receiptDivider() {
+    return Row(
+      children: List.generate(
+        32,
+        (index) => Expanded(
+          child: Container(
+            color: index % 2 == 0 ? Colors.transparent : const Color(0xFFCBD5E1),
+            height: 1.5,
           ),
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Close'),
-        ),
-        FilledButton.icon(
-          icon: const Icon(Icons.print),
-          label: const Text('Print X-Read'),
-          onPressed: () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Printing X-Reading report...')),
-            );
-            Navigator.of(context).pop();
-          },
-        ),
-      ],
     );
   }
 
   Widget _row(String label, String value, {bool isBold = false, Color? color}) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2.0),
+      padding: const EdgeInsets.symmetric(vertical: 3.0),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(
             label,
-            style: GoogleFonts.roboto(fontSize: 11, fontWeight: isBold ? FontWeight.bold : FontWeight.normal),
+            style: GoogleFonts.inter(
+              fontSize: 12,
+              fontWeight: isBold ? FontWeight.bold : FontWeight.w500,
+              color: const Color(0xFF475569),
+            ),
           ),
           Text(
             value,
-            style: GoogleFonts.roboto(
-              fontSize: 11,
-              fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
-              color: color,
+            style: GoogleFonts.inter(
+              fontSize: 12,
+              fontWeight: isBold ? FontWeight.bold : FontWeight.w600,
+              color: color ?? textDark,
             ),
           ),
         ],

@@ -13,12 +13,16 @@ class ProcessCheckout {
     required int paymentMethodId,
     required double cashTendered,
     required double changeGiven,
+    double manualDiscountPercentage = 0.0,
+    double manualDiscountFixed = 0.0,
   }) async {
     return await repository.processCheckout(
       order: order,
       paymentMethodId: paymentMethodId,
       cashTendered: cashTendered,
       changeGiven: changeGiven,
+      manualDiscountPercentage: manualDiscountPercentage,
+      manualDiscountFixed: manualDiscountFixed,
     );
   }
 }

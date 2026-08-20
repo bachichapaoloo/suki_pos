@@ -1,20 +1,14 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/widgets.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:suki_pos/core/utils/image_storage_service.dart';
 import 'package:suki_pos/domain/entities/maintenance/item.dart';
 import 'package:suki_pos/domain/entities/orders/cart_item.dart';
 
 /// A single row in the cart list — the thumbnail, name/options/notes, and
-/// the quantity stepper + line total. Extracted as a standalone widget so
-/// it can be reused anywhere a cart line needs to be rendered (side panel,
-/// mobile bottom sheet, receipt-style previews, etc).
-///
-/// The thumbnail and overall row height scale with the available width
-/// (via [LayoutBuilder]) instead of being pinned to a fixed size, so the
-/// tile reads comfortably on both a narrow phone sheet and a wide desktop
-/// side panel.
+/// the quantity stepper + line total with support for Free Items, Item Discounts,
+/// and Discount Exemption indicators.
 class CartLineItemTile extends StatelessWidget {
   const CartLineItemTile({
     super.key,
@@ -31,13 +25,18 @@ class CartLineItemTile extends StatelessWidget {
   final VoidCallback onDecrease;
   final VoidCallback onIncrease;
 
-  /// Thumbnail is sized relative to the tile's width, clamped between these.
   final double minImageSize;
   final double maxImageSize;
+
+  static const Color primaryBlue = Color(0xFF355C8F);
+  static const Color textDark = Color(0xFF1E293B);
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final hasDiscount = cartItem.hasItemDiscount;
+    final isFree = cartItem.isFreeItem;
+    final isDiscExempt = cartItem.isDiscountExempt;
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -45,6 +44,7 @@ class CartLineItemTile extends StatelessWidget {
 
         return InkWell(
           onTap: onTap,
+          borderRadius: BorderRadius.circular(12),
           child: Padding(
             padding: EdgeInsets.symmetric(horizontal: 16, vertical: imageSize * 0.11),
             child: Row(
@@ -57,31 +57,104 @@ class CartLineItemTile extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(
-                        cartItem.item.name,
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
+                      // Item Name & Discount Badges
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              cartItem.item.name,
+                              style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 14.5, color: textDark),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          if (isFree) ...[
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFDCFCE7),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                'FREE',
+                                style: GoogleFonts.inter(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w800,
+                                  color: const Color(0xFF15803D),
+                                ),
+                              ),
+                            ),
+                          ] else if (hasDiscount) ...[
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFFEF3C7),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                cartItem.itemDiscountPercent > 0
+                                    ? '-${cartItem.itemDiscountPercent.toStringAsFixed(0)}%'
+                                    : '-₱${cartItem.itemDiscountAmount.toStringAsFixed(2)}',
+                                style: GoogleFonts.inter(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                  color: const Color(0xFFB45309),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
+
+                      // Modifier Options List
                       if (cartItem.selectedOptions.isNotEmpty) ...[
-                        const SizedBox(height: 4),
+                        const SizedBox(height: 3),
                         Text(
                           cartItem.selectedOptions.map((o) => o.alias).join(', '),
-                          style: TextStyle(color: theme.colorScheme.primary, fontSize: 12.5),
+                          style: GoogleFonts.inter(color: primaryBlue, fontSize: 12),
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                         ),
                       ],
-                      if (cartItem.notes != null && cartItem.notes!.isNotEmpty) ...[
-                        const SizedBox(height: 2),
-                        Text(
-                          'Note: ${cartItem.notes}',
-                          style: const TextStyle(fontStyle: FontStyle.italic, fontSize: 11.5),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+
+                      // Special Notes & Discount Exemption Tag
+                      if (isDiscExempt || (cartItem.notes != null && cartItem.notes!.isNotEmpty)) ...[
+                        const SizedBox(height: 3),
+                        Row(
+                          children: [
+                            if (isDiscExempt) ...[
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF1F5F9),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  'Disc Exempt',
+                                  style: GoogleFonts.inter(fontSize: 9.5, color: const Color(0xFF64748B), fontWeight: FontWeight.w600),
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                            ],
+                            if (cartItem.notes != null && cartItem.notes!.isNotEmpty)
+                              Expanded(
+                                child: Text(
+                                  'Note: ${cartItem.notes}',
+                                  style: GoogleFonts.inter(fontStyle: FontStyle.italic, fontSize: 11, color: const Color(0xFF64748B)),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                          ],
                         ),
                       ],
-                      const SizedBox(height: 10),
+
+                      const SizedBox(height: 8),
+
+                      // Stepper and Price
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
@@ -90,9 +163,27 @@ class CartLineItemTile extends StatelessWidget {
                             onDecrease: onDecrease,
                             onIncrease: onIncrease,
                           ),
-                          Text(
-                            '₱${cartItem.totalPrice.toStringAsFixed(2)}',
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              if (hasDiscount || isFree)
+                                Text(
+                                  '₱${cartItem.totalPrice.toStringAsFixed(2)}',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 11,
+                                    color: const Color(0xFF94A3B8),
+                                    decoration: TextDecoration.lineThrough,
+                                  ),
+                                ),
+                              Text(
+                                isFree ? '₱0.00' : '₱${cartItem.effectiveTotalPrice.toStringAsFixed(2)}',
+                                style: GoogleFonts.inter(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 15,
+                                  color: isFree ? const Color(0xFF15803D) : textDark,
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
@@ -165,10 +256,9 @@ class _QuantityStepper extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     return Container(
       decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest,
+        color: const Color(0xFFF1F5F9),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Row(
@@ -177,7 +267,11 @@ class _QuantityStepper extends StatelessWidget {
           _stepperButton(icon: Icons.remove, onPressed: onDecrease),
           SizedBox(
             width: 28,
-            child: Text('$quantity', textAlign: TextAlign.center, style: theme.textTheme.titleSmall),
+            child: Text(
+              '$quantity',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 13),
+            ),
           ),
           _stepperButton(icon: Icons.add, onPressed: onIncrease),
         ],
@@ -191,7 +285,7 @@ class _QuantityStepper extends StatelessWidget {
       customBorder: const CircleBorder(),
       child: Padding(
         padding: const EdgeInsets.all(6),
-        child: Icon(icon, size: 18),
+        child: Icon(icon, size: 16, color: const Color(0xFF475569)),
       ),
     );
   }

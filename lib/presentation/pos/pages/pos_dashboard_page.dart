@@ -4,9 +4,13 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:suki_pos/core/enums/enums.dart';
+import 'package:suki_pos/data/dao/order_dao.dart';
+import 'package:suki_pos/injection_container.dart' as di;
 import 'package:suki_pos/presentation/auth/bloc/auth_bloc.dart';
 import 'package:suki_pos/presentation/pos/bloc/cart_cubit.dart';
 import 'package:suki_pos/presentation/pos/bloc/cart_state.dart';
+import 'package:suki_pos/presentation/pos/bloc/shift_cubit.dart';
+import 'package:suki_pos/presentation/pos/bloc/shift_state.dart';
 import 'package:suki_pos/presentation/pos/bloc/transaction_history_cubit.dart';
 import 'package:suki_pos/presentation/pos/bloc/transaction_history_state.dart';
 import 'package:suki_pos/presentation/pos/widgets/shift_reconciliation_dialog.dart';
@@ -23,13 +27,18 @@ class PosDashboardPage extends StatefulWidget {
 class _PosDashboardPageState extends State<PosDashboardPage> {
   late Timer _timer;
   late DateTime _currentTime;
-  late DateTime _shiftStartTime;
+  DateTime? _shiftStartTime;
+
+  double _totalSalesToday = 0.0;
+  int _completedCountToday = 0;
+  int _activeOrdersCount = 0;
+  int _totalOrdersToday = 0;
+  bool _isLoadingMetrics = true;
 
   @override
   void initState() {
     super.initState();
     _currentTime = DateTime.now();
-    _shiftStartTime = DateTime.now().subtract(const Duration(hours: 1, minutes: 41, seconds: 22));
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (mounted) {
         setState(() {
@@ -39,8 +48,35 @@ class _PosDashboardPageState extends State<PosDashboardPage> {
     });
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadDashboardMetrics();
       context.read<TransactionHistoryCubit>().loadHistory();
+      
+      final authState = context.read<AuthBloc>().state;
+      if (authState is AuthAuthenticated) {
+        context.read<ShiftCubit>().checkActiveShift(authState.user.id);
+      }
     });
+  }
+
+  Future<void> _loadDashboardMetrics() async {
+    try {
+      final metrics = await di.sl<OrderDao>().getDashboardMetrics();
+      if (mounted) {
+        setState(() {
+          _totalSalesToday = (metrics['total_sales'] as num?)?.toDouble() ?? 0.0;
+          _completedCountToday = (metrics['completed_count'] as int?) ?? 0;
+          _activeOrdersCount = (metrics['active_count'] as int?) ?? 0;
+          _totalOrdersToday = (metrics['total_orders_today'] as int?) ?? 0;
+          _isLoadingMetrics = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _isLoadingMetrics = false;
+        });
+      }
+    }
   }
 
   @override
@@ -52,8 +88,9 @@ class _PosDashboardPageState extends State<PosDashboardPage> {
   String get _formattedTime => DateFormat('h:mm:ss a').format(_currentTime);
   String get _formattedDate => DateFormat('EEEE, MMMM d, yyyy').format(_currentTime);
 
-  String get _shiftDuration {
-    final diff = _currentTime.difference(_shiftStartTime);
+  String _formatShiftDuration(DateTime? start) {
+    if (start == null) return '00:00:00';
+    final diff = _currentTime.difference(start);
     final hours = diff.inHours.toString().padLeft(2, '0');
     final minutes = (diff.inMinutes % 60).toString().padLeft(2, '0');
     final seconds = (diff.inSeconds % 60).toString().padLeft(2, '0');
@@ -291,38 +328,45 @@ class _PosDashboardPageState extends State<PosDashboardPage> {
   }
 
   Widget _buildSummaryCards() {
-    return Row(
-      children: [
-        Expanded(
-          child: _buildSummaryCard(
-            icon: Icons.payments_outlined,
-            iconBg: const Color(0xFFE2E8F0),
-            iconColor: const Color(0xFF355C8F),
-            title: 'Total Sales (Today)',
-            value: '₱ 24,500.00',
-            badgeText: '+14% Today',
-            badgeBg: const Color(0xFFBAE6FD),
-            badgeColor: const Color(0xFF0369A1),
-          ),
-        ),
-        const SizedBox(width: 24),
-        Expanded(
-          child: _buildSummaryCard(
-            icon: Icons.list_alt_outlined,
-            iconBg: const Color(0xFFE2E8F0),
-            iconColor: const Color(0xFF355C8F),
-            title: 'Active Orders',
-            value: '128',
-            badgeText: '4 pending',
-            badgeBg: const Color(0xFFE2E8F0),
-            badgeColor: const Color(0xFF475569),
-          ),
-        ),
-        const SizedBox(width: 24),
-        Expanded(
-          child: _buildShiftDurationCard(),
-        ),
-      ],
+    return BlocBuilder<ShiftCubit, ShiftState>(
+      builder: (context, shiftState) {
+        final shiftStart = shiftState is ShiftActive ? shiftState.shift.startTime : null;
+        final formattedSales = NumberFormat.currency(symbol: '₱ ', decimalDigits: 2).format(_totalSalesToday);
+
+        return Row(
+          children: [
+            Expanded(
+              child: _buildSummaryCard(
+                icon: Icons.payments_outlined,
+                iconBg: const Color(0xFFE2E8F0),
+                iconColor: const Color(0xFF355C8F),
+                title: 'Total Sales (Today)',
+                value: formattedSales,
+                badgeText: '$_completedCountToday Completed',
+                badgeBg: const Color(0xFFBAE6FD),
+                badgeColor: const Color(0xFF0369A1),
+              ),
+            ),
+            const SizedBox(width: 24),
+            Expanded(
+              child: _buildSummaryCard(
+                icon: Icons.list_alt_outlined,
+                iconBg: const Color(0xFFE2E8F0),
+                iconColor: const Color(0xFF355C8F),
+                title: 'Active Orders',
+                value: '$_totalOrdersToday',
+                badgeText: '$_activeOrdersCount pending',
+                badgeBg: _activeOrdersCount > 0 ? const Color(0xFFFEF3C7) : const Color(0xFFE2E8F0),
+                badgeColor: _activeOrdersCount > 0 ? const Color(0xFFB45309) : const Color(0xFF475569),
+              ),
+            ),
+            const SizedBox(width: 24),
+            Expanded(
+              child: _buildShiftDurationCard(shiftStart: shiftStart, isActive: shiftState is ShiftActive),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -403,7 +447,12 @@ class _PosDashboardPageState extends State<PosDashboardPage> {
     );
   }
 
-  Widget _buildShiftDurationCard() {
+  Widget _buildShiftDurationCard({DateTime? shiftStart, required bool isActive}) {
+    final durationStr = isActive ? _formatShiftDuration(shiftStart) : 'Shift Inactive';
+    final elapsedSeconds = shiftStart != null ? _currentTime.difference(shiftStart).inSeconds : 0;
+    // 8 hour target progress bar
+    final progress = (elapsedSeconds / (8 * 3600)).clamp(0.0, 1.0);
+
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
@@ -432,16 +481,36 @@ class _PosDashboardPageState extends State<PosDashboardPage> {
                 child: const Icon(Icons.timer_outlined, color: Color(0xFF0369A1)),
               ),
               Container(
-                width: 60,
-                height: 60,
-                decoration: const BoxDecoration(
-                  color: Color(0xFFF1F5F9),
-                  shape: BoxShape.circle,
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: isActive ? const Color(0xFFDCFCE7) : const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 6,
+                      height: 6,
+                      decoration: BoxDecoration(
+                        color: isActive ? const Color(0xFF16A34A) : Colors.grey,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      isActive ? 'Active' : 'Closed',
+                      style: GoogleFonts.inter(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: isActive ? const Color(0xFF15803D) : Colors.grey[600],
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 24),
           Text(
             'Shift Duration',
             style: GoogleFonts.inter(
@@ -452,7 +521,7 @@ class _PosDashboardPageState extends State<PosDashboardPage> {
           ),
           const SizedBox(height: 8),
           Text(
-            '01:41:22',
+            durationStr,
             style: GoogleFonts.inter(
               fontSize: 28,
               fontWeight: FontWeight.bold,
@@ -460,24 +529,29 @@ class _PosDashboardPageState extends State<PosDashboardPage> {
             ),
           ),
           const SizedBox(height: 16),
-          Stack(
-            children: [
-              Container(
-                height: 6,
-                decoration: BoxDecoration(
-                  color: Colors.grey[200],
-                  borderRadius: BorderRadius.circular(4),
-                ),
-              ),
-              Container(
-                height: 6,
-                width: 80,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF355C8F),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-              ),
-            ],
+          LayoutBuilder(
+            builder: (context, constraints) {
+              return Stack(
+                children: [
+                  Container(
+                    height: 6,
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[200],
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                  Container(
+                    height: 6,
+                    width: constraints.maxWidth * progress,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF355C8F),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                ],
+              );
+            },
           ),
         ],
       ),
@@ -526,6 +600,7 @@ class _PosDashboardPageState extends State<PosDashboardPage> {
                           iconBg: const Color(0xFF355C8F),
                           iconColor: Colors.white,
                           height: cardHeight,
+                          route: '/orders',
                         ),
                       ),
                       const SizedBox(width: spacing),
@@ -553,6 +628,7 @@ class _PosDashboardPageState extends State<PosDashboardPage> {
                           iconBg: const Color(0xFF355C8F),
                           iconColor: Colors.white,
                           height: cardHeight,
+                          route: '/pos/transaction-history',
                         ),
                       ),
                       const SizedBox(width: spacing),
@@ -564,7 +640,7 @@ class _PosDashboardPageState extends State<PosDashboardPage> {
                           iconBg: const Color(0xFFE2E8F0),
                           iconColor: const Color(0xFF475569),
                           height: cardHeight,
-                          route: '/inventory/stock',
+                          route: '/inventory/stocks',
                         ),
                       ),
                     ],
@@ -725,6 +801,8 @@ class _PosDashboardPageState extends State<PosDashboardPage> {
   }
 
   Widget _buildMobileSalesCard() {
+    final formattedSales = NumberFormat.currency(symbol: '₱ ', decimalDigits: 2).format(_totalSalesToday);
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -756,7 +834,7 @@ class _PosDashboardPageState extends State<PosDashboardPage> {
           ),
           const SizedBox(height: 8),
           Text(
-            '₱14,520.00',
+            formattedSales,
             style: GoogleFonts.inter(
               color: Colors.white,
               fontSize: 24,
@@ -766,10 +844,10 @@ class _PosDashboardPageState extends State<PosDashboardPage> {
           const SizedBox(height: 16),
           Row(
             children: [
-              const Icon(Icons.arrow_upward, color: Colors.white, size: 14),
+              const Icon(Icons.check_circle_outline_rounded, color: Colors.white, size: 14),
               const SizedBox(width: 4),
               Text(
-                '12% higher than yesterday',
+                '$_completedCountToday completed orders today',
                 style: GoogleFonts.inter(
                   color: Colors.white.withOpacity(0.9),
                   fontSize: 13,
@@ -783,104 +861,111 @@ class _PosDashboardPageState extends State<PosDashboardPage> {
   }
 
   Widget _buildMobileStatsRow() {
-    return Row(
-      children: [
-        Expanded(
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.grey[200]!),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+    return BlocBuilder<ShiftCubit, ShiftState>(
+      builder: (context, shiftState) {
+        final shiftStart = shiftState is ShiftActive ? shiftState.shift.startTime : null;
+        final durationStr = shiftState is ShiftActive ? _formatShiftDuration(shiftStart) : 'Closed';
+
+        return Row(
+          children: [
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.grey[200]!),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: const BoxDecoration(
-                        color: Color(0xFFBAE6FD),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(Icons.shopping_bag_outlined, color: Color(0xFF0369A1), size: 18),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        'Active Orders',
-                        style: GoogleFonts.inter(
-                          color: const Color(0xFF1E293B),
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: const BoxDecoration(
+                            color: Color(0xFFBAE6FD),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.shopping_bag_outlined, color: Color(0xFF0369A1), size: 18),
                         ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            'Active Orders',
+                            style: GoogleFonts.inter(
+                              color: const Color(0xFF1E293B),
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      '$_activeOrdersCount pending',
+                      style: GoogleFonts.inter(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: _activeOrdersCount > 0 ? const Color(0xFFB45309) : const Color(0xFF1E293B),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 12),
-                Text(
-                  '24',
-                  style: GoogleFonts.inter(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: const Color(0xFF1E293B),
-                  ),
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.grey[200]!),
                 ),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.grey[200]!),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: const BoxDecoration(
-                        color: Color(0xFF355C8F),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(Icons.access_time, color: Colors.white, size: 18),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        'Shift Time',
-                        style: GoogleFonts.inter(
-                          color: const Color(0xFF1E293B),
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: const BoxDecoration(
+                            color: Color(0xFF355C8F),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.access_time, color: Colors.white, size: 18),
                         ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            'Shift Time',
+                            style: GoogleFonts.inter(
+                              color: const Color(0xFF1E293B),
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      durationStr,
+                      style: GoogleFonts.inter(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: const Color(0xFF1E293B),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 12),
-                Text(
-                  '4h 12m',
-                  style: GoogleFonts.inter(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: const Color(0xFF1E293B),
-                  ),
-                ),
-              ],
+              ),
             ),
-          ),
-        ),
-      ],
+          ],
+        );
+      },
     );
   }
 
@@ -918,6 +1003,7 @@ class _PosDashboardPageState extends State<PosDashboardPage> {
                 Icons.list_alt_outlined,
                 const Color(0xFFA5DDF1),
                 const Color(0xFF0369A1),
+                route: '/orders',
               ),
             ),
           ],
@@ -932,6 +1018,7 @@ class _PosDashboardPageState extends State<PosDashboardPage> {
                 Icons.receipt_long_outlined,
                 const Color(0xFF355C8F),
                 Colors.white,
+                route: '/pos/sales-reading',
               ),
             ),
             const SizedBox(width: 16),
@@ -942,6 +1029,7 @@ class _PosDashboardPageState extends State<PosDashboardPage> {
                 Icons.search,
                 const Color(0xFF355C8F),
                 Colors.white,
+                route: '/pos/transaction-history',
               ),
             ),
           ],
@@ -956,7 +1044,7 @@ class _PosDashboardPageState extends State<PosDashboardPage> {
                 Icons.inventory_2_outlined,
                 const Color(0xFFA5DDF1),
                 const Color(0xFF0369A1),
-                route: '/inventory/stock',
+                route: '/inventory/stocks',
               ),
             ),
             const SizedBox(width: 16),

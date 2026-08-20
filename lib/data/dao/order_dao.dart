@@ -24,20 +24,50 @@ class OrderDao {
     return await db.transaction((txn) async {
       final now = DateTime.now().toIso8601String();
 
-      // 1. Calculate Financial Breakdown with actual discounts
+      // 1. Calculate Financial Breakdown with actual discounts & item discounts
       final breakdown = CartCalculator.calculate(
         items: order.items,
         manualDiscountPercentage: manualDiscountPercentage > 0 ? manualDiscountPercentage : (order.discPercentage),
         manualDiscountFixed: manualDiscountFixed > 0 ? manualDiscountFixed : (order.discFixedAmount),
+        guestCount: order.guestCount,
+        eligibleGuestCount: order.eligibleGuestCount,
+        surchargeAmount: order.surchargeAmount,
       );
 
-      // 2. Insert Master Sales Order
+      // 2. Compute Next Sequence and SI Numbers
+      final maxSi =
+          Sqflite.firstIntValue(
+            await txn.rawQuery('SELECT MAX(si_number) FROM ${SchemaConstants.saleTransaction}'),
+          ) ??
+          0;
+      final nextSiNumber = maxSi + 1;
+
+      final maxSeq =
+          Sqflite.firstIntValue(
+            await txn.rawQuery('SELECT MAX(seq_no) FROM ${SchemaConstants.saleTransaction}'),
+          ) ??
+          0;
+      final nextSeqNumber = maxSeq + 1;
+
+      // Query active shift Z-number if open
+      final activeShiftRes = await txn.query(
+        SchemaConstants.shift,
+        columns: ['id'],
+        where: 'cashier_id = ? AND status = 1',
+        whereArgs: [order.cashierId],
+        limit: 1,
+      );
+      final zNumber = activeShiftRes.isNotEmpty ? (activeShiftRes.first['id'] as int) : 1;
+
+      // 3. Insert Master Sales Order
       final orderId = await txn.insert(SchemaConstants.salesOrder, {
         'dining_table_id': order.diningTableId,
         'order_type_id': order.orderTypeId,
         'cashier_id': order.cashierId,
         'guest_count': order.guestCount,
+        'eligible_guest_count': order.eligibleGuestCount,
         'payment_status': 1, // 1 = Paid
+        'discount_id': order.discountId,
         'disc_percentage': order.discPercentage,
         'disc_fixed_amount': order.discFixedAmount,
         'remarks': order.remarks,
@@ -47,40 +77,60 @@ class OrderDao {
         'updated_at': now,
       });
 
-      // 3. Insert Sale Transaction Record for BIR Audit
+      // 4. Insert Sale Transaction Record for BIR Audit
       final txnId = await txn.insert(SchemaConstants.saleTransaction, {
         'sales_order_id': orderId,
         'cashier_id': order.cashierId,
+        'si_number': nextSiNumber,
+        'seq_no': nextSeqNumber,
+        'tseq_no': nextSeqNumber,
+        'z_number': zNumber,
         'order_type_id': order.orderTypeId,
         'guest_count': order.guestCount,
+        'eligible_guest_count': order.eligibleGuestCount,
         'gross_amount': breakdown.grossSubtotal,
         'discount_amount': breakdown.manualDiscountAmount,
+        'item_discount_amount': breakdown.itemDiscountAmount,
+        'surcharge_amount': breakdown.surchargeAmount,
+        'surcharge_percent': order.surchargePercent,
         'net_amount': breakdown.netTotal,
         'vat_sales': breakdown.vatableSales,
         'vat_amount': breakdown.vatAmount,
         'vat_exempt': breakdown.vatExemptSales,
         'vat_zero_rated': breakdown.zeroRatedSales,
+        'vat_private': 0.0,
+        'non_vat_sales': breakdown.nonVatSales,
+        'discount_id': order.discountId,
         'status': 1, // 1 = Completed
+        'is_voided': 0,
+        'x_read_status': 0,
         'transaction_date': now,
         'created_at': now,
+        'posted_at': now,
       });
 
       final String txnNo = 'TXN-${txnId.toString().padLeft(6, '0')}';
+      final String siNo = 'SI-${nextSiNumber.toString().padLeft(6, '0')}';
       final StringBuffer ejBuffer = StringBuffer();
 
       // Start building EJ text format
       ejBuffer.writeln('========================================');
       ejBuffer.writeln('*** ELECTRONIC JOURNAL (EJ) LOG ***');
+      ejBuffer.writeln('Invoice No     : $siNo');
       ejBuffer.writeln('Transaction No : $txnNo');
       ejBuffer.writeln('Sales Order ID : $orderId');
       ejBuffer.writeln('Cashier ID     : ${order.cashierId}');
       ejBuffer.writeln('Order Type ID  : ${order.orderTypeId}');
+      ejBuffer.writeln('Guests / Elig  : ${order.guestCount} / ${order.eligibleGuestCount}');
       ejBuffer.writeln('Date/Time      : $now');
       ejBuffer.writeln('----------------------------------------');
       ejBuffer.writeln('ITEMS SOLD:');
 
-      // 4. Insert Line Items, Options, and Deduct Stock
+      // 5. Insert Line Items, Options, and Deduct Stock
       for (final cartItem in order.items) {
+        final isDiscExempt = cartItem.isDiscountExempt || cartItem.item.isDiscountExempt;
+        final isFree = cartItem.isFreeItem;
+
         final orderItemId = await txn.insert(SchemaConstants.salesOrderItem, {
           'sales_order_id': orderId,
           'item_id': cartItem.item.id,
@@ -88,15 +138,24 @@ class OrderDao {
           'item_name': cartItem.item.name,
           'quantity': cartItem.quantity,
           'unit_price': cartItem.unitPrice,
-          'amount': cartItem.totalPrice,
-          'is_disc_exempt': cartItem.item.isDiscountExempt ? 1 : 0,
+          'amount': cartItem.effectiveTotalPrice,
+          'is_disc_exempt': isDiscExempt ? 1 : 0,
+          'item_discount': cartItem.totalLineDiscount,
           'notes': cartItem.notes,
           'created_at': now,
         });
 
-        ejBuffer.writeln(
-          '  ${cartItem.quantity}x ${cartItem.item.name} @ ₱${cartItem.unitPrice.toStringAsFixed(2)} = ₱${cartItem.totalPrice.toStringAsFixed(2)}',
-        );
+        String itemLabel =
+            '  ${cartItem.quantity}x ${cartItem.item.name} @ ₱${cartItem.unitPrice.toStringAsFixed(2)} = ₱${cartItem.effectiveTotalPrice.toStringAsFixed(2)}';
+        if (isFree) {
+          itemLabel += ' [FREE ITEM / 100% COMP]';
+        } else if (cartItem.totalLineDiscount > 0) {
+          itemLabel += ' [Disc: -₱${cartItem.totalLineDiscount.toStringAsFixed(2)}]';
+        }
+        if (isDiscExempt) {
+          itemLabel += ' (Disc Exempt)';
+        }
+        ejBuffer.writeln(itemLabel);
 
         // Insert Options / Modifiers
         for (final option in cartItem.selectedOptions) {
@@ -104,12 +163,13 @@ class OrderDao {
             'sales_order_item_id': orderItemId,
             'option_group_id': option.optionGroupId,
             'option_value_id': option.id,
-            'option_value_name': option.alias,
+            'option_group_name': null,
+            'option_value_name': option.alias ?? '',
             'price_delta': option.priceDelta,
             'quantity': 1.0,
           });
 
-          ejBuffer.writeln('    + Option: ${option.alias} (₱${option.priceDelta.toStringAsFixed(2)})');
+          ejBuffer.writeln('    + Option: ${option.alias ?? ''} (₱${option.priceDelta.toStringAsFixed(2)})');
         }
 
         if (cartItem.notes != null && cartItem.notes!.isNotEmpty) {
@@ -117,11 +177,11 @@ class OrderDao {
         }
 
         // Calculate line-level tax breakdown
-        final lineGross = cartItem.totalPrice;
+        final lineEffectiveGross = cartItem.effectiveTotalPrice;
         final isVatExempt = cartItem.item.isVatExempt;
-        final lineVatableSales = isVatExempt ? 0.0 : (lineGross / 1.12);
-        final lineVatAmount = isVatExempt ? 0.0 : (lineGross - lineVatableSales);
-        final lineVatExemptSales = isVatExempt ? lineGross : 0.0;
+        final lineVatableSales = isVatExempt ? 0.0 : (lineEffectiveGross / 1.12);
+        final lineVatAmount = isVatExempt ? 0.0 : (lineEffectiveGross - lineVatableSales);
+        final lineVatExemptSales = isVatExempt ? lineEffectiveGross : 0.0;
 
         // Insert Transaction Line (Standardized sale_transaction_id)
         await txn.insert(SchemaConstants.transactionLine, {
@@ -130,11 +190,15 @@ class OrderDao {
           'barcode': cartItem.item.barcode ?? cartItem.item.itemCode,
           'item_name': cartItem.item.name,
           'quantity': cartItem.quantity.toDouble(),
-          'unit_price': cartItem.unitPrice,
+          'unit_price': cartItem.effectiveUnitPrice,
           'gross_price': cartItem.unitPrice,
-          'amount': cartItem.totalPrice,
+          'amount': cartItem.effectiveTotalPrice,
           'gross_amount': cartItem.totalPrice,
-          'is_disc_exempt': cartItem.item.isDiscountExempt ? 1 : 0,
+          'cost_price': cartItem.item.costPrice,
+          'deduction': cartItem.totalLineDiscount,
+          'disc_fixed_amt': cartItem.itemDiscountAmount,
+          'disc_percent': cartItem.itemDiscountPercent,
+          'is_disc_exempt': isDiscExempt ? 1 : 0,
           'order_type_id': order.orderTypeId,
           'vat_sales': lineVatableSales,
           'vat_amount': lineVatAmount,
@@ -159,7 +223,7 @@ class OrderDao {
         }
       }
 
-      // 5. Insert Payment Record
+      // 6. Insert Payment Record
       await txn.insert(SchemaConstants.payment, {
         'sale_transaction_id': txnId,
         'cashier_id': order.cashierId,
@@ -176,7 +240,13 @@ class OrderDao {
       ejBuffer.writeln('----------------------------------------');
       ejBuffer.writeln('FINANCIAL SUMMARY:');
       ejBuffer.writeln('  Gross Subtotal : ₱${breakdown.grossSubtotal.toStringAsFixed(2)}');
-      ejBuffer.writeln('  Discount       : -₱${breakdown.manualDiscountAmount.toStringAsFixed(2)}');
+      if (breakdown.itemDiscountAmount > 0) {
+        ejBuffer.writeln('  Item Discounts : -₱${breakdown.itemDiscountAmount.toStringAsFixed(2)}');
+      }
+      ejBuffer.writeln('  Order Discount : -₱${breakdown.manualDiscountAmount.toStringAsFixed(2)}');
+      if (breakdown.surchargeAmount > 0) {
+        ejBuffer.writeln('  Surcharge      : +₱${breakdown.surchargeAmount.toStringAsFixed(2)}');
+      }
       ejBuffer.writeln('  VATable Sales  : ₱${breakdown.vatableSales.toStringAsFixed(2)}');
       ejBuffer.writeln('  VAT Amount 12% : ₱${breakdown.vatAmount.toStringAsFixed(2)}');
       ejBuffer.writeln('  VAT Exempt     : ₱${breakdown.vatExemptSales.toStringAsFixed(2)}');
@@ -185,7 +255,7 @@ class OrderDao {
       ejBuffer.writeln('  Change Given   : ₱${changeGiven.toStringAsFixed(2)}');
       ejBuffer.writeln('========================================');
 
-      // 6. Save Electronic Journal (EJ) Entry
+      // 7. Save Electronic Journal (EJ) Entry
       await txn.insert(SchemaConstants.electronicJournal, {
         'sale_transaction_id': txnId,
         'cashier_id': order.cashierId,
@@ -358,5 +428,144 @@ Restored Line Items: ${lineItems.length}
         'created_at': now,
       });
     });
+  }
+
+  /// Retrieves live aggregated metrics for the POS Dashboard.
+  Future<Map<String, dynamic>> getDashboardMetrics() async {
+    final db = await _databaseHelper.database;
+    final now = DateTime.now();
+    final todayStr =
+        "${now.year.toString().padLeft(4, '0')}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
+
+    // Total sales today
+    final salesRes = await db.rawQuery(
+      '''
+      SELECT COALESCE(SUM(net_amount), 0.0) AS total_sales, COUNT(*) AS completed_count
+      FROM ${SchemaConstants.saleTransaction}
+      WHERE transaction_date LIKE ? AND is_voided = 0
+      ''',
+      ['$todayStr%'],
+    );
+
+    // Active (pending/unpaid) orders count
+    final activeRes = await db.rawQuery(
+      '''
+      SELECT COUNT(*) AS active_count
+      FROM ${SchemaConstants.salesOrder}
+      WHERE payment_status = 0
+      ''',
+    );
+
+    // Total orders count today
+    final ordersRes = await db.rawQuery(
+      '''
+      SELECT COUNT(*) AS total_orders_today
+      FROM ${SchemaConstants.salesOrder}
+      WHERE transaction_date LIKE ?
+      ''',
+      ['$todayStr%'],
+    );
+
+    final totalSales = (salesRes.isNotEmpty ? salesRes.first['total_sales'] as num? : 0.0)?.toDouble() ?? 0.0;
+    final completedCount = (salesRes.isNotEmpty ? (salesRes.first['completed_count'] as num?)?.toInt() : 0) ?? 0;
+    final activeCount = (activeRes.isNotEmpty ? (activeRes.first['active_count'] as num?)?.toInt() : 0) ?? 0;
+    final totalOrdersToday = (ordersRes.isNotEmpty ? (ordersRes.first['total_orders_today'] as num?)?.toInt() : 0) ?? 0;
+
+    return {
+      'total_sales': totalSales,
+      'completed_count': completedCount,
+      'active_count': activeCount,
+      'total_orders_today': totalOrdersToday,
+    };
+  }
+
+  /// Retrieves list of sales orders with table names, cashier, and order types.
+  Future<List<Map<String, dynamic>>> getSalesOrders({int? paymentStatus, int limit = 50}) async {
+    final db = await _databaseHelper.database;
+    String whereClause = '';
+    List<dynamic> whereArgs = [];
+
+    if (paymentStatus != null) {
+      whereClause = 'WHERE so.payment_status = ?';
+      whereArgs.add(paymentStatus);
+    }
+
+    whereArgs.add(limit);
+
+    return await db.rawQuery(
+      '''
+      SELECT 
+        so.*,
+        dt.name AS table_name,
+        ot.name AS order_type_name,
+        u.name AS cashier_name,
+        (SELECT COUNT(*) FROM ${SchemaConstants.salesOrderItem} soi WHERE soi.sales_order_id = so.id) AS item_count,
+        (SELECT COALESCE(SUM(soi.amount), 0.0) FROM ${SchemaConstants.salesOrderItem} soi WHERE soi.sales_order_id = so.id) AS total_amount
+      FROM ${SchemaConstants.salesOrder} so
+      LEFT JOIN ${SchemaConstants.diningTable} dt ON so.dining_table_id = dt.id
+      LEFT JOIN ${SchemaConstants.orderType} ot ON so.order_type_id = ot.id
+      LEFT JOIN ${SchemaConstants.appUser} u ON so.cashier_id = u.id
+      $whereClause
+      ORDER BY so.created_at DESC
+      LIMIT ?
+      ''',
+      whereArgs,
+    );
+  }
+
+  /// Holds / creates a pending sales order without checking out payment.
+  Future<int> holdSalesOrder({
+    required SalesOrderAggregate order,
+  }) async {
+    final db = await _databaseHelper.database;
+    return await db.transaction((txn) async {
+      final now = DateTime.now().toIso8601String();
+
+      final orderId = await txn.insert(SchemaConstants.salesOrder, {
+        'dining_table_id': order.diningTableId,
+        'order_type_id': order.orderTypeId,
+        'cashier_id': order.cashierId,
+        'guest_count': order.guestCount,
+        'payment_status': 0, // 0 = Pending/Hold
+        'disc_percentage': order.discPercentage,
+        'disc_fixed_amount': order.discFixedAmount,
+        'remarks': order.remarks,
+        'transaction_date': now,
+        'created_at': now,
+        'updated_at': now,
+      });
+
+      for (final cartItem in order.items) {
+        await txn.insert(SchemaConstants.salesOrderItem, {
+          'sales_order_id': orderId,
+          'item_id': cartItem.item.id,
+          'item_barcode': cartItem.item.barcode ?? cartItem.item.itemCode,
+          'item_name': cartItem.item.name,
+          'quantity': cartItem.quantity,
+          'unit_price': cartItem.unitPrice,
+          'amount': cartItem.totalPrice,
+          'is_disc_exempt': cartItem.item.isDiscountExempt ? 1 : 0,
+          'notes': cartItem.notes,
+          'created_at': now,
+        });
+      }
+
+      return orderId;
+    });
+  }
+
+  /// Cancels / Voids a pending sales order.
+  Future<void> cancelPendingOrder(int orderId) async {
+    final db = await _databaseHelper.database;
+    final now = DateTime.now().toIso8601String();
+    await db.update(
+      SchemaConstants.salesOrder,
+      {
+        'payment_status': 2, // 2 = Voided/Cancelled
+        'updated_at': now,
+      },
+      where: 'id = ?',
+      whereArgs: [orderId],
+    );
   }
 }

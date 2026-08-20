@@ -6,21 +6,26 @@ import 'package:suki_pos/presentation/widgets/main_layout.dart';
 class MaintenancePage extends StatelessWidget {
   const MaintenancePage({super.key});
 
+  static const Color primaryBlue = Color(0xFF355C8F);
+  static const Color textDark = Color(0xFF1E293B);
+  static const Color bgGrey = Color(0xFFF7F8FA);
+  static const Color surfaceBorder = Color(0xFFE2E8F0);
+
   @override
   Widget build(BuildContext context) {
     return MainLayout(
       currentTab: MainTab.inventory,
       mobileAppBar: AppBar(
-        backgroundColor: const Color(0xFFF7F8FA),
+        backgroundColor: bgGrey,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Color(0xFF1E293B)),
+          icon: const Icon(Icons.arrow_back, color: primaryBlue),
           onPressed: () => Navigator.of(context).pushReplacementNamed('/pos'),
         ),
         title: Text(
-          'Maintenance',
+          'Maintenance Hub',
           style: GoogleFonts.inter(
-            color: const Color(0xFF1E293B),
+            color: textDark,
             fontWeight: FontWeight.bold,
             fontSize: 18,
           ),
@@ -35,14 +40,15 @@ class MaintenancePage extends StatelessWidget {
               'Master Data',
               style: GoogleFonts.inter(
                 fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: const Color(0xFF1E293B),
+                fontWeight: FontWeight.w700,
+                color: textDark,
               ),
             ),
             const SizedBox(height: 12),
             _buildMobileActionCard(
               context,
               'Departments',
+              'Organize store departments',
               Icons.account_balance_outlined,
               const Color(0xFFA5DDF1),
               const Color(0xFF0369A1),
@@ -52,228 +58,232 @@ class MaintenancePage extends StatelessWidget {
             _buildMobileActionCard(
               context,
               'Categories',
+              'Manage item classifications',
               Icons.grid_view_outlined,
-              const Color(0xFF355C8F),
-              Colors.white,
+              primaryBlue.withOpacity(0.12),
+              primaryBlue,
               route: '/maintenance/categories',
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
             _buildMobileActionCard(
               context,
               'Items',
+              'Manage products and services',
               Icons.category_outlined,
-              const Color(0xFF355C8F),
-              Colors.white,
+              primaryBlue.withOpacity(0.12),
+              primaryBlue,
               route: '/maintenance/items',
             ),
-            const SizedBox(height: 32),
+            const SizedBox(height: 12),
             _buildMobileActionCard(
               context,
               'Discounts',
+              'Manage promotions & discounts',
               Icons.discount_outlined,
               const Color(0xFFA5DDF1),
               const Color(0xFF0369A1),
               route: '/maintenance/discounts',
             ),
             const SizedBox(height: 12),
-            Text(
-              'System Config',
-              style: GoogleFonts.inter(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: const Color(0xFF1E293B),
-              ),
-            ),
-            const SizedBox(height: 16),
             _buildMobileActionCard(
               context,
-              'Hardware',
-              Icons.print_outlined,
-              const Color(0xFFA5DDF1),
-              const Color(0xFF0369A1),
+              'Stock Inventory',
+              'Track on-hand stock and perform adjustments',
+              Icons.inventory_2_outlined,
+              const Color(0xFFDCFCE7),
+              const Color(0xFF15803D),
+              route: '/inventory/stocks',
+            ),
+            const SizedBox(height: 28),
+            Text(
+              'System & Administration',
+              style: GoogleFonts.inter(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: textDark,
+              ),
             ),
             const SizedBox(height: 12),
-            _buildMobileActionCard(context, 'Users', Icons.people_outline, const Color(0xFF355C8F), Colors.white),
-            const SizedBox(height: 32),
+            _buildMobileActionCard(
+              context,
+              'Users & Roles',
+              'Manage security and permissions',
+              Icons.admin_panel_settings_outlined,
+              const Color(0xFFFED7AA),
+              const Color(0xFFC2410C),
+              route: '/admin',
+            ),
+            const SizedBox(height: 24),
+          ],
+        ),
+      ),
+      desktopHeader: Container(
+        height: 72,
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          border: Border(bottom: BorderSide(color: surfaceBorder)),
+        ),
+        child: Row(
+          children: [
+            InkWell(
+              onTap: () => Navigator.of(context).pushReplacementNamed('/pos'),
+              borderRadius: BorderRadius.circular(8),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                child: Row(
+                  children: [
+                    const Icon(Icons.arrow_back, size: 18, color: primaryBlue),
+                    const SizedBox(width: 8),
+                    Text(
+                      'POS Terminal',
+                      style: GoogleFonts.inter(
+                        fontSize: 14,
+                        color: primaryBlue,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Container(width: 1, height: 24, color: Colors.grey[300]),
+            const SizedBox(width: 16),
+            Text(
+              'Maintenance Hub',
+              style: GoogleFonts.inter(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                color: textDark,
+              ),
+            ),
           ],
         ),
       ),
       desktopBody: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 48.0, vertical: 32.0),
+        padding: const EdgeInsets.symmetric(horizontal: 40.0, vertical: 32.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header with Breadcrumbs
-            Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Breadcrumb
-                      Column(
-                        children: [
-                          Row(
-                            children: [
-                              InkWell(
-                                onTap: () => Navigator.of(context).pushReplacementNamed('/pos'),
-                                borderRadius: BorderRadius.circular(4),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const Icon(Icons.home_outlined, size: 16, color: Colors.grey),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      'Home',
-                                      style: GoogleFonts.inter(
-                                        fontSize: 14,
-                                        color: Colors.grey[700],
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              const Icon(Icons.chevron_right, size: 16, color: Colors.grey),
-                              const SizedBox(width: 8),
-                              Text(
-                                'Maintenance Hub',
-                                style: GoogleFonts.inter(
-                                  fontSize: 14,
-                                  color: const Color(0xFF1E293B),
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              const Spacer(),
-                              IconButton(
-                                icon: const Icon(Icons.logout, color: Colors.grey),
-                                onPressed: () {
-                                  Navigator.of(context).pushReplacementNamed('/pos');
-                                },
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-
-                      const SizedBox(height: 32),
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF355C8F),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: const Icon(Icons.build_outlined, color: Colors.white, size: 28),
-                          ),
-                          const SizedBox(width: 16),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Maintenance Hub',
-                                style: GoogleFonts.inter(
-                                  fontSize: 32,
-                                  fontWeight: FontWeight.bold,
-                                  color: const Color(0xFF1E293B),
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                'Manage system data and configurations',
-                                style: GoogleFonts.inter(
-                                  fontSize: 16,
-                                  color: Colors.grey[600],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+            // Title description
+            Text(
+              'Master Data Configuration',
+              style: GoogleFonts.inter(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: textDark,
+              ),
             ),
-            const SizedBox(height: 48),
-
-            // Master Data Section
-            _buildSectionHeader(Icons.storage_outlined, 'Master Data'),
+            const SizedBox(height: 6),
+            Text(
+              'Configure and maintain categories, items, departments, and system entities.',
+              style: GoogleFonts.inter(fontSize: 14, color: const Color(0xFF64748B)),
+            ),
             const SizedBox(height: 24),
-            Row(
-              children: [
-                const SizedBox(width: 24),
-                Expanded(
-                  child: _buildDesktopActionCard(
-                    context,
-                    title: 'Departments',
-                    subtitle: 'Organize store departments',
-                    icon: Icons.account_balance_outlined,
-                    iconBg: const Color(0xFFA5DDF1),
-                    iconColor: const Color(0xFF0369A1),
-                    route: '/maintenance/departments',
-                  ),
-                ),
-                const SizedBox(width: 24),
-                Expanded(
-                  child: _buildDesktopActionCard(
-                    context,
-                    title: 'Categories',
-                    subtitle: 'Manage item classifications',
-                    icon: Icons.grid_view_outlined,
-                    iconBg: const Color(0xFF355C8F),
-                    iconColor: Colors.white,
-                    route: '/maintenance/categories',
-                  ),
-                ),
-                const SizedBox(width: 24),
-                Expanded(
-                  child: _buildDesktopActionCard(
-                    context,
-                    title: 'Items',
-                    subtitle: 'Manage products and services',
-                    icon: Icons.category_outlined,
-                    iconBg: const Color(0xFF355C8F),
-                    iconColor: Colors.white,
-                    route: '/maintenance/items',
-                  ),
-                ),
-                const SizedBox(width: 24),
-                Expanded(
-                  child: _buildDesktopActionCard(
-                    context,
-                    title: 'Discounts',
-                    subtitle: 'Manage discounts',
-                    icon: Icons.discount_outlined,
-                    iconBg: const Color(0xFF355C8F),
-                    iconColor: Colors.white,
-                    route: '/maintenance/discounts',
-                  ),
-                ),
-              ],
+            // Master Data Grid
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final crossAxisCount = constraints.maxWidth > 1100 ? 4 : 2;
+                return GridView.count(
+                  crossAxisCount: crossAxisCount,
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  crossAxisSpacing: 20,
+                  mainAxisSpacing: 20,
+                  childAspectRatio: 1.4,
+                  children: [
+                    _buildDesktopActionCard(
+                      context,
+                      title: 'Departments',
+                      subtitle: 'Organize store departments & divisions',
+                      icon: Icons.account_balance_outlined,
+                      iconBg: const Color(0xFFA5DDF1),
+                      iconColor: const Color(0xFF0369A1),
+                      route: '/maintenance/departments',
+                    ),
+                    _buildDesktopActionCard(
+                      context,
+                      title: 'Categories',
+                      subtitle: 'Manage item classifications & groups',
+                      icon: Icons.grid_view_outlined,
+                      iconBg: primaryBlue.withOpacity(0.12),
+                      iconColor: primaryBlue,
+                      route: '/maintenance/categories',
+                    ),
+                    _buildDesktopActionCard(
+                      context,
+                      title: 'Items',
+                      subtitle: 'Manage products, pricing & inventory',
+                      icon: Icons.category_outlined,
+                      iconBg: primaryBlue.withOpacity(0.12),
+                      iconColor: primaryBlue,
+                      route: '/maintenance/items',
+                    ),
+                    _buildDesktopActionCard(
+                      context,
+                      title: 'Discounts',
+                      subtitle: 'Manage promotional rates & discounts',
+                      icon: Icons.discount_outlined,
+                      iconBg: const Color(0xFFA5DDF1),
+                      iconColor: const Color(0xFF0369A1),
+                      route: '/maintenance/discounts',
+                    ),
+                    _buildDesktopActionCard(
+                      context,
+                      title: 'Stock Inventory',
+                      subtitle: 'Monitor stock on-hand, reorders & low alerts',
+                      icon: Icons.inventory_2_outlined,
+                      iconBg: const Color(0xFFDCFCE7),
+                      iconColor: const Color(0xFF15803D),
+                      route: '/inventory/stocks',
+                    ),
+                  ],
+                );
+              },
+            ),
+            const SizedBox(height: 40),
+            Text(
+              'Administration & Security',
+              style: GoogleFonts.inter(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: textDark,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Configure roles, user permissions, and security controls.',
+              style: GoogleFonts.inter(fontSize: 14, color: const Color(0xFF64748B)),
+            ),
+            const SizedBox(height: 24),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final crossAxisCount = constraints.maxWidth > 1100 ? 4 : 2;
+                return GridView.count(
+                  crossAxisCount: crossAxisCount,
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  crossAxisSpacing: 20,
+                  mainAxisSpacing: 20,
+                  childAspectRatio: 1.4,
+                  children: [
+                    _buildDesktopActionCard(
+                      context,
+                      title: 'Admin Hub',
+                      subtitle: 'Access security, users & role configurations',
+                      icon: Icons.admin_panel_settings_outlined,
+                      iconBg: const Color(0xFFFED7AA),
+                      iconColor: const Color(0xFFC2410C),
+                      route: '/admin',
+                    ),
+                  ],
+                );
+              },
             ),
           ],
         ),
       ),
-    );
-  }
-
-  Widget _buildSectionHeader(IconData icon, String title) {
-    return Row(
-      children: [
-        Icon(icon, color: const Color(0xFF355C8F), size: 24),
-        const SizedBox(width: 12),
-        Text(
-          title,
-          style: GoogleFonts.inter(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-            color: const Color(0xFF1E293B),
-          ),
-        ),
-      ],
     );
   }
 
@@ -286,71 +296,72 @@ class MaintenancePage extends StatelessWidget {
     required Color iconColor,
     String? route,
   }) {
-    return InkWell(
-      onTap: () {
-        if (route != null) {
-          Navigator.of(context).pushReplacementNamed(route);
-        }
-      },
-      borderRadius: BorderRadius.circular(20),
-      child: Container(
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.grey[200]!),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.02),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: iconBg,
-                shape: BoxShape.circle,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () {
+          if (route != null) {
+            Navigator.of(context).pushReplacementNamed(route);
+          }
+        },
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: surfaceBorder),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.02),
+                blurRadius: 8,
+                offset: const Offset(0, 3),
               ),
-              child: Icon(icon, color: iconColor, size: 28),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              title,
-              style: GoogleFonts.inter(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: const Color(0xFF1E293B),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              subtitle,
-              style: GoogleFonts.inter(
-                fontSize: 14,
-                color: Colors.grey[600],
-              ),
-            ),
-            const SizedBox(height: 24),
-            Row(
-              children: [
-                Text(
-                  'Manage',
-                  style: GoogleFonts.inter(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: const Color(0xFF355C8F),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: iconBg,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(icon, color: iconColor, size: 24),
                   ),
-                ),
-                const SizedBox(width: 4),
-                const Icon(Icons.arrow_forward, color: Color(0xFF355C8F), size: 16),
-              ],
-            ),
-          ],
+                  const Icon(Icons.arrow_forward_rounded, color: Color(0xFF94A3B8), size: 18),
+                ],
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: GoogleFonts.inter(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: textDark,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitle,
+                    style: GoogleFonts.inter(
+                      fontSize: 13,
+                      color: const Color(0xFF64748B),
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -359,6 +370,7 @@ class MaintenancePage extends StatelessWidget {
   Widget _buildMobileActionCard(
     BuildContext context,
     String title,
+    String subtitle,
     IconData icon,
     Color iconBg,
     Color iconColor, {
@@ -370,36 +382,46 @@ class MaintenancePage extends StatelessWidget {
           Navigator.of(context).pushReplacementNamed(route);
         }
       },
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(14),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.grey[200]!),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: surfaceBorder),
         ),
         child: Row(
           children: [
             Container(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
                 color: iconBg,
                 shape: BoxShape.circle,
               ),
-              child: Icon(icon, color: iconColor, size: 24),
+              child: Icon(icon, color: iconColor, size: 22),
             ),
-            const SizedBox(width: 16),
+            const SizedBox(width: 14),
             Expanded(
-              child: Text(
-                title,
-                style: GoogleFonts.inter(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w500,
-                  color: const Color(0xFF1E293B),
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: GoogleFonts.inter(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: textDark,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
+                  ),
+                ],
               ),
             ),
-            const Icon(Icons.chevron_right, color: Colors.grey),
+            const Icon(Icons.chevron_right_rounded, color: Color(0xFF94A3B8)),
           ],
         ),
       ),

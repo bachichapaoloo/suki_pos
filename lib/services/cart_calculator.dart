@@ -8,23 +8,42 @@ class CartCalculator {
     double manualDiscountPercentage = 0.0,
     double manualDiscountFixed = 0.0,
     Discount? appliedDiscount,
+    int guestCount = 1,
+    int eligibleGuestCount = 0,
+    double surchargeAmount = 0.0,
   }) {
     double grossSubtotal = 0.0;
+    double itemDiscountAmount = 0.0;
     double discountableGross = 0.0;
+    double nonDiscountableGross = 0.0;
+    double inherentlyVatExemptGross = 0.0;
 
     for (final item in items) {
-      final linePrice = item.totalPrice;
-      grossSubtotal += linePrice;
+      final undiscountedLine = item.totalPrice;
+      final effectiveLine = item.effectiveTotalPrice;
+      final lineDisc = item.totalLineDiscount;
 
-      if (!item.item.isDiscountExempt) {
-        discountableGross += linePrice;
+      grossSubtotal += undiscountedLine;
+      itemDiscountAmount += lineDisc;
+
+      if (item.item.isVatExempt) {
+        inherentlyVatExemptGross += effectiveLine;
+      }
+
+      // Check exemption from order-level discounts
+      final isExemptFromOrderDiscount = item.isDiscountExempt || item.item.isDiscountExempt || item.isFreeItem;
+
+      if (!isExemptFromOrderDiscount) {
+        discountableGross += effectiveLine;
+      } else {
+        nonDiscountableGross += effectiveLine;
       }
     }
 
     // 1. Check if the applied discount is Senior/PWD/Special VAT Exempt
     final isSpecialVatExempt = appliedDiscount?.isSpecialVatExempt ?? false;
 
-    double discountAmount = 0.0;
+    double orderDiscountAmount = 0.0;
     double vatableSales = 0.0;
     double vatAmount = 0.0;
     double vatExemptSales = 0.0;
@@ -34,54 +53,83 @@ class CartCalculator {
       // --- Case A: Senior / PWD 20% + VAT Exemption ---
       final percentage = appliedDiscount?.percentage ?? 20.0;
 
-      // Strip 12% VAT from discountable items
-      final netOfVatGross = discountableGross / 1.12;
-
-      // Compute discount on net of VAT
-      discountAmount = netOfVatGross * (percentage / 100);
-
-      // Check cap if configured
-      if (appliedDiscount?.capAmount != null && discountAmount > appliedDiscount!.capAmount!) {
-        discountAmount = appliedDiscount!.capAmount!;
+      // If guest count > 1 and eligible guest count is specified, apply proportional sharing
+      final safeGuestCount = guestCount > 0 ? guestCount : 1;
+      double eligiblePortion = discountableGross;
+      if (safeGuestCount > 1 && eligibleGuestCount > 0 && eligibleGuestCount < safeGuestCount) {
+        final ratio = eligibleGuestCount / safeGuestCount;
+        eligiblePortion = discountableGross * ratio;
+        nonDiscountableGross += (discountableGross - eligiblePortion);
       }
 
-      // Non-discountable items retain their normal VAT treatment
-      final nonDiscountableGross = grossSubtotal - discountableGross;
+      // Strip 12% VAT from discountable items
+      final netOfVatGross = eligiblePortion / 1.12;
+
+      // Compute discount on net of VAT
+      orderDiscountAmount = netOfVatGross * (percentage / 100);
+
+      // Check cap if configured
+      if (appliedDiscount?.capAmount != null && orderDiscountAmount > appliedDiscount!.capAmount!) {
+        orderDiscountAmount = appliedDiscount!.capAmount!;
+      }
+
+      // Non-discountable items retain their standard 12% VAT
       final nonDiscountableVatable = nonDiscountableGross / 1.12;
       final nonDiscountableVat = nonDiscountableGross - nonDiscountableVatable;
 
-      vatExemptSales = netOfVatGross - discountAmount;
+      vatExemptSales = (netOfVatGross - orderDiscountAmount) + inherentlyVatExemptGross;
       vatableSales = nonDiscountableVatable;
       vatAmount = nonDiscountableVat;
-      netTotal = vatExemptSales + nonDiscountableGross;
+      netTotal = vatExemptSales + nonDiscountableGross + surchargeAmount;
     } else {
       // --- Case B: Regular / Commercial Discount ---
-      if (manualDiscountPercentage > 0) {
-        discountAmount = discountableGross * (manualDiscountPercentage / 100);
+      if (appliedDiscount != null) {
+        if (appliedDiscount.isPercentage && (appliedDiscount.percentage ?? 0) > 0) {
+          orderDiscountAmount = discountableGross * (appliedDiscount.percentage! / 100);
+        } else if ((appliedDiscount.fixedAmount ?? 0) > 0) {
+          orderDiscountAmount = appliedDiscount.fixedAmount!;
+        }
+      } else if (manualDiscountPercentage > 0) {
+        orderDiscountAmount = discountableGross * (manualDiscountPercentage / 100);
       } else if (manualDiscountFixed > 0) {
-        discountAmount = manualDiscountFixed > discountableGross ? discountableGross : manualDiscountFixed;
+        orderDiscountAmount = manualDiscountFixed;
+      }
+
+      if (orderDiscountAmount > discountableGross) {
+        orderDiscountAmount = discountableGross;
       }
 
       // Check cap if configured
-      if (appliedDiscount?.capAmount != null && discountAmount > appliedDiscount!.capAmount!) {
-        discountAmount = appliedDiscount!.capAmount!;
+      if (appliedDiscount?.capAmount != null && orderDiscountAmount > appliedDiscount!.capAmount!) {
+        orderDiscountAmount = appliedDiscount!.capAmount!;
       }
 
-      netTotal = grossSubtotal - discountAmount;
+      final subtotalAfterAllDiscounts = (grossSubtotal - itemDiscountAmount - orderDiscountAmount);
+      netTotal = (subtotalAfterAllDiscounts > 0 ? subtotalAfterAllDiscounts : 0.0) + surchargeAmount;
 
       // 12% Inclusive VAT breakdown on Net Total
-      vatableSales = netTotal / 1.12;
-      vatAmount = netTotal - vatableSales;
-      vatExemptSales = 0.0;
+      if (inherentlyVatExemptGross > 0) {
+        final vatablePortion = netTotal > inherentlyVatExemptGross ? (netTotal - inherentlyVatExemptGross) : 0.0;
+        vatableSales = vatablePortion / 1.12;
+        vatAmount = vatablePortion - vatableSales;
+        vatExemptSales = inherentlyVatExemptGross;
+      } else {
+        vatableSales = netTotal / 1.12;
+        vatAmount = netTotal - vatableSales;
+        vatExemptSales = 0.0;
+      }
     }
 
     return TaxDiscountBreakdown(
       grossSubtotal: grossSubtotal,
-      manualDiscountAmount: discountAmount,
+      itemDiscountAmount: itemDiscountAmount,
+      manualDiscountAmount: orderDiscountAmount,
+      surchargeAmount: surchargeAmount,
       vatableSales: vatableSales,
       vatAmount: vatAmount,
       vatExemptSales: vatExemptSales,
       zeroRatedSales: 0.0,
+      nonVatSales: 0.0,
       netTotal: netTotal,
     );
   }

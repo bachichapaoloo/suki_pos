@@ -9,6 +9,8 @@ import 'package:suki_pos/domain/entities/maintenance/category.dart';
 import 'package:suki_pos/domain/entities/maintenance/item.dart';
 import 'package:suki_pos/domain/entities/orders/tax_discount_breakdown.dart';
 import 'package:suki_pos/presentation/auth/bloc/auth_bloc.dart';
+import 'package:suki_pos/presentation/inventory/stock_cubit.dart';
+import 'package:suki_pos/presentation/inventory/stock_state.dart';
 import 'package:suki_pos/presentation/maintenance/category/bloc/category_bloc.dart';
 import 'package:suki_pos/presentation/maintenance/department/bloc/department_bloc.dart';
 import 'package:suki_pos/presentation/maintenance/discount/bloc/discount_bloc.dart';
@@ -28,6 +30,7 @@ import 'package:suki_pos/presentation/pos/widgets/cart_line_item_tile.dart';
 import 'package:suki_pos/presentation/pos/widgets/change_fund_dialog.dart';
 import 'package:suki_pos/presentation/pos/widgets/confirmation_dialog.dart';
 import 'package:suki_pos/presentation/pos/widgets/discount_selection_dialog.dart';
+import 'package:suki_pos/presentation/pos/widgets/line_item_action_dialog.dart';
 import 'package:suki_pos/presentation/pos/widgets/payment_dialog.dart';
 import 'package:suki_pos/presentation/pos/widgets/receipt_preview_dialog.dart';
 
@@ -60,6 +63,7 @@ class _SalesEntryPageState extends State<SalesEntryPage> {
     context.read<OptionGroupCubit>().loadOptionGroups();
     context.read<OrderTypeCubit>().loadOrderTypes();
     context.read<DiscountBloc>().add(GetDiscountsEvent());
+    context.read<StockCubit>().loadStockList();
 
     _searchController.addListener(() {
       final query = _searchController.text.trim().toLowerCase();
@@ -723,65 +727,139 @@ class _SalesEntryPageState extends State<SalesEntryPage> {
                 );
               }
 
-              return GridView.builder(
-                padding: const EdgeInsets.all(12),
-                gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
-                  maxCrossAxisExtent: crossAxisExtent,
-                  childAspectRatio: 0.72,
-                  crossAxisSpacing: 12,
-                  mainAxisSpacing: 12,
-                ),
-                itemCount: items.length,
-                itemBuilder: (context, idx) {
-                  final item = items[idx];
-                  final defaultPrice = item.prices.isNotEmpty ? item.prices.first.price : 0.0;
+              return BlocBuilder<StockCubit, StockState>(
+                builder: (context, state) {
+                  if (state is StockLoading) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  if (state is StockLoaded) {
+                    final stockMap = {for (final s in state.stockList) s.stock.itemId: s};
 
-                  return Card(
-                    elevation: 2,
-                    clipBehavior: Clip.antiAlias,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    child: InkWell(
-                      onTap: () => AddToCartModal.show(context, item: item),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          AspectRatio(
-                            aspectRatio: 1.1,
-                            child: _buildProductCardImage(theme, item),
-                          ),
-                          Expanded(
-                            child: Padding(
-                              padding: const EdgeInsets.all(10.0),
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    item.name,
-                                    style: GoogleFonts.inter(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w600,
-                                      color: const Color(0xFF1E293B),
+                    return GridView.builder(
+                      padding: const EdgeInsets.all(12),
+                      gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+                        maxCrossAxisExtent: crossAxisExtent,
+                        childAspectRatio: 0.72,
+                        crossAxisSpacing: 12,
+                        mainAxisSpacing: 12,
+                      ),
+                      itemCount: items.length,
+                      itemBuilder: (context, idx) {
+                        final item = items[idx];
+                        final defaultPrice = item.prices.isNotEmpty ? item.prices.first.price : 0.0;
+                        final stockRecord = stockMap[item.id];
+                        final qty = stockRecord?.stock.quantity ?? 0.0;
+                        final minLevel = stockRecord?.stock.minLevel ?? 0.0;
+                        final unit = stockRecord?.unitName ?? 'pcs';
+
+                        final isOutOfStock = qty <= 0;
+                        final isLowStock = qty > 0 && qty <= minLevel;
+
+                        final badgeColor = isOutOfStock
+                            ? const Color(0xFFDC2626) // Red
+                            : (isLowStock
+                                  ? const Color(0xFFD97706) // Orange/Amber
+                                  : const Color(0xFF16A34A)); // Green
+
+                        final badgeText = isOutOfStock
+                            ? 'Out of Stock'
+                            : (isLowStock ? 'Low: ${qty.toInt()} $unit' : '${qty.toInt()} $unit');
+
+                        return Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            Card(
+                              elevation: 2,
+                              clipBehavior: Clip.antiAlias,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              child: InkWell(
+                                onTap: () async {
+                                  final qty = stockRecord?.stock.quantity ?? 0.0;
+
+                                  if (qty <= 0) {
+                                    final proceed = await ConfirmationDialog.show(
+                                      context,
+                                      title: 'Out of Stock',
+                                      message:
+                                          '"${item.name}" is currently out of stock. Do you want to proceed anyway?',
+                                      variant: DialogVariant.warning,
+                                      confirmLabel: 'Proceed',
+                                      cancelLabel: 'Cancel',
+                                    );
+                                    if (proceed != true || !context.mounted) return;
+                                  }
+
+                                  AddToCartModal.show(context, item: item);
+                                },
+
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    AspectRatio(
+                                      aspectRatio: 1.1,
+                                      child: _buildProductCardImage(theme, item),
                                     ),
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  Text(
-                                    '₱${defaultPrice.toStringAsFixed(2)}',
-                                    style: GoogleFonts.inter(
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.bold,
-                                      color: theme.colorScheme.primary,
+                                    Expanded(
+                                      child: Padding(
+                                        padding: const EdgeInsets.all(10.0),
+                                        child: Column(
+                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              item.name,
+                                              style: GoogleFonts.inter(
+                                                fontSize: 13,
+                                                fontWeight: FontWeight.w600,
+                                                color: const Color(0xFF1E293B),
+                                              ),
+                                              maxLines: 2,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                            Text(
+                                              '₱${defaultPrice.toStringAsFixed(2)}',
+                                              style: GoogleFonts.inter(
+                                                fontSize: 15,
+                                                fontWeight: FontWeight.bold,
+                                                color: theme.colorScheme.primary,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
                                     ),
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
                             ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
+                            Positioned(
+                              top: 10,
+                              right: 8,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: badgeColor,
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  badgeText,
+                                  style: GoogleFonts.inter(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        );
+                      },
+                    );
+                  }
+                  return const Center(child: Text('No Stocks available.'));
                 },
               );
             }
@@ -888,11 +966,15 @@ class _SalesEntryPageState extends State<SalesEntryPage> {
                         final cartItem = cartState.items[idx];
                         return CartLineItemTile(
                           cartItem: cartItem,
-                          onTap: () => AddToCartModal.show(
-                            context,
-                            item: cartItem.item,
-                            existingCartItem: cartItem,
-                          ),
+                          onTap: () {
+                            LineItemActionDialog.show(
+                              context,
+                              cartItem: cartItem,
+                              optionGroups: const [],
+                              onSave: (updated) => context.read<CartCubit>().updateCartItem(cartItem.id, updated),
+                              onRemove: () => context.read<CartCubit>().removeItem(cartItem.id),
+                            );
+                          },
                           onDecrease: () => context.read<CartCubit>().updateQuantity(cartItem.id, -1),
                           onIncrease: () => context.read<CartCubit>().updateQuantity(cartItem.id, 1),
                         );
@@ -909,40 +991,77 @@ class _SalesEntryPageState extends State<SalesEntryPage> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text('Subtotal:'),
+                      const Text('Gross Subtotal:'),
                       Text('₱${breakdown.grossSubtotal.toStringAsFixed(2)}'),
                     ],
                   ),
+                  if (breakdown.itemDiscountAmount > 0)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('Item Discounts / Free:', style: TextStyle(color: Color(0xFFB45309))),
+                          Text(
+                            '-₱${breakdown.itemDiscountAmount.toStringAsFixed(2)}',
+                            style: const TextStyle(color: Color(0xFFB45309), fontWeight: FontWeight.bold),
+                          ),
+                        ],
+                      ),
+                    ),
                   if (breakdown.manualDiscountAmount > 0)
-                    Row(
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('Order Discount:'),
+                          Text(
+                            '-₱${breakdown.manualDiscountAmount.toStringAsFixed(2)}',
+                            style: TextStyle(color: theme.colorScheme.error, fontWeight: FontWeight.bold),
+                          ),
+                        ],
+                      ),
+                    ),
+                  if (breakdown.vatExemptSales > 0)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text('VAT-Exempt Sales:', style: TextStyle(color: theme.colorScheme.outline, fontSize: 12)),
+                          Text(
+                            '₱${breakdown.vatExemptSales.toStringAsFixed(2)}',
+                            style: TextStyle(color: theme.colorScheme.outline, fontSize: 12),
+                          ),
+                        ],
+                      ),
+                    ),
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text('Discount:'),
+                        Text('VATable Sales (12%):', style: TextStyle(color: theme.colorScheme.outline, fontSize: 12)),
                         Text(
-                          '-₱${breakdown.manualDiscountAmount.toStringAsFixed(2)}',
-                          style: TextStyle(color: theme.colorScheme.error, fontWeight: FontWeight.bold),
+                          '₱${breakdown.vatableSales.toStringAsFixed(2)}',
+                          style: TextStyle(color: theme.colorScheme.outline, fontSize: 12),
                         ),
                       ],
                     ),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text('VATable Sales:', style: TextStyle(color: theme.colorScheme.outline, fontSize: 12)),
-                      Text(
-                        '₱${breakdown.vatableSales.toStringAsFixed(2)}',
-                        style: TextStyle(color: theme.colorScheme.outline, fontSize: 12),
-                      ),
-                    ],
                   ),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text('VAT Amount (12%):', style: TextStyle(color: theme.colorScheme.outline, fontSize: 12)),
-                      Text(
-                        '₱${breakdown.vatAmount.toStringAsFixed(2)}',
-                        style: TextStyle(color: theme.colorScheme.outline, fontSize: 12),
-                      ),
-                    ],
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('VAT Amount (12%):', style: TextStyle(color: theme.colorScheme.outline, fontSize: 12)),
+                        Text(
+                          '₱${breakdown.vatAmount.toStringAsFixed(2)}',
+                          style: TextStyle(color: theme.colorScheme.outline, fontSize: 12),
+                        ),
+                      ],
+                    ),
                   ),
                   const SizedBox(height: 8),
                   Row(

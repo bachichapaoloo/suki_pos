@@ -1,14 +1,17 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:suki_pos/domain/entities/inventory/stock.dart';
 import 'package:suki_pos/domain/use_cases/inventory/stock_use_cases.dart';
 import 'package:suki_pos/presentation/inventory/stock_state.dart';
 
 class StockCubit extends Cubit<StockState> {
   final GetStockWithDetails getStockWithDetails;
   final UpdateStockQuantity updateStockQuantity;
+  final AdjustStock? adjustStockUseCase;
 
   StockCubit({
     required this.getStockWithDetails,
     required this.updateStockQuantity,
+    this.adjustStockUseCase,
   }) : super(StockInitial());
 
   Future<void> loadStockList() async {
@@ -45,6 +48,21 @@ class StockCubit extends Cubit<StockState> {
       },
       (_) {
         loadStockList(); // Refresh list after adjustment
+        return true;
+      },
+    );
+  }
+
+  Future<bool> saveStock(Stock stock) async {
+    if (adjustStockUseCase == null) return false;
+    final result = await adjustStockUseCase!(stock);
+    return result.fold(
+      (failure) {
+        emit(StockError('Failed to save stock record'));
+        return false;
+      },
+      (_) {
+        loadStockList();
         return true;
       },
     );
