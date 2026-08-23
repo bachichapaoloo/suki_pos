@@ -33,6 +33,7 @@ import 'package:suki_pos/presentation/pos/widgets/discount_selection_dialog.dart
 import 'package:suki_pos/presentation/pos/widgets/line_item_action_dialog.dart';
 import 'package:suki_pos/presentation/pos/widgets/payment_dialog.dart';
 import 'package:suki_pos/presentation/pos/widgets/receipt_preview_dialog.dart';
+import 'package:suki_pos/presentation/widgets/stock_adjustment_dialog.dart';
 
 /// Responsive breakpoints for the Sales Entry layout.
 class _Breakpoints {
@@ -86,7 +87,6 @@ class _SalesEntryPageState extends State<SalesEntryPage> {
 
   int _getActiveCashierId(BuildContext context) {
     final authState = context.read<AuthBloc>().state;
-    final shiftState = context.read<ShiftCubit>().state;
 
     if (authState is AuthAuthenticated) {
       return authState.user.id;
@@ -96,18 +96,28 @@ class _SalesEntryPageState extends State<SalesEntryPage> {
 
   void _verifyShiftStatus() {
     final cashierId = _getActiveCashierId(context);
-    final shiftState = context.read<ShiftCubit>().state;
+    context.read<ShiftCubit>().checkActiveShift(cashierId);
+  }
 
-    if (shiftState is ShiftInactive || shiftState is ShiftInitial) {
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (_) => ChangeFundDialog(
-          onConfirm: (beginningCash) {
-            context.read<ShiftCubit>().openShift(cashierId, beginningCash);
-          },
-        ),
-      );
+  void _handlePosMenuAction(BuildContext context, PosMenuAction action) {
+    switch (action) {
+      case PosMenuAction.xReading:
+        // Trigger X-Reading reading preview
+        break;
+
+      case PosMenuAction.shiftReconciliation:
+        // Confirm and close shift
+        break;
+
+      case PosMenuAction.reprint:
+      case PosMenuAction.postVoid:
+      case PosMenuAction.ejLog:
+      case PosMenuAction.zReading:
+      case PosMenuAction.tenderDeclaration:
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${action.name} feature coming soon.')),
+        );
+        break;
     }
   }
 
@@ -283,23 +293,35 @@ class _SalesEntryPageState extends State<SalesEntryPage> {
       canPop: false,
       onPopInvokedWithResult: (didPop, result) async {
         if (didPop) return;
-        _handleBackNavigation(context);
+        await _handleBackNavigation(context);
       },
-      child: Scaffold(
-        appBar: AppBar(
-          backgroundColor: theme.primaryColor,
-          title: Text('Sales Entry', style: TextStyle(color: theme.colorScheme.onPrimary)),
-          actions: [
-            // Cart icon + badge, shown only on mobile widths (search/order-type live in the body).
-            Builder(
-              builder: (context) {
-                final isMobile = MediaQuery.of(context).size.width < _Breakpoints.mobile;
-                if (!isMobile) return const SizedBox.shrink();
-                return BlocBuilder<CartCubit, CartState>(
-                  builder: (context, cartState) {
-                    return Padding(
-                      padding: const EdgeInsets.only(right: 8),
-                      child: Stack(
+      child: BlocListener<ShiftCubit, ShiftState>(
+        listener: (context, state) async {
+          if (state is ShiftInactive) {
+            await showDialog(
+              context: context,
+              barrierDismissible: false,
+              builder: (_) => ChangeFundDialog(
+                onConfirm: (amount) {
+                  context.read<ShiftCubit>().openShift(_getActiveCashierId(context), amount);
+                },
+              ),
+            );
+          }
+        },
+        child: Scaffold(
+          appBar: AppBar(
+            backgroundColor: theme.primaryColor,
+            title: Text('Sales Entry', style: TextStyle(color: theme.colorScheme.onPrimary)),
+            actions: [
+              // 1. Mobile-only Cart Icon
+              Builder(
+                builder: (context) {
+                  final isMobile = MediaQuery.of(context).size.width < _Breakpoints.mobile;
+                  if (!isMobile) return const SizedBox.shrink();
+                  return BlocBuilder<CartCubit, CartState>(
+                    builder: (context, cartState) {
+                      return Stack(
                         clipBehavior: Clip.none,
                         children: [
                           IconButton(
@@ -323,25 +345,44 @@ class _SalesEntryPageState extends State<SalesEntryPage> {
                               ),
                             ),
                         ],
-                      ),
-                    );
-                  },
-                );
+                      );
+                    },
+                  );
+                },
+              ),
+
+              // 2. POS Actions Menu (Visible on BOTH Mobile & Wide Screens)
+              PopupMenuButton<PosMenuAction>(
+                icon: const Icon(Icons.more_vert),
+                tooltip: 'POS Menu',
+                onSelected: (action) => _handlePosMenuAction(context, action),
+                itemBuilder: (context) => [
+                  // Shift & Cash Management Section
+                  const PopupMenuItem(
+                    value: PosMenuAction.xReading,
+                    child: ListTile(
+                      leading: Icon(Icons.assessment_outlined),
+                      title: Text('X-Reading (Mid-Day)'),
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  ),
+                  // ... rest of the menu items ...
+                ],
+              ),
+            ],
+          ),
+          body: SafeArea(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final isMobile = constraints.maxWidth < _Breakpoints.mobile;
+                final isTablet = !isMobile && constraints.maxWidth < _Breakpoints.tablet;
+
+                if (isMobile) {
+                  return _buildMobileLayout(theme);
+                }
+                return _buildWideLayout(theme, isTablet: isTablet);
               },
             ),
-          ],
-        ),
-        body: SafeArea(
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final isMobile = constraints.maxWidth < _Breakpoints.mobile;
-              final isTablet = !isMobile && constraints.maxWidth < _Breakpoints.tablet;
-
-              if (isMobile) {
-                return _buildMobileLayout(theme);
-              }
-              return _buildWideLayout(theme, isTablet: isTablet);
-            },
           ),
         ),
       ),

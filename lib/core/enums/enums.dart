@@ -19,5 +19,5 @@ enum PosMenuAction {
   zReading,
   shiftReconciliation,
   tenderDeclaration,
-  stockAdjustment,
+  // stockAdjustment,
 }
