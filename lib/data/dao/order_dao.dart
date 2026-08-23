@@ -42,6 +42,13 @@ class OrderDao {
           0;
       final nextSiNumber = maxSi + 1;
 
+      final maxTseq =
+          Sqflite.firstIntValue(
+            await txn.rawQuery('SELECT MAX(tseq_no) FROM ${SchemaConstants.saleTransaction}'),
+          ) ??
+          0;
+      final nextTseqNumber = maxTseq + 1;
+
       final maxSeq =
           Sqflite.firstIntValue(
             await txn.rawQuery('SELECT MAX(seq_no) FROM ${SchemaConstants.saleTransaction}'),
@@ -52,12 +59,16 @@ class OrderDao {
       // Query active shift Z-number if open
       final activeShiftRes = await txn.query(
         SchemaConstants.shift,
-        columns: ['id'],
+        columns: ['id', 'start_time'],
         where: 'cashier_id = ? AND status = 1',
         whereArgs: [order.cashierId],
         limit: 1,
       );
       final zNumber = activeShiftRes.isNotEmpty ? (activeShiftRes.first['id'] as int) : 1;
+
+      final String postingDate = activeShiftRes.isNotEmpty && activeShiftRes.first['start_time'] != null
+          ? (activeShiftRes.first['start_time'] as String).substring(0, 10)
+          : now.substring(0, 10);
 
       // 3. Insert Master Sales Order
       final orderId = await txn.insert(SchemaConstants.salesOrder, {
@@ -83,7 +94,7 @@ class OrderDao {
         'cashier_id': order.cashierId,
         'si_number': nextSiNumber,
         'seq_no': nextSeqNumber,
-        'tseq_no': nextSeqNumber,
+        'tseq_no': nextTseqNumber,
         'z_number': zNumber,
         'order_type_id': order.orderTypeId,
         'guest_count': order.guestCount,
@@ -106,7 +117,7 @@ class OrderDao {
         'x_read_status': 0,
         'transaction_date': now,
         'created_at': now,
-        'posted_at': now,
+        'posted_at': postingDate,
       });
 
       final String txnNo = 'TXN-${txnId.toString().padLeft(6, '0')}';
