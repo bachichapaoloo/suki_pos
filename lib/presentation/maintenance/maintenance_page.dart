@@ -90,6 +90,16 @@ class MaintenancePage extends StatelessWidget {
                 const SizedBox(height: 12),
                 _buildMobileActionCard(
                   context,
+                  'Service Charge',
+                  'Configure rate, auto-compute & order types',
+                  Icons.room_service_outlined,
+                  const Color(0xFFF3E8FF),
+                  const Color(0xFF7E22CE),
+                  route: '/maintenance/service-charge',
+                ),
+                const SizedBox(height: 12),
+                _buildMobileActionCard(
+                  context,
                   'Stock Inventory',
                   'Track on-hand stock and perform adjustments',
                   Icons.inventory_2_outlined,
@@ -193,6 +203,15 @@ class MaintenancePage extends StatelessWidget {
                           iconBg: const Color(0xFFA5DDF1),
                           iconColor: const Color(0xFF0369A1),
                           route: '/maintenance/discounts',
+                        ),
+                        _buildDesktopActionCard(
+                          context,
+                          title: 'Service Charge',
+                          subtitle: 'Configure rate, auto-compute & order types',
+                          icon: Icons.room_service_outlined,
+                          iconBg: const Color(0xFFF3E8FF),
+                          iconColor: const Color(0xFF7E22CE),
+                          route: '/maintenance/service-charge',
                         ),
                         _buildDesktopActionCard(
                           context,
