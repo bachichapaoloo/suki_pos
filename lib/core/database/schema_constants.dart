@@ -1394,10 +1394,14 @@ class SchemaConstants {
   /// Seed data inserted on new database initialization.
   static const List<String> seedScripts = [
     '''
-    INSERT OR IGNORE INTO order_type (id, name, is_active) VALUES
-        (1, 'Dine-In', 1),
-        (2, 'Take-Out', 1),
-        (3, 'Delivery', 1);
+    INSERT OR IGNORE INTO order_type (id, name, has_service_charge, is_active) VALUES
+        (1, 'Dine-In', 1, 1),
+        (2, 'Take-Out', 0, 1),
+        (3, 'Delivery', 0, 1);
+    ''',
+    '''
+    INSERT OR IGNORE INTO service_charge (id, amount, is_active) VALUES
+        (1, 10.0, 1);
     ''',
     '''
     INSERT OR IGNORE INTO discount_type (code, name) VALUES

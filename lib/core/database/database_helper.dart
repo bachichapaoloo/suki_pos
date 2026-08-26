@@ -50,6 +50,9 @@ class DatabaseHelper {
   Future<void> _onOpen(Database db) async {
     await db.transaction((txn) async {
       final batch = txn.batch();
+      SchemaConstants.createTableScripts.forEach(batch.execute);
+      SchemaConstants.createIndexScripts.forEach(batch.execute);
+      SchemaConstants.createTriggerScripts.forEach(batch.execute);
       SchemaConstants.seedScripts.forEach(batch.execute);
       await batch.commit(noResult: true);
     });
