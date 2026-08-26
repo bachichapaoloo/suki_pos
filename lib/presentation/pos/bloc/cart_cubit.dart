@@ -230,6 +230,28 @@ class CartCubit extends Cubit<CartState> {
     emit(state.copyWith(surchargeAmount: amount, surchargePercent: percent));
   }
 
+  void setServiceChargeConfig({
+    required double ratePercent,
+    required bool isActive,
+    required bool computeBeforeDiscount,
+  }) {
+    emit(
+      state.copyWith(
+        serviceChargeRate: ratePercent,
+        isServiceChargeActive: isActive,
+        computeServiceChargeBeforeDiscount: computeBeforeDiscount,
+      ),
+    );
+  }
+
+  void toggleServiceChargeWaived() {
+    emit(state.copyWith(isServiceChargeWaived: !state.isServiceChargeWaived));
+  }
+
+  void setServiceChargeWaived(bool waived) {
+    emit(state.copyWith(isServiceChargeWaived: waived));
+  }
+
   // -------------------------------------------------------------
   // HOLD / SUSPEND & RECALL ORDER SYSTEM
   // -------------------------------------------------------------

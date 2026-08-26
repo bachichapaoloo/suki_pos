@@ -11,6 +11,11 @@ class CartCalculator {
     int guestCount = 1,
     int eligibleGuestCount = 0,
     double surchargeAmount = 0.0,
+    double surchargePercent = 0.0,
+    double serviceChargeRate = 10.0,
+    bool isServiceChargeActive = false,
+    bool computeServiceChargeBeforeDiscount = true,
+    bool isServiceChargeWaived = false,
   }) {
     double grossSubtotal = 0.0;
     double itemDiscountAmount = 0.0;
@@ -40,6 +45,8 @@ class CartCalculator {
       }
     }
 
+    final effectiveSubtotal = (grossSubtotal - itemDiscountAmount).clamp(0.0, double.infinity);
+
     // 1. Check if the applied discount is Senior/PWD/Special VAT Exempt
     final isSpecialVatExempt = appliedDiscount?.isSpecialVatExempt ?? false;
 
@@ -47,6 +54,7 @@ class CartCalculator {
     double vatableSales = 0.0;
     double vatAmount = 0.0;
     double vatExemptSales = 0.0;
+    double effectiveServiceCharge = 0.0;
     double netTotal = 0.0;
 
     if (isSpecialVatExempt) {
@@ -73,6 +81,19 @@ class CartCalculator {
         orderDiscountAmount = appliedDiscount!.capAmount!;
       }
 
+      // Compute Service Charge
+      if (surchargeAmount > 0) {
+        effectiveServiceCharge = surchargeAmount;
+      } else if (isServiceChargeActive && !isServiceChargeWaived && items.isNotEmpty) {
+        final rate = surchargePercent > 0 ? surchargePercent : serviceChargeRate;
+        if (computeServiceChargeBeforeDiscount) {
+          effectiveServiceCharge = effectiveSubtotal * (rate / 100);
+        } else {
+          final discountedBase = (effectiveSubtotal - orderDiscountAmount).clamp(0.0, double.infinity);
+          effectiveServiceCharge = discountedBase * (rate / 100);
+        }
+      }
+
       // Non-discountable items retain their standard 12% VAT
       final nonDiscountableVatable = nonDiscountableGross / 1.12;
       final nonDiscountableVat = nonDiscountableGross - nonDiscountableVatable;
@@ -80,7 +101,7 @@ class CartCalculator {
       vatExemptSales = (netOfVatGross - orderDiscountAmount) + inherentlyVatExemptGross;
       vatableSales = nonDiscountableVatable;
       vatAmount = nonDiscountableVat;
-      netTotal = vatExemptSales + nonDiscountableGross + surchargeAmount;
+      netTotal = vatExemptSales + nonDiscountableGross + effectiveServiceCharge;
     } else {
       // --- Case B: Regular / Commercial Discount ---
       if (appliedDiscount != null) {
@@ -104,8 +125,21 @@ class CartCalculator {
         orderDiscountAmount = appliedDiscount!.capAmount!;
       }
 
+      // Compute Service Charge
+      if (surchargeAmount > 0) {
+        effectiveServiceCharge = surchargeAmount;
+      } else if (isServiceChargeActive && !isServiceChargeWaived && items.isNotEmpty) {
+        final rate = surchargePercent > 0 ? surchargePercent : serviceChargeRate;
+        if (computeServiceChargeBeforeDiscount) {
+          effectiveServiceCharge = effectiveSubtotal * (rate / 100);
+        } else {
+          final discountedBase = (effectiveSubtotal - orderDiscountAmount).clamp(0.0, double.infinity);
+          effectiveServiceCharge = discountedBase * (rate / 100);
+        }
+      }
+
       final subtotalAfterAllDiscounts = (grossSubtotal - itemDiscountAmount - orderDiscountAmount);
-      netTotal = (subtotalAfterAllDiscounts > 0 ? subtotalAfterAllDiscounts : 0.0) + surchargeAmount;
+      netTotal = (subtotalAfterAllDiscounts > 0 ? subtotalAfterAllDiscounts : 0.0) + effectiveServiceCharge;
 
       // 12% Inclusive VAT breakdown on Net Total
       if (inherentlyVatExemptGross > 0) {
@@ -124,7 +158,7 @@ class CartCalculator {
       grossSubtotal: grossSubtotal,
       itemDiscountAmount: itemDiscountAmount,
       manualDiscountAmount: orderDiscountAmount,
-      surchargeAmount: surchargeAmount,
+      surchargeAmount: effectiveServiceCharge,
       vatableSales: vatableSales,
       vatAmount: vatAmount,
       vatExemptSales: vatExemptSales,

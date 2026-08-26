@@ -17,6 +17,10 @@ class CartState extends Equatable {
   final double manualDiscountFixed;
   final double surchargeAmount;
   final double surchargePercent;
+  final double serviceChargeRate;
+  final bool isServiceChargeActive;
+  final bool computeServiceChargeBeforeDiscount;
+  final bool isServiceChargeWaived;
   final Discount? appliedDiscount;
   final String? beneficiaryName;
   final String? beneficiaryIdNo;
@@ -38,6 +42,10 @@ class CartState extends Equatable {
     this.manualDiscountFixed = 0.0,
     this.surchargeAmount = 0.0,
     this.surchargePercent = 0.0,
+    this.serviceChargeRate = 10.0,
+    this.isServiceChargeActive = true,
+    this.computeServiceChargeBeforeDiscount = true,
+    this.isServiceChargeWaived = false,
     this.appliedDiscount,
     this.beneficiaryName,
     this.beneficiaryIdNo,
@@ -57,6 +65,11 @@ class CartState extends Equatable {
         guestCount: guestCount,
         eligibleGuestCount: eligibleGuestCount,
         surchargeAmount: surchargeAmount,
+        surchargePercent: surchargePercent,
+        serviceChargeRate: serviceChargeRate,
+        isServiceChargeActive: isServiceChargeActive,
+        computeServiceChargeBeforeDiscount: computeServiceChargeBeforeDiscount,
+        isServiceChargeWaived: isServiceChargeWaived,
       );
 
   CartState copyWith({
@@ -74,6 +87,10 @@ class CartState extends Equatable {
     double? manualDiscountFixed,
     double? surchargeAmount,
     double? surchargePercent,
+    double? serviceChargeRate,
+    bool? isServiceChargeActive,
+    bool? computeServiceChargeBeforeDiscount,
+    bool? isServiceChargeWaived,
     Discount? appliedDiscount,
     bool clearAppliedDiscount = false,
     String? beneficiaryName,
@@ -98,6 +115,10 @@ class CartState extends Equatable {
       manualDiscountFixed: manualDiscountFixed ?? this.manualDiscountFixed,
       surchargeAmount: surchargeAmount ?? this.surchargeAmount,
       surchargePercent: surchargePercent ?? this.surchargePercent,
+      serviceChargeRate: serviceChargeRate ?? this.serviceChargeRate,
+      isServiceChargeActive: isServiceChargeActive ?? this.isServiceChargeActive,
+      computeServiceChargeBeforeDiscount: computeServiceChargeBeforeDiscount ?? this.computeServiceChargeBeforeDiscount,
+      isServiceChargeWaived: isServiceChargeWaived ?? this.isServiceChargeWaived,
       appliedDiscount: clearAppliedDiscount ? null : (appliedDiscount ?? this.appliedDiscount),
       beneficiaryName: clearBeneficiary ? null : (beneficiaryName ?? this.beneficiaryName),
       beneficiaryIdNo: clearBeneficiary ? null : (beneficiaryIdNo ?? this.beneficiaryIdNo),
@@ -122,6 +143,10 @@ class CartState extends Equatable {
         manualDiscountFixed,
         surchargeAmount,
         surchargePercent,
+        serviceChargeRate,
+        isServiceChargeActive,
+        computeServiceChargeBeforeDiscount,
+        isServiceChargeWaived,
         appliedDiscount,
         beneficiaryName,
         beneficiaryIdNo,

@@ -24,6 +24,8 @@ import 'package:suki_pos/presentation/maintenance/item/bloc/item_state.dart';
 import 'package:suki_pos/presentation/maintenance/option_group/bloc/option_group_cubit.dart';
 import 'package:suki_pos/presentation/maintenance/order_type/bloc/order_type_cubit.dart';
 import 'package:suki_pos/presentation/maintenance/order_type/bloc/order_type_state.dart';
+import 'package:suki_pos/presentation/maintenance/service_charge/bloc/service_charge_cubit.dart';
+import 'package:suki_pos/presentation/maintenance/service_charge/bloc/service_charge_state.dart';
 import 'package:suki_pos/presentation/pos/bloc/cart_cubit.dart';
 import 'package:suki_pos/presentation/pos/bloc/cart_state.dart';
 import 'package:suki_pos/presentation/pos/bloc/shift_cubit.dart';
@@ -76,6 +78,7 @@ class _SalesEntryPageState extends State<SalesEntryPage> {
     context.read<OrderTypeCubit>().loadOrderTypes();
     context.read<DiscountBloc>().add(GetDiscountsEvent());
     context.read<StockCubit>().loadStockList();
+    context.read<ServiceChargeCubit>().loadServiceChargeConfig();
 
     _searchController.addListener(() {
       final query = _searchController.text.trim().toLowerCase();
@@ -300,6 +303,9 @@ class _SalesEntryPageState extends State<SalesEntryPage> {
           if (!mounted) return;
 
           if (completedTxn != null) {
+            // Realtime Stock sync
+            context.read<StockCubit>().loadStockList();
+
             AppToast.showSuccess(
               context,
               message: 'Sale Completed! Transaction #${completedTxn.transactionNo}',
@@ -417,12 +423,53 @@ class _SalesEntryPageState extends State<SalesEntryPage> {
       },
       child: Focus(
         autofocus: true,
-        child: BlocListener<ShiftCubit, ShiftState>(
-          listener: (context, state) {
-            if (state is ShiftInactive || state is ShiftClosed) {
-              ChangeFundDialog.show(context, cashierId: _getActiveCashierId(context));
-            }
-          },
+        child: MultiBlocListener(
+          listeners: [
+            BlocListener<ShiftCubit, ShiftState>(
+              listener: (context, state) {
+                if (state is ShiftInactive || state is ShiftClosed) {
+                  ChangeFundDialog.show(context, cashierId: _getActiveCashierId(context));
+                }
+              },
+            ),
+            BlocListener<ServiceChargeCubit, ServiceChargeState>(
+              listener: (context, state) {
+                if (state is ServiceChargeLoaded) {
+                  context.read<CartCubit>().setServiceChargeConfig(
+                    ratePercent: state.config.ratePercent,
+                    isActive: state.config.isActive,
+                    computeBeforeDiscount: state.config.computeBeforeDiscount,
+                  );
+                }
+              },
+            ),
+            BlocListener<OrderTypeCubit, OrderTypeState>(
+              listener: (context, state) {
+                if (state is OrderTypeLoaded && state.orderTypes.isNotEmpty) {
+                  final activeId = _selectedOrderTypeId ?? 1;
+                  final matching =
+                      state.orderTypes.where((o) => o.id == activeId).firstOrNull ?? state.orderTypes.first;
+
+                  if (_selectedOrderTypeId != matching.id) {
+                    setState(() => _selectedOrderTypeId = matching.id);
+                  }
+
+                  final scState = context.read<ServiceChargeCubit>().state;
+                  final isGloballyActive = scState is ServiceChargeLoaded ? scState.config.isActive : true;
+                  final hasSc = isGloballyActive && matching.hasServiceCharge;
+                  final effectiveRate = matching.additionalPercentage > 0
+                      ? matching.additionalPercentage
+                      : (scState is ServiceChargeLoaded ? scState.config.ratePercent : 10.0);
+
+                  context.read<CartCubit>().setServiceChargeConfig(
+                    ratePercent: effectiveRate,
+                    isActive: hasSc,
+                    computeBeforeDiscount: scState is ServiceChargeLoaded ? scState.config.computeBeforeDiscount : true,
+                  );
+                }
+              },
+            ),
+          ],
           child: Scaffold(
             backgroundColor: const Color(0xFFF8FAFC),
             appBar: AppUnifiedHeader(
@@ -641,6 +688,30 @@ class _SalesEntryPageState extends State<SalesEntryPage> {
                   if (value != null) {
                     setState(() => _selectedOrderTypeId = value);
                     context.read<CartCubit>().setOrderType(value);
+
+                    // Sync order type service charge & surcharge rules
+                    final ot = state.orderTypes.where((o) => o.id == value).firstOrNull;
+                    final scState = context.read<ServiceChargeCubit>().state;
+                    final isGloballyActive = scState is ServiceChargeLoaded ? scState.config.isActive : true;
+                    final hasSc = isGloballyActive && (ot == null || ot.hasServiceCharge);
+                    final effectiveRate = (ot != null && ot.additionalPercentage > 0)
+                        ? ot.additionalPercentage
+                        : (scState is ServiceChargeLoaded ? scState.config.ratePercent : 10.0);
+
+                    context.read<CartCubit>().setServiceChargeConfig(
+                      ratePercent: effectiveRate,
+                      isActive: hasSc,
+                      computeBeforeDiscount: scState is ServiceChargeLoaded
+                          ? scState.config.computeBeforeDiscount
+                          : true,
+                    );
+
+                    // Trigger Guest Count or Pager/Ref Dialog if configured on Order Type
+                    // if (ot != null && (ot.askGuestCount || ot.askRefNo)) {
+                    //   WidgetsBinding.instance.addPostFrameCallback((_) {
+                    //     _openTableCustomerDialog(context);
+                    //   });
+                    // }
                   }
                 },
                 items: ([...state.orderTypes]..sort((a, b) => a.id.compareTo(b.id))).map((ot) {
@@ -1235,12 +1306,79 @@ class _SalesEntryPageState extends State<SalesEntryPage> {
                       textColor: theme.colorScheme.error,
                       isBold: true,
                     ),
-                  if (breakdown.surchargeAmount > 0)
-                    _buildSummaryRow(
-                      'Service Charge / Surcharge:',
-                      '+₱${breakdown.surchargeAmount.toStringAsFixed(2)}',
-                      textColor: const Color(0xFF475569),
-                      isBold: true,
+                  if (breakdown.surchargeAmount > 0 || (cartState.isServiceChargeActive && cartState.items.isNotEmpty))
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2.0),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: [
+                              Text(
+                                'Service Charge (${cartState.serviceChargeRate.toStringAsFixed(0)}%):',
+                                style: GoogleFonts.inter(
+                                  fontSize: 12.5,
+                                  color: cartState.isServiceChargeWaived
+                                      ? const Color(0xFF94A3B8)
+                                      : const Color(0xFF475569),
+                                  fontWeight: FontWeight.w600,
+                                  decoration: cartState.isServiceChargeWaived ? TextDecoration.lineThrough : null,
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              InkWell(
+                                onTap: () {
+                                  FeedbackService.tap();
+                                  context.read<CartCubit>().toggleServiceChargeWaived();
+                                  AppToast.showInfo(
+                                    context,
+                                    message: cartState.isServiceChargeWaived
+                                        ? 'Service charge restored'
+                                        : 'Service charge waived for this order',
+                                  );
+                                },
+                                borderRadius: BorderRadius.circular(4),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                  decoration: BoxDecoration(
+                                    color: cartState.isServiceChargeWaived
+                                        ? const Color(0xFFECFDF5)
+                                        : const Color(0xFFFEF2F2),
+                                    borderRadius: BorderRadius.circular(4),
+                                    border: Border.all(
+                                      color: cartState.isServiceChargeWaived
+                                          ? const Color(0xFFA7F3D0)
+                                          : const Color(0xFFFECACA),
+                                    ),
+                                  ),
+                                  child: Text(
+                                    cartState.isServiceChargeWaived ? 'Restore' : 'Waive',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                      color: cartState.isServiceChargeWaived
+                                          ? const Color(0xFF059669)
+                                          : const Color(0xFFDC2626),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          Text(
+                            cartState.isServiceChargeWaived
+                                ? '₱0.00'
+                                : '+₱${breakdown.surchargeAmount.toStringAsFixed(2)}',
+                            style: GoogleFonts.inter(
+                              fontSize: 12.5,
+                              color: cartState.isServiceChargeWaived
+                                  ? const Color(0xFF94A3B8)
+                                  : const Color(0xFF1E293B),
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   if (breakdown.vatExemptSales > 0)
                     _buildSummaryRow(
