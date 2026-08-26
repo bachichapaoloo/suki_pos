@@ -1,4 +1,5 @@
 import 'package:sqflite/sqflite.dart';
+import 'package:suki_pos/domain/entities/maintenance/discount.dart';
 import '../../core/database/database_helper.dart';
 import '../../core/database/schema_constants.dart';
 import '../../domain/entities/orders/sales_order.dart';
@@ -24,11 +25,30 @@ class OrderDao {
     return await db.transaction((txn) async {
       final now = DateTime.now().toIso8601String();
 
-      // 1. Calculate Financial Breakdown with actual discounts & item discounts
+      // 1. Resolve applied discount details if specified
+      Discount? appliedDiscount;
+      if (order.discountId != null) {
+        final discMaps = await txn.rawQuery(
+          '''
+          SELECT d.*, dt.code AS discount_type_code, dt.name AS discount_type_name
+          FROM ${SchemaConstants.discount} d
+          JOIN ${SchemaConstants.discountType} dt ON d.discount_type_id = dt.id
+          WHERE d.id = ?
+          LIMIT 1
+          ''',
+          [order.discountId],
+        );
+        if (discMaps.isNotEmpty) {
+          appliedDiscount = Discount.fromMap(discMaps.first);
+        }
+      }
+
+      // Calculate Financial Breakdown with actual discounts & item discounts
       final breakdown = CartCalculator.calculate(
         items: order.items,
         manualDiscountPercentage: manualDiscountPercentage > 0 ? manualDiscountPercentage : (order.discPercentage),
         manualDiscountFixed: manualDiscountFixed > 0 ? manualDiscountFixed : (order.discFixedAmount),
+        appliedDiscount: appliedDiscount,
         guestCount: order.guestCount,
         eligibleGuestCount: order.eligibleGuestCount,
         surchargeAmount: order.surchargeAmount,
@@ -247,6 +267,19 @@ class OrderDao {
         'created_at': now,
       });
 
+      // 7. Insert Statutory Discount Beneficiary if recorded
+      if (order.beneficiaryName != null && order.beneficiaryName!.isNotEmpty) {
+        final discTypeId = order.beneficiaryDiscountTypeId ?? (appliedDiscount?.discountTypeId ?? 2);
+        await txn.insert(SchemaConstants.discountBeneficiary, {
+          'sale_transaction_id': txnId,
+          'tseq_no': nextTseqNumber,
+          'discount_type_id': discTypeId,
+          'beneficiary_name': order.beneficiaryName ?? 'N/A',
+          'id_number': order.beneficiaryIdNo,
+          'created_at': now,
+        });
+      }
+
       // Finish EJ Text Buffer
       ejBuffer.writeln('----------------------------------------');
       ejBuffer.writeln('FINANCIAL SUMMARY:');
@@ -255,6 +288,12 @@ class OrderDao {
         ejBuffer.writeln('  Item Discounts : -₱${breakdown.itemDiscountAmount.toStringAsFixed(2)}');
       }
       ejBuffer.writeln('  Order Discount : -₱${breakdown.manualDiscountAmount.toStringAsFixed(2)}');
+      if (appliedDiscount != null) {
+        ejBuffer.writeln('  Discount Name  : ${appliedDiscount.name}');
+      }
+      if (order.beneficiaryName != null && order.beneficiaryName!.isNotEmpty) {
+        ejBuffer.writeln('  Beneficiary    : ${order.beneficiaryName} (ID: ${order.beneficiaryIdNo ?? "N/A"})');
+      }
       if (breakdown.surchargeAmount > 0) {
         ejBuffer.writeln('  Surcharge      : +₱${breakdown.surchargeAmount.toStringAsFixed(2)}');
       }
@@ -266,7 +305,7 @@ class OrderDao {
       ejBuffer.writeln('  Change Given   : ₱${changeGiven.toStringAsFixed(2)}');
       ejBuffer.writeln('========================================');
 
-      // 7. Save Electronic Journal (EJ) Entry
+      // 8. Save Electronic Journal (EJ) Entry
       await txn.insert(SchemaConstants.electronicJournal, {
         'sale_transaction_id': txnId,
         'cashier_id': order.cashierId,
@@ -284,7 +323,6 @@ class OrderDao {
   }) async {
     final db = await _databaseHelper.database;
 
-    // Fixed u.username -> u.name
     return await db.rawQuery(
       '''
       SELECT
@@ -292,18 +330,31 @@ class OrderDao {
         st.sales_order_id,
         st.gross_amount,
         st.net_amount,
+        st.guest_count,
+        st.eligible_guest_count,
+        st.discount_amount AS order_discount_amount,
+        st.item_discount_amount,
+        st.vat_sales AS vatable_sales,
+        st.vat_amount,
+        st.vat_exempt AS vat_exempt_sales,
+        st.vat_zero_rated AS zero_rated_sales,
         st.transaction_date,
         st.status,
         u.name AS cashier_name,
         ot.name AS order_type_name,
         p.cash_tendered,
         p.change_given,
-        pm.name AS payment_method_name
+        pm.name AS payment_method_name,
+        d.name AS discount_name,
+        dben.beneficiary_name,
+        dben.id_number AS beneficiary_id_no
       FROM ${SchemaConstants.saleTransaction} st
       LEFT JOIN ${SchemaConstants.appUser} u ON st.cashier_id = u.id
       LEFT JOIN ${SchemaConstants.orderType} ot ON st.order_type_id = ot.id
       LEFT JOIN ${SchemaConstants.payment} p ON st.id = p.sale_transaction_id
       LEFT JOIN ${SchemaConstants.paymentMethod} pm ON p.payment_method_id = pm.id
+      LEFT JOIN ${SchemaConstants.discount} d ON st.discount_id = d.id
+      LEFT JOIN ${SchemaConstants.discountBeneficiary} dben ON dben.sale_transaction_id = st.id
       ORDER BY st.transaction_date DESC
       LIMIT ?
       ''',
@@ -323,6 +374,9 @@ class OrderDao {
         tl.quantity,
         tl.unit_price,
         tl.amount,
+        tl.deduction AS line_discount,
+        tl.disc_percent,
+        tl.disc_fixed_amt,
         soi.id AS sales_order_item_id
       FROM ${SchemaConstants.transactionLine} tl
       LEFT JOIN ${SchemaConstants.saleTransaction} st ON tl.sale_transaction_id = st.id

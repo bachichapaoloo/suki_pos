@@ -15,6 +15,9 @@ class SalesOrderAggregate extends Equatable {
   final double surchargeAmount;
   final double surchargePercent;
   final int paymentStatus;
+  final String? beneficiaryName;
+  final String? beneficiaryIdNo;
+  final int? beneficiaryDiscountTypeId;
   final String? remarks;
   final DateTime createdAt;
 
@@ -32,6 +35,9 @@ class SalesOrderAggregate extends Equatable {
     this.surchargeAmount = 0.0,
     this.surchargePercent = 0.0,
     this.paymentStatus = 0,
+    this.beneficiaryName,
+    this.beneficiaryIdNo,
+    this.beneficiaryDiscountTypeId,
     this.remarks,
     required this.createdAt,
   });
@@ -54,6 +60,9 @@ class SalesOrderAggregate extends Equatable {
         surchargeAmount,
         surchargePercent,
         paymentStatus,
+        beneficiaryName,
+        beneficiaryIdNo,
+        beneficiaryDiscountTypeId,
         remarks,
         createdAt,
       ];

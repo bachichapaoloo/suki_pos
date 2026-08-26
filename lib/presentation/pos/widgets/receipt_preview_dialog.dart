@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:suki_pos/domain/entities/orders/transaction_detail.dart';
+import 'package:suki_pos/presentation/widgets/app_toast.dart';
 
 class ReceiptPreviewDialog extends StatelessWidget {
   final TransactionDetail transaction;
@@ -16,13 +17,14 @@ class ReceiptPreviewDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final dateFormat = DateFormat('yyyy-MM-dd hh:mm a');
+    final hasStatutory = transaction.beneficiaryName != null && transaction.beneficiaryName!.isNotEmpty;
 
     return AlertDialog(
       backgroundColor: const Color(0xFFF1F5F9),
       contentPadding: const EdgeInsets.all(16),
       content: SingleChildScrollView(
         child: Container(
-          width: 340, // 80mm thermal paper width
+          width: 360, // 80mm thermal paper width
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
             color: Colors.white,
@@ -53,44 +55,27 @@ class ReceiptPreviewDialog extends StatelessWidget {
 
               // HEADER
               Text('SUKIPOS STORE', style: GoogleFonts.robotoMono(fontSize: 18, fontWeight: FontWeight.bold)),
-              Text('Main Branch, Quezon City', style: GoogleFonts.robotoMono(fontSize: 12, color: Colors.grey[700])),
-              Text('TIN: 000-123-456-00000', style: GoogleFonts.robotoMono(fontSize: 12, color: Colors.grey[700])),
+              Text('Official POS Terminal Receipt', style: GoogleFonts.robotoMono(fontSize: 11, color: Colors.grey[700])),
+              Text('Main Branch, Quezon City', style: GoogleFonts.robotoMono(fontSize: 11, color: Colors.grey[700])),
+              Text('TIN: 000-123-456-00000 VAT', style: GoogleFonts.robotoMono(fontSize: 11, color: Colors.grey[700])),
               const SizedBox(height: 8),
               const Text('------------------------------------------'),
               const SizedBox(height: 8),
 
               // TRANSACTION METADATA
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text('Txn No:', style: GoogleFonts.robotoMono(fontSize: 12)),
-                  Text(
-                    transaction.transactionNo,
-                    style: GoogleFonts.robotoMono(fontSize: 12, fontWeight: FontWeight.bold),
-                  ),
-                ],
-              ),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text('Date:', style: GoogleFonts.robotoMono(fontSize: 12)),
-                  Text(dateFormat.format(transaction.transactionDate), style: GoogleFonts.robotoMono(fontSize: 11)),
-                ],
-              ),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text('Cashier:', style: GoogleFonts.robotoMono(fontSize: 12)),
-                  Text(transaction.cashierName, style: GoogleFonts.robotoMono(fontSize: 12)),
-                ],
-              ),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text('Type:', style: GoogleFonts.robotoMono(fontSize: 12)),
-                  Text(transaction.orderTypeName, style: GoogleFonts.robotoMono(fontSize: 12)),
-                ],
-              ),
+              _buildMetaRow('Txn No:', transaction.transactionNo, isBold: true),
+              _buildMetaRow('Date/Time:', dateFormat.format(transaction.transactionDate)),
+              _buildMetaRow('Cashier:', transaction.cashierName),
+              _buildMetaRow('Order Type:', transaction.orderTypeName),
+              _buildMetaRow('Guests / SC:', '${transaction.guestCount} / ${transaction.eligibleGuestCount}'),
+
+              // STATUTORY BENEFICIARY INFO
+              if (hasStatutory) ...[
+                const SizedBox(height: 4),
+                _buildMetaRow('Discount:', transaction.discountName ?? 'Statutory (SC/PWD)', isBold: true),
+                _buildMetaRow('Cardholder:', transaction.beneficiaryName ?? 'N/A'),
+                _buildMetaRow('ID / OSCA No:', transaction.beneficiaryIdNo ?? 'N/A'),
+              ],
 
               const SizedBox(height: 8),
               const Text('------------------------------------------'),
@@ -99,7 +84,7 @@ class ReceiptPreviewDialog extends StatelessWidget {
               // ITEMIZED LINE ITEMS
               ...transaction.lines.map(
                 (line) => Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 4.0),
+                  padding: const EdgeInsets.symmetric(vertical: 3.0),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -113,14 +98,28 @@ class ReceiptPreviewDialog extends StatelessWidget {
                             ),
                           ),
                           Text(
-                            '₱${line.amount.toStringAsFixed(2)}',
-                            style: GoogleFonts.robotoMono(fontSize: 12, fontWeight: FontWeight.bold),
+                            line.isFreeItem ? 'FREE' : '₱${line.amount.toStringAsFixed(2)}',
+                            style: GoogleFonts.robotoMono(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: line.isFreeItem ? Colors.green.shade700 : Colors.black,
+                            ),
                           ),
                         ],
                       ),
-                      Text(
-                        '  ${line.quantity} x ₱${line.unitPrice.toStringAsFixed(2)}',
-                        style: GoogleFonts.robotoMono(fontSize: 11, color: Colors.grey[700]),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            '  ${line.quantity} x ₱${line.unitPrice.toStringAsFixed(2)}',
+                            style: GoogleFonts.robotoMono(fontSize: 11, color: Colors.grey[700]),
+                          ),
+                          if (line.lineDiscount > 0)
+                            Text(
+                              '-₱${line.lineDiscount.toStringAsFixed(2)}',
+                              style: GoogleFonts.robotoMono(fontSize: 11, color: Colors.red.shade700),
+                            ),
+                        ],
                       ),
                       if (line.selectedOptions.isNotEmpty)
                         Padding(
@@ -139,31 +138,41 @@ class ReceiptPreviewDialog extends StatelessWidget {
               const Text('------------------------------------------'),
               const SizedBox(height: 8),
 
-              // TOTALS & PAYMENT
+              // FINANCIAL TOTALS
+              _buildAmountRow('GROSS SUBTOTAL:', transaction.grossAmount),
+              if (transaction.itemDiscountAmount > 0)
+                _buildAmountRow('LESS ITEM DISCOUNTS:', -transaction.itemDiscountAmount, isDiscount: true),
+              if (transaction.orderDiscountAmount > 0)
+                _buildAmountRow('LESS ORDER DISCOUNT:', -transaction.orderDiscountAmount, isDiscount: true),
+
+              const SizedBox(height: 4),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('TOTAL DUE:', style: GoogleFonts.robotoMono(fontSize: 14, fontWeight: FontWeight.bold)),
+                  Text('NET TOTAL DUE:', style: GoogleFonts.robotoMono(fontSize: 15, fontWeight: FontWeight.bold)),
                   Text(
-                    '₱${transaction.grossAmount.toStringAsFixed(2)}',
+                    '₱${transaction.netAmount.toStringAsFixed(2)}',
                     style: GoogleFonts.robotoMono(fontSize: 16, fontWeight: FontWeight.bold),
                   ),
                 ],
               ),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text('${transaction.paymentMethodName} Tendered:', style: GoogleFonts.robotoMono(fontSize: 11)),
-                  Text('₱${transaction.cashTendered.toStringAsFixed(2)}', style: GoogleFonts.robotoMono(fontSize: 11)),
-                ],
-              ),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text('Change:', style: GoogleFonts.robotoMono(fontSize: 11)),
-                  Text('₱${transaction.changeGiven.toStringAsFixed(2)}', style: GoogleFonts.robotoMono(fontSize: 11)),
-                ],
-              ),
+              const SizedBox(height: 6),
+
+              // PAYMENT BREAKDOWN
+              _buildMetaRow('${transaction.paymentMethodName} Tendered:', '₱${transaction.cashTendered.toStringAsFixed(2)}'),
+              _buildMetaRow('Change Given:', '₱${transaction.changeGiven.toStringAsFixed(2)}', isBold: true),
+
+              const SizedBox(height: 8),
+              const Text('------------------------------------------'),
+              const SizedBox(height: 8),
+
+              // BIR TAX & EXEMPTION BREAKDOWN
+              Text('TAX BREAKDOWN (12% VAT)', style: GoogleFonts.robotoMono(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.grey[700])),
+              const SizedBox(height: 4),
+              _buildTaxRow('VATable Sales (12%):', transaction.vatableSales),
+              _buildTaxRow('VAT Amount (12%):', transaction.vatAmount),
+              _buildTaxRow('VAT-Exempt Sales:', transaction.vatExemptSales),
+              _buildTaxRow('Zero-Rated Sales:', transaction.zeroRatedSales),
 
               const SizedBox(height: 16),
               Text(
@@ -182,15 +191,69 @@ class ReceiptPreviewDialog extends StatelessWidget {
         ),
         FilledButton.icon(
           icon: const Icon(Icons.print),
-          label: const Text('Print Receipt'),
+          label: const Text('Print Thermal Receipt'),
           onPressed: () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Sending thermal receipt to ESC/POS printer...')),
+            AppToast.showInfo(
+              context,
+              message: 'Thermal receipt sent to 80mm ESC/POS printer',
+              title: 'Receipt Printed',
             );
             Navigator.of(context).pop();
           },
         ),
       ],
+    );
+  }
+
+  Widget _buildMetaRow(String label, String value, {bool isBold = false}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 1.5),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: GoogleFonts.robotoMono(fontSize: 11, color: Colors.grey[800])),
+          Text(
+            value,
+            style: GoogleFonts.robotoMono(
+              fontSize: 11,
+              fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAmountRow(String label, double amount, {bool isDiscount = false}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: GoogleFonts.robotoMono(fontSize: 12, fontWeight: FontWeight.w600)),
+          Text(
+            '${amount < 0 ? "-" : ""}₱${amount.abs().toStringAsFixed(2)}',
+            style: GoogleFonts.robotoMono(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: isDiscount ? Colors.red.shade700 : Colors.black,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTaxRow(String label, double amount) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 1.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: GoogleFonts.robotoMono(fontSize: 10, color: Colors.grey[700])),
+          Text('₱${amount.toStringAsFixed(2)}', style: GoogleFonts.robotoMono(fontSize: 10, color: Colors.grey[900])),
+        ],
+      ),
     );
   }
 }

@@ -9,6 +9,7 @@ import 'package:suki_pos/presentation/maintenance/discount/bloc/discount_event.d
 import 'package:suki_pos/presentation/maintenance/discount/bloc/discount_state.dart';
 import 'package:suki_pos/presentation/maintenance/discount/widgets/discount_form_dialog.dart';
 import 'package:suki_pos/presentation/pos/widgets/confirmation_dialog.dart';
+import 'package:suki_pos/presentation/widgets/app_toast.dart';
 import 'package:suki_pos/presentation/widgets/responsive_data_page.dart';
 
 class DiscountListPage extends StatefulWidget {
@@ -60,16 +61,9 @@ class _DiscountListPageState extends State<DiscountListPage> {
     return BlocConsumer<DiscountBloc, DiscountState>(
       listener: (context, state) {
         if (state is DiscountSuccess) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(state.message)),
-          );
+          AppToast.showSuccess(context, message: state.message);
         } else if (state is DiscountError) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(state.message),
-              backgroundColor: Theme.of(context).colorScheme.error,
-            ),
-          );
+          AppToast.showError(context, message: state.message);
         }
       },
       builder: (context, state) {

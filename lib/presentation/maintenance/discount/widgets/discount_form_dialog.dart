@@ -135,19 +135,18 @@ class _DiscountFormDialogState extends State<DiscountFormDialog> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Text(
-              'Discount Type',
-              style: GoogleFonts.roboto(fontSize: 15),
-            ),
-            if (widget.discountTypes.isEmpty)
-              Text(
-                'No discount types available. Please add a discount type first.',
-                style: GoogleFonts.roboto(color: Colors.red, fontSize: 12),
-              ),
-          ],
+        Text(
+          'Discount Type',
+          style: GoogleFonts.roboto(fontSize: 14, fontWeight: FontWeight.w600),
         ),
+        if (widget.discountTypes.isEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: Text(
+              'No discount types available. Please add a discount type first.',
+              style: GoogleFonts.roboto(color: Colors.red, fontSize: 11),
+            ),
+          ),
         const SizedBox(height: 6),
         DropdownButtonFormField<int>(
           value: _selectedTypeId,

@@ -7,6 +7,8 @@ class TransactionLineDetail extends Equatable {
   final int quantity;
   final double unitPrice;
   final double amount;
+  final double lineDiscount;
+  final bool isFreeItem;
   final List<String> selectedOptions;
 
   const TransactionLineDetail({
@@ -16,6 +18,8 @@ class TransactionLineDetail extends Equatable {
     required this.quantity,
     required this.unitPrice,
     required this.amount,
+    this.lineDiscount = 0.0,
+    this.isFreeItem = false,
     this.selectedOptions = const [],
   });
 
@@ -27,6 +31,8 @@ class TransactionLineDetail extends Equatable {
     quantity,
     unitPrice,
     amount,
+    lineDiscount,
+    isFreeItem,
     selectedOptions,
   ];
 }
@@ -43,6 +49,16 @@ class TransactionDetail extends Equatable {
   final String cashierName;
   final String orderTypeName;
   final int guestCount;
+  final int eligibleGuestCount;
+  final String? discountName;
+  final double itemDiscountAmount;
+  final double orderDiscountAmount;
+  final double vatableSales;
+  final double vatAmount;
+  final double vatExemptSales;
+  final double zeroRatedSales;
+  final String? beneficiaryName;
+  final String? beneficiaryIdNo;
   final DateTime transactionDate;
   final List<TransactionLineDetail> lines;
 
@@ -58,6 +74,16 @@ class TransactionDetail extends Equatable {
     required this.cashierName,
     required this.orderTypeName,
     required this.guestCount,
+    this.eligibleGuestCount = 0,
+    this.discountName,
+    this.itemDiscountAmount = 0.0,
+    this.orderDiscountAmount = 0.0,
+    this.vatableSales = 0.0,
+    this.vatAmount = 0.0,
+    this.vatExemptSales = 0.0,
+    this.zeroRatedSales = 0.0,
+    this.beneficiaryName,
+    this.beneficiaryIdNo,
     required this.transactionDate,
     required this.lines,
   });
@@ -75,6 +101,16 @@ class TransactionDetail extends Equatable {
     cashierName,
     orderTypeName,
     guestCount,
+    eligibleGuestCount,
+    discountName,
+    itemDiscountAmount,
+    orderDiscountAmount,
+    vatableSales,
+    vatAmount,
+    vatExemptSales,
+    zeroRatedSales,
+    beneficiaryName,
+    beneficiaryIdNo,
     transactionDate,
     lines,
   ];
