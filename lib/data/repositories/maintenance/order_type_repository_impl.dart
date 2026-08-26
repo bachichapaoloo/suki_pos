@@ -44,6 +44,7 @@ class OrderTypeRepositoryImpl implements OrderTypeRepository {
           OrderTypeModel(
             id: id,
             name: orderType.name,
+            hasServiceCharge: orderType.hasServiceCharge,
             askGuestCount: orderType.askGuestCount,
             askRefNo: orderType.askRefNo,
             isRental: orderType.isRental,

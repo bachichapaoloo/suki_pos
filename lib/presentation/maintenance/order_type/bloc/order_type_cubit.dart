@@ -17,7 +17,6 @@ class OrderTypeCubit extends Cubit<OrderTypeState> {
   final GetOrderTypeById getOrderTypeById;
 
   Future<bool> loadOrderTypes() async {
-    emit(OrderTypeLoading());
     final result = await getOrderTypes();
     return result.fold(
       (failure) {
@@ -46,8 +45,8 @@ class OrderTypeCubit extends Cubit<OrderTypeState> {
         emit(OrderTypeError(message: 'Failed to save order type'));
         return false;
       },
-      (_) {
-        loadOrderTypes();
+      (_) async {
+        await loadOrderTypes();
         return true;
       },
     );
@@ -60,8 +59,8 @@ class OrderTypeCubit extends Cubit<OrderTypeState> {
         emit(OrderTypeError(message: 'Failed to delete order type'));
         return false;
       },
-      (_) {
-        loadOrderTypes();
+      (_) async {
+        await loadOrderTypes();
         return true;
       },
     );

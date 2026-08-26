@@ -58,6 +58,10 @@ import 'package:suki_pos/presentation/maintenance/discount/bloc/discount_bloc.da
 import 'package:suki_pos/presentation/maintenance/item/bloc/item_bloc.dart';
 import 'package:suki_pos/presentation/maintenance/option_group/bloc/option_group_cubit.dart';
 import 'package:suki_pos/presentation/maintenance/order_type/bloc/order_type_cubit.dart';
+import 'package:suki_pos/data/dao/service_charge_dao.dart';
+import 'package:suki_pos/data/repositories/maintenance/service_charge_repository_impl.dart';
+import 'package:suki_pos/domain/repositories/maintenance/service_charge_repository.dart';
+import 'package:suki_pos/presentation/maintenance/service_charge/bloc/service_charge_cubit.dart';
 import 'package:suki_pos/presentation/pos/bloc/cart_cubit.dart';
 import 'package:suki_pos/presentation/pos/bloc/shift_cubit.dart';
 import 'package:suki_pos/presentation/pos/bloc/transaction_history_cubit.dart';
@@ -148,6 +152,12 @@ Future<void> init() async {
         discountRepository: sl(),
       ),
     )
+    ..registerFactory<ServiceChargeCubit>(
+      () => ServiceChargeCubit(
+        serviceChargeRepository: sl(),
+        orderTypeRepository: sl(),
+      ),
+    )
     //! Domain - Use Cases
     ..registerLazySingleton(() => GetDepartments(sl()))
     ..registerLazySingleton(() => SaveDepartment(sl()))
@@ -218,6 +228,9 @@ Future<void> init() async {
     ..registerLazySingleton<DiscountRepository>(
       () => DiscountRepositoryImpl(sl()),
     )
+    ..registerLazySingleton<ServiceChargeRepository>(
+      () => ServiceChargeRepositoryImpl(serviceChargeDao: sl()),
+    )
     //! DAOs
     ..registerLazySingleton(() => DepartmentDao(sl()))
     ..registerLazySingleton(() => ItemDao(sl()))
@@ -227,7 +240,8 @@ Future<void> init() async {
     ..registerLazySingleton(() => OrderDao(sl()))
     ..registerLazySingleton(() => OrderTypeDao(sl()))
     ..registerLazySingleton(() => ShiftDao(sl()))
-    ..registerLazySingleton(() => DiscountDao(sl()));
+    ..registerLazySingleton(() => DiscountDao(sl()))
+    ..registerLazySingleton(() => ServiceChargeDao(sl()));
 
   //! Core
   final dbHelper = DatabaseHelper();
