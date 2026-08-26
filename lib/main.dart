@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import 'package:toastification/toastification.dart';
 import 'package:suki_pos/core/theme/app_theme.dart';
 import 'package:suki_pos/injection_container.dart' as di;
 import 'package:suki_pos/presentation/admin/admin_page.dart';
@@ -74,33 +75,36 @@ class MainApp extends StatelessWidget {
         BlocProvider(create: (_) => di.sl<StockCubit>()),
         BlocProvider(create: (_) => di.sl<TransactionHistoryCubit>()),
       ],
-      child: MaterialApp(
-        title: 'Suki POS',
-        debugShowCheckedModeBanner: false,
-        // DevicePreview Integration
-        locale: DevicePreview.locale(context),
-        builder: DevicePreview.appBuilder,
-        // Theme Config
-        theme: AppTheme.light,
-        darkTheme: AppTheme.dark,
-        themeMode: ThemeMode.system,
-        initialRoute: '/',
-        routes: {
-          '/': (context) => const LoginPage(),
-          '/pos': (context) => const PosDashboardPage(),
-          '/pos/sales-entry': (context) => const SalesEntryPage(),
-          '/pos/sales-reading': (context) => const SalesReadingPage(),
-          '/pos/transaction-history': (context) => const TransactionHistoryPage(),
-          '/inventory/stock': (context) => const StockListPage(),
-          '/maintenance': (context) => const MaintenancePage(),
-          '/maintenance/departments': (context) => const DepartmentListPage(),
-          '/maintenance/categories': (context) => const CategoryListPage(),
-          '/maintenance/items': (context) => const ItemListPage(),
-          '/maintenance/discounts': (context) => const DiscountListPage(),
-          '/admin': (context) => const AdminPage(),
-          '/admin/users': (context) => const UserListPage(),
-          '/admin/roles': (context) => const RoleListPage(),
-        },
+      child: ToastificationWrapper(
+        child: MaterialApp(
+          title: 'Suki POS',
+          debugShowCheckedModeBanner: false,
+          // DevicePreview Integration
+          locale: DevicePreview.locale(context),
+          builder: DevicePreview.appBuilder,
+          // Theme Config
+          theme: AppTheme.light,
+          darkTheme: AppTheme.dark,
+          themeMode: ThemeMode.system,
+          initialRoute: '/',
+          routes: {
+            '/': (context) => const LoginPage(),
+            '/pos': (context) => const PosDashboardPage(),
+            '/pos/sales-entry': (context) => const SalesEntryPage(),
+            '/pos/sales-reading': (context) => const SalesReadingPage(),
+            '/pos/transaction-history': (context) => const TransactionHistoryPage(),
+            '/inventory/stock': (context) => const StockListPage(),
+            '/inventory/stocks': (context) => const StockListPage(),
+            '/maintenance': (context) => const MaintenancePage(),
+            '/maintenance/departments': (context) => const DepartmentListPage(),
+            '/maintenance/categories': (context) => const CategoryListPage(),
+            '/maintenance/items': (context) => const ItemListPage(),
+            '/maintenance/discounts': (context) => const DiscountListPage(),
+            '/admin': (context) => const AdminPage(),
+            '/admin/users': (context) => const UserListPage(),
+            '/admin/roles': (context) => const RoleListPage(),
+          },
+        ),
       ),
     );
   }
