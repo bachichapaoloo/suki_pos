@@ -278,13 +278,16 @@ class ConfirmationDialog extends StatelessWidget {
     final colorScheme = theme.colorScheme;
     final primaryActionColor = _resolvePrimaryColor(colorScheme);
 
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final screenHeight = MediaQuery.sizeOf(context).height;
+
     final effectiveConstraints =
         constraints ??
         BoxConstraints(
-          minWidth: width ?? minWidth,
-          maxWidth: width ?? maxWidth,
+          minWidth: (width ?? minWidth).clamp(0.0, screenWidth - 32),
+          maxWidth: (width ?? maxWidth).clamp(0.0, screenWidth - 32),
           minHeight: height ?? minHeight,
-          maxHeight: height ?? (maxHeight ?? MediaQuery.sizeOf(context).height * 0.85),
+          maxHeight: height ?? (maxHeight ?? screenHeight * 0.85),
         );
 
     final isFixedHeight =
@@ -297,7 +300,7 @@ class ConfirmationDialog extends StatelessWidget {
       child: Dialog(
         elevation: 6,
         backgroundColor: colorScheme.surface,
-        insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+        insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
           side: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.4)),
@@ -306,7 +309,6 @@ class ConfirmationDialog extends StatelessWidget {
         child: ConstrainedBox(
           constraints: effectiveConstraints,
           child: SizedBox(
-            width: width,
             height: height,
             child: Column(
               mainAxisSize: isFixedHeight ? MainAxisSize.max : MainAxisSize.min,

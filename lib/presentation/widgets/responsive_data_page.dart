@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:suki_pos/core/enums/enums.dart';
+import 'package:suki_pos/core/services/feedback_service.dart';
+import 'package:suki_pos/presentation/widgets/app_unified_header.dart';
+import 'package:suki_pos/presentation/widgets/hotkey_badge.dart';
 import 'package:suki_pos/presentation/widgets/main_layout.dart';
+import 'package:suki_pos/presentation/widgets/skeleton_loader.dart';
 
 /// Column definition for Desktop DataTable in [ResponsiveDataPage].
 class ResponsiveTableColumn<T> {
@@ -21,7 +26,7 @@ class ResponsiveTableColumn<T> {
 }
 
 /// A comprehensive responsive data page supporting Desktop DataTable
-/// and Mobile Card/List views, search, empty/loading states, and header actions.
+/// and Mobile Card/List views, search, empty/skeleton loading states, unified header, and hotkeys.
 class ResponsiveDataPage<T> extends StatelessWidget {
   const ResponsiveDataPage({
     super.key,
@@ -70,138 +75,132 @@ class ResponsiveDataPage<T> extends StatelessWidget {
 
   static const Color primaryBlue = Color(0xFF355C8F);
   static const Color textDark = Color(0xFF1E293B);
-  static const Color bgGrey = Color(0xFFF7F8FA);
   static const Color surfaceBorder = Color(0xFFE2E8F0);
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     final count = totalCount ?? items.length;
 
-    return MainLayout(
-      currentTab: currentTab,
-      mobileAppBar: AppBar(
-        backgroundColor: bgGrey,
-        elevation: 0,
-        centerTitle: true,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: primaryBlue),
-          onPressed: () => Navigator.of(context).pushReplacementNamed(parentHubRoute),
-        ),
-        title: Text(
-          title,
-          style: GoogleFonts.inter(
-            color: textDark,
-            fontWeight: FontWeight.bold,
-            fontSize: 18,
+    return CallbackShortcuts(
+      bindings: {
+        const SingleActivator(LogicalKeyboardKey.keyN, control: true): () {
+          if (onAddNew != null) {
+            FeedbackService.tap();
+            onAddNew!();
+          }
+        },
+        const SingleActivator(LogicalKeyboardKey.f5): () {
+          if (onRefresh != null) {
+            FeedbackService.tap();
+            onRefresh!();
+          }
+        },
+        const SingleActivator(LogicalKeyboardKey.escape): () {
+          if (Navigator.of(context).canPop()) {
+            Navigator.of(context).pop();
+          } else {
+            Navigator.of(context).pushReplacementNamed(parentHubRoute);
+          }
+        },
+      },
+      child: Focus(
+        autofocus: true,
+        child: MainLayout(
+          currentTab: currentTab,
+          mobileAppBar: AppUnifiedHeader(
+            title: title,
+            parentHubTitle: parentHubTitle,
+            parentHubRoute: parentHubRoute,
+            actions: [
+              if (onAddNew != null)
+                IconButton(
+                  icon: Icon(Icons.add_rounded, color: colorScheme.primary),
+                  tooltip: 'Add New',
+                  onPressed: () {
+                    FeedbackService.tap();
+                    onAddNew!();
+                  },
+                ),
+            ],
           ),
-        ),
-        actions: [
-          if (onAddNew != null)
-            IconButton(
-              icon: const Icon(Icons.add_rounded, color: primaryBlue),
-              onPressed: onAddNew,
-            ),
-        ],
-      ),
-      floatingActionButton: onAddNew != null
-          ? (fabLabel != null
-              ? FloatingActionButton.extended(
-                  backgroundColor: primaryBlue,
-                  onPressed: onAddNew,
-                  icon: const Icon(Icons.add_rounded, color: Colors.white),
-                  label: Text(
-                    fabLabel!,
-                    style: GoogleFonts.inter(fontWeight: FontWeight.w600, color: Colors.white),
+          floatingActionButton: onAddNew != null
+              ? (fabLabel != null
+                  ? FloatingActionButton.extended(
+                      backgroundColor: colorScheme.primary,
+                      onPressed: () {
+                        FeedbackService.tap();
+                        onAddNew!();
+                      },
+                      icon: const Icon(Icons.add_rounded, color: Colors.white),
+                      label: Text(
+                        fabLabel!,
+                        style: GoogleFonts.inter(fontWeight: FontWeight.w600, color: Colors.white),
+                      ),
+                    )
+                  : FloatingActionButton(
+                      backgroundColor: colorScheme.primary,
+                      elevation: 3,
+                      onPressed: () {
+                        FeedbackService.tap();
+                        onAddNew!();
+                      },
+                      child: const Icon(Icons.add_rounded, color: Colors.white, size: 28),
+                    ))
+              : null,
+          mobileBody: _buildMobileBody(context),
+          desktopHeader: AppUnifiedHeader(
+            title: title,
+            parentHubTitle: parentHubTitle,
+            parentHubRoute: parentHubRoute,
+            actions: [
+              ...desktopActions,
+              if (onAddNew != null) ...[
+                const SizedBox(width: 16),
+                ElevatedButton.icon(
+                  onPressed: () {
+                    FeedbackService.tap();
+                    onAddNew!();
+                  },
+                  icon: const Icon(Icons.add_rounded, size: 20, color: Colors.white),
+                  label: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Add New',
+                        style: GoogleFonts.inter(fontWeight: FontWeight.w600, color: Colors.white),
+                      ),
+                      const SizedBox(width: 8),
+                      const HotkeyBadge(label: 'Ctrl+N', isLight: true, fontSize: 10),
+                    ],
                   ),
-                )
-              : FloatingActionButton(
-                  backgroundColor: primaryBlue,
-                  elevation: 3,
-                  onPressed: onAddNew,
-                  child: const Icon(Icons.add_rounded, color: Colors.white, size: 28),
-                ))
-          : null,
-      mobileBody: _buildMobileBody(context),
-      desktopHeader: _buildDesktopHeader(context),
-      desktopBody: _buildDesktopBody(context, count),
-    );
-  }
-
-  Widget _buildDesktopHeader(BuildContext context) {
-    return Container(
-      height: 72,
-      padding: const EdgeInsets.symmetric(horizontal: 32),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        border: Border(bottom: BorderSide(color: surfaceBorder)),
-      ),
-      child: Row(
-        children: [
-          InkWell(
-            onTap: () => Navigator.of(context).pushReplacementNamed(parentHubRoute),
-            borderRadius: BorderRadius.circular(8),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-              child: Row(
-                children: [
-                  const Icon(Icons.arrow_back, size: 18, color: primaryBlue),
-                  const SizedBox(width: 8),
-                  Text(
-                    parentHubTitle,
-                    style: GoogleFonts.inter(
-                      fontSize: 14,
-                      color: primaryBlue,
-                      fontWeight: FontWeight.w600,
-                    ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: colorScheme.primary,
+                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    elevation: 0,
                   ),
-                ],
-              ),
-            ),
+                ),
+              ],
+            ],
           ),
-          const SizedBox(width: 12),
-          Container(width: 1, height: 24, color: Colors.grey[300]),
-          const SizedBox(width: 16),
-          Text(
-            title,
-            style: GoogleFonts.inter(
-              fontSize: 22,
-              fontWeight: FontWeight.bold,
-              color: textDark,
-            ),
-          ),
-          const Spacer(),
-          ...desktopActions,
-          if (onAddNew != null) ...[
-            const SizedBox(width: 16),
-            ElevatedButton.icon(
-              onPressed: onAddNew,
-              icon: const Icon(Icons.add_rounded, size: 20, color: Colors.white),
-              label: Text(
-                'Add New',
-                style: GoogleFonts.inter(fontWeight: FontWeight.w600, color: Colors.white),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: primaryBlue,
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                elevation: 0,
-              ),
-            ),
-          ],
-        ],
+          desktopBody: _buildDesktopBody(context, count),
+        ),
       ),
     );
   }
 
   Widget _buildDesktopBody(BuildContext context, int count) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Padding(
       padding: const EdgeInsets.all(28),
       child: Container(
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: colorScheme.surface,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: surfaceBorder),
+          border: Border.all(color: colorScheme.outlineVariant.withOpacity(0.5)),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.02),
@@ -212,10 +211,10 @@ class ResponsiveDataPage<T> extends StatelessWidget {
         ),
         child: Column(
           children: [
-            _buildDesktopToolbar(),
-            const Divider(height: 1, color: surfaceBorder),
+            _buildDesktopToolbar(context),
+            Divider(height: 1, color: colorScheme.outlineVariant.withOpacity(0.5)),
             Expanded(child: _buildDesktopTableContent(context)),
-            const Divider(height: 1, color: surfaceBorder),
+            Divider(height: 1, color: colorScheme.outlineVariant.withOpacity(0.5)),
             _buildDesktopPaginationFooter(count),
           ],
         ),
@@ -223,7 +222,9 @@ class ResponsiveDataPage<T> extends StatelessWidget {
     );
   }
 
-  Widget _buildDesktopToolbar() {
+  Widget _buildDesktopToolbar(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Padding(
       padding: const EdgeInsets.all(16.0),
       child: Row(
@@ -232,15 +233,16 @@ class ResponsiveDataPage<T> extends StatelessWidget {
             child: Container(
               height: 44,
               decoration: BoxDecoration(
-                color: const Color(0xFFF1F5F9),
+                color: colorScheme.surfaceContainerHighest.withOpacity(0.4),
                 borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: colorScheme.outlineVariant.withOpacity(0.5)),
               ),
               child: TextField(
                 onChanged: onSearchChanged,
                 decoration: InputDecoration(
                   hintText: searchHint,
-                  hintStyle: GoogleFonts.inter(color: Colors.grey[500], fontSize: 14),
-                  prefixIcon: Icon(Icons.search_rounded, color: Colors.grey[600], size: 20),
+                  hintStyle: GoogleFonts.inter(color: colorScheme.onSurfaceVariant, fontSize: 14),
+                  prefixIcon: Icon(Icons.search_rounded, color: colorScheme.onSurfaceVariant, size: 20),
                   border: InputBorder.none,
                   contentPadding: const EdgeInsets.symmetric(vertical: 12),
                 ),
@@ -257,8 +259,10 @@ class ResponsiveDataPage<T> extends StatelessWidget {
   }
 
   Widget _buildDesktopTableContent(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     if (isLoading) {
-      return const Center(child: CircularProgressIndicator());
+      return const SkeletonTable(rows: 7);
     }
 
     if (errorMessage != null) {
@@ -282,11 +286,11 @@ class ResponsiveDataPage<T> extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(emptyIcon, size: 48, color: Colors.grey[400]),
+            Icon(emptyIcon, size: 48, color: colorScheme.onSurfaceVariant.withOpacity(0.5)),
             const SizedBox(height: 12),
             Text(
               emptyMessage,
-              style: GoogleFonts.inter(color: Colors.grey[600], fontSize: 15),
+              style: GoogleFonts.inter(color: colorScheme.onSurfaceVariant, fontSize: 15),
             ),
           ],
         ),
@@ -298,9 +302,9 @@ class ResponsiveDataPage<T> extends StatelessWidget {
         // Header Row
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-          decoration: const BoxDecoration(
-            color: Color(0xFFF8FAFC),
-            border: Border(bottom: BorderSide(color: surfaceBorder)),
+          decoration: BoxDecoration(
+            color: colorScheme.surfaceContainerHighest.withOpacity(0.3),
+            border: Border(bottom: BorderSide(color: colorScheme.outlineVariant.withOpacity(0.5))),
           ),
           child: Row(
             children: columns.map((col) {
@@ -311,9 +315,9 @@ class ResponsiveDataPage<T> extends StatelessWidget {
                   child: Text(
                     col.title,
                     style: GoogleFonts.inter(
-                      fontSize: 13,
+                      fontSize: 12,
                       fontWeight: FontWeight.w700,
-                      color: const Color(0xFF64748B),
+                      color: colorScheme.onSurfaceVariant,
                       letterSpacing: 0.5,
                     ),
                   ),
@@ -326,7 +330,8 @@ class ResponsiveDataPage<T> extends StatelessWidget {
         Expanded(
           child: ListView.separated(
             itemCount: items.length,
-            separatorBuilder: (context, index) => const Divider(height: 1, color: Color(0xFFF1F5F9)),
+            separatorBuilder: (context, index) =>
+                Divider(height: 1, color: colorScheme.outlineVariant.withOpacity(0.3)),
             itemBuilder: (context, index) {
               final item = items[index];
               return Container(
@@ -370,10 +375,41 @@ class ResponsiveDataPage<T> extends StatelessWidget {
   }
 
   Widget _buildMobileBody(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     Widget content;
 
     if (isLoading) {
-      content = const Center(child: CircularProgressIndicator());
+      content = ListView.separated(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        itemCount: 6,
+        separatorBuilder: (context, index) => const SizedBox(height: 10),
+        itemBuilder: (context, index) => Container(
+          height: 72,
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: colorScheme.surface,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: colorScheme.outlineVariant.withOpacity(0.5)),
+          ),
+          child: Row(
+            children: const [
+              SkeletonBox(width: 44, height: 44, borderRadius: 10),
+              SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    SkeletonBox(height: 16, width: 140),
+                    SizedBox(height: 6),
+                    SkeletonBox(height: 12, width: 90),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
     } else if (errorMessage != null) {
       content = Center(
         child: Padding(
@@ -390,11 +426,11 @@ class ResponsiveDataPage<T> extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(emptyIcon, size: 48, color: Colors.grey[400]),
+            Icon(emptyIcon, size: 48, color: colorScheme.onSurfaceVariant.withOpacity(0.5)),
             const SizedBox(height: 12),
             Text(
               emptyMessage,
-              style: GoogleFonts.inter(color: Colors.grey[600], fontSize: 15),
+              style: GoogleFonts.inter(color: colorScheme.onSurfaceVariant, fontSize: 15),
             ),
           ],
         ),
@@ -423,16 +459,16 @@ class ResponsiveDataPage<T> extends StatelessWidget {
             child: Container(
               height: 44,
               decoration: BoxDecoration(
-                color: const Color(0xFFF1F5F9),
+                color: colorScheme.surfaceContainerHighest.withOpacity(0.4),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: surfaceBorder),
+                border: Border.all(color: colorScheme.outlineVariant.withOpacity(0.5)),
               ),
               child: TextField(
                 onChanged: onSearchChanged,
                 decoration: InputDecoration(
                   hintText: searchHint,
-                  hintStyle: GoogleFonts.inter(color: Colors.grey[500], fontSize: 14),
-                  prefixIcon: Icon(Icons.search_rounded, color: Colors.grey[600], size: 20),
+                  hintStyle: GoogleFonts.inter(color: colorScheme.onSurfaceVariant, fontSize: 14),
+                  prefixIcon: Icon(Icons.search_rounded, color: colorScheme.onSurfaceVariant, size: 20),
                   border: InputBorder.none,
                   contentPadding: const EdgeInsets.symmetric(vertical: 12),
                 ),
