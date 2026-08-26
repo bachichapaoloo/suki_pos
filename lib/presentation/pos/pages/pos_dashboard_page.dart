@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:suki_pos/core/enums/enums.dart';
+import 'package:suki_pos/core/services/feedback_service.dart';
 import 'package:suki_pos/data/dao/order_dao.dart';
 import 'package:suki_pos/injection_container.dart' as di;
 import 'package:suki_pos/presentation/auth/bloc/auth_bloc.dart';
@@ -14,7 +16,9 @@ import 'package:suki_pos/presentation/pos/bloc/shift_state.dart';
 import 'package:suki_pos/presentation/pos/bloc/transaction_history_cubit.dart';
 import 'package:suki_pos/presentation/pos/bloc/transaction_history_state.dart';
 import 'package:suki_pos/presentation/pos/widgets/shift_reconciliation_dialog.dart';
-import 'package:suki_pos/presentation/widgets/app_snackbar.dart';
+import 'package:suki_pos/presentation/widgets/app_toast.dart';
+import 'package:suki_pos/presentation/widgets/app_unified_header.dart';
+import 'package:suki_pos/presentation/widgets/hotkey_badge.dart';
 import 'package:suki_pos/presentation/widgets/main_layout.dart';
 
 class PosDashboardPage extends StatefulWidget {
@@ -102,119 +106,182 @@ class _PosDashboardPageState extends State<PosDashboardPage> {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
-    return MainLayout(
-      currentTab: MainTab.home,
-      mobileAppBar: AppBar(
-        backgroundColor: colorScheme.surface,
-        elevation: 0,
-        title: Row(
-          children: [
-            Icon(Icons.storefront_outlined, color: colorScheme.primary),
-            const SizedBox(width: 8),
-            Text(
-              'SukiPOS',
-              style: GoogleFonts.inter(
-                color: colorScheme.primary,
-                fontWeight: FontWeight.bold,
-                fontSize: 18,
+    return CallbackShortcuts(
+      bindings: {
+        const SingleActivator(LogicalKeyboardKey.f1): () {
+          FeedbackService.tap();
+          Navigator.of(context).pushNamed('/pos/sales-entry');
+        },
+        const SingleActivator(LogicalKeyboardKey.f2): () {
+          FeedbackService.tap();
+          Navigator.of(context).pushNamed('/pos/sales-reading');
+        },
+        const SingleActivator(LogicalKeyboardKey.f3): () {
+          FeedbackService.tap();
+          Navigator.of(context).pushNamed('/pos/transaction-history');
+        },
+        const SingleActivator(LogicalKeyboardKey.f4): () {
+          FeedbackService.tap();
+          Navigator.of(context).pushNamed('/inventory/stocks');
+        },
+        const SingleActivator(LogicalKeyboardKey.f5): () {
+          FeedbackService.tap();
+          _loadDashboardMetrics();
+          context.read<TransactionHistoryCubit>().loadHistory();
+          AppToast.showInfo(context, message: 'Dashboard metrics refreshed');
+        },
+        const SingleActivator(LogicalKeyboardKey.f6): () {
+          FeedbackService.tap();
+          Navigator.of(context).pushNamed('/maintenance');
+        },
+        const SingleActivator(LogicalKeyboardKey.f7): () {
+          FeedbackService.tap();
+          Navigator.of(context).pushNamed('/admin');
+        },
+      },
+      child: Focus(
+        autofocus: true,
+        child: MainLayout(
+          currentTab: MainTab.home,
+          mobileAppBar: AppUnifiedHeader(
+            title: 'SukiPOS',
+            subtitle: 'Register #01 • Online',
+            showBackButton: false,
+            leading: Padding(
+              padding: const EdgeInsets.only(left: 4, right: 8),
+              child: Icon(Icons.storefront_outlined, color: colorScheme.primary, size: 24),
+            ),
+            badge: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: colorScheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.access_time_rounded, size: 14, color: colorScheme.onSurfaceVariant),
+                  const SizedBox(width: 4),
+                  Text(
+                    _formattedTime,
+                    style: GoogleFonts.inter(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
               ),
             ),
-          ],
-        ),
-        actions: [
-          Row(
-            children: [
-              Icon(Icons.access_time, color: colorScheme.onSurfaceVariant, size: 18),
-              const SizedBox(width: 4),
-              Text(
-                _formattedTime,
-                style: GoogleFonts.inter(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: colorScheme.onSurfaceVariant,
-                ),
+            actions: [
+              IconButton(
+                icon: Icon(Icons.refresh_rounded, color: colorScheme.primary, size: 22),
+                tooltip: 'Refresh (F5)',
+                onPressed: () {
+                  FeedbackService.tap();
+                  _loadDashboardMetrics();
+                  context.read<TransactionHistoryCubit>().loadHistory();
+                  AppToast.showInfo(context, message: 'Dashboard metrics refreshed');
+                },
+              ),
+              IconButton(
+                icon: Icon(Icons.logout_rounded, color: colorScheme.onSurfaceVariant, size: 22),
+                tooltip: 'Logout',
+                onPressed: () => Navigator.of(context).pushReplacementNamed('/'),
               ),
             ],
           ),
-          const SizedBox(width: 12),
-          IconButton(
-            icon: Icon(Icons.logout, color: colorScheme.onSurfaceVariant),
-            onPressed: () => Navigator.of(context).pushReplacementNamed('/'),
+          desktopHeader: AppUnifiedHeader(
+            title: 'SukiPOS Dashboard',
+            subtitle: 'Terminal #01 • Point of Sale & Store Management',
+            showBackButton: false,
+            leading: Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: colorScheme.primary.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(Icons.storefront_outlined, color: colorScheme.primary, size: 28),
+            ),
+            badge: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: colorScheme.surfaceContainerHighest.withOpacity(0.6),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: colorScheme.outlineVariant.withOpacity(0.5)),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.access_time_rounded, size: 16, color: colorScheme.onSurfaceVariant),
+                      const SizedBox(width: 6),
+                      Text(
+                        _formattedTime,
+                        style: GoogleFonts.inter(
+                          fontWeight: FontWeight.w600,
+                          color: colorScheme.onSurface,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              IconButton(
+                icon: Icon(Icons.refresh_rounded, color: colorScheme.primary),
+                tooltip: 'Refresh (F5)',
+                onPressed: () {
+                  FeedbackService.tap();
+                  _loadDashboardMetrics();
+                  context.read<TransactionHistoryCubit>().loadHistory();
+                  AppToast.showInfo(context, message: 'Dashboard metrics refreshed');
+                },
+              ),
+              const SizedBox(width: 8),
+              IconButton(
+                icon: Icon(Icons.logout_rounded, color: colorScheme.onSurfaceVariant),
+                tooltip: 'Logout',
+                onPressed: () => Navigator.of(context).pushReplacementNamed('/'),
+              ),
+            ],
           ),
-          const SizedBox(width: 8),
-        ],
-      ),
-      desktopHeader: Container(
-        height: 80,
-        padding: const EdgeInsets.symmetric(horizontal: 32),
-        decoration: BoxDecoration(
-          color: colorScheme.surface,
-          border: Border(bottom: BorderSide(color: colorScheme.outlineVariant)),
-        ),
-        child: Row(
-          children: [
-            Icon(Icons.storefront_outlined, color: colorScheme.primary, size: 32),
-            const SizedBox(width: 8),
-            Text(
-              'SukiPOS',
-              style: GoogleFonts.inter(
-                color: colorScheme.primary,
-                fontWeight: FontWeight.bold,
-                fontSize: 24,
-              ),
+          mobileBody: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildMobileWelcomeSection(),
+                const SizedBox(height: 24),
+                _buildMobileSalesCard(),
+                const SizedBox(height: 16),
+                _buildMobileStatsRow(),
+                const SizedBox(height: 32),
+                _buildOperationsText(),
+                const SizedBox(height: 16),
+                _buildMobileOperationsGrid(context),
+                const SizedBox(height: 32),
+              ],
             ),
-            const Spacer(),
-            Icon(Icons.access_time, color: colorScheme.onSurfaceVariant, size: 20),
-            const SizedBox(width: 8),
-            Text(
-              _formattedTime,
-              style: GoogleFonts.inter(
-                fontWeight: FontWeight.w600,
-                color: colorScheme.onSurface,
-                fontSize: 16,
-              ),
+          ),
+          desktopBody: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 48.0, vertical: 32.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildDesktopWelcomeSection(),
+                const SizedBox(height: 32),
+                _buildSummaryCards(),
+                const SizedBox(height: 48),
+                _buildStoreOperationsHeader(),
+                const SizedBox(height: 24),
+                _buildDesktopOperationsGrid(context),
+              ],
             ),
-            const SizedBox(width: 24),
-            IconButton(
-              icon: Icon(Icons.logout, color: colorScheme.onSurfaceVariant),
-              onPressed: () {
-                Navigator.of(context).pushReplacementNamed('/');
-              },
-            ),
-          ],
-        ),
-      ),
-      mobileBody: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildMobileWelcomeSection(),
-            const SizedBox(height: 24),
-            _buildMobileSalesCard(),
-            const SizedBox(height: 16),
-            _buildMobileStatsRow(),
-            const SizedBox(height: 32),
-            _buildOperationsText(),
-            const SizedBox(height: 16),
-            _buildMobileOperationsGrid(context),
-            const SizedBox(height: 32),
-          ],
-        ),
-      ),
-      desktopBody: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 48.0, vertical: 32.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildDesktopWelcomeSection(),
-            const SizedBox(height: 32),
-            _buildSummaryCards(),
-            const SizedBox(height: 48),
-            _buildStoreOperationsHeader(),
-            const SizedBox(height: 24),
-            _buildDesktopOperationsGrid(context),
-          ],
+          ),
         ),
       ),
     );
@@ -595,24 +662,26 @@ class _PosDashboardPageState extends State<PosDashboardPage> {
                       Expanded(
                         child: _buildActionCard(
                           context,
-                          title: 'Sales Order',
-                          icon: Icons.shopping_cart_outlined,
-                          iconBg: const Color(0xFF355C8F),
-                          iconColor: Colors.white,
-                          height: cardHeight,
-                          route: '/orders',
-                        ),
-                      ),
-                      const SizedBox(width: spacing),
-                      Expanded(
-                        child: _buildActionCard(
-                          context,
                           title: 'Sales Reading',
                           icon: Icons.request_quote_outlined,
                           iconBg: const Color(0xFFA5DDF1),
                           iconColor: const Color(0xFF0369A1),
                           height: cardHeight,
                           route: '/pos/sales-reading',
+                          hotkey: 'F2',
+                        ),
+                      ),
+                      const SizedBox(width: spacing),
+                      Expanded(
+                        child: _buildActionCard(
+                          context,
+                          title: 'Sales Inquiry',
+                          icon: Icons.search_rounded,
+                          iconBg: const Color(0xFF355C8F),
+                          iconColor: Colors.white,
+                          height: cardHeight,
+                          route: '/pos/transaction-history',
+                          hotkey: 'F3',
                         ),
                       ),
                     ],
@@ -623,24 +692,26 @@ class _PosDashboardPageState extends State<PosDashboardPage> {
                       Expanded(
                         child: _buildActionCard(
                           context,
-                          title: 'Sales Inquiry',
-                          icon: Icons.search,
-                          iconBg: const Color(0xFF355C8F),
-                          iconColor: Colors.white,
+                          title: 'Inventory',
+                          icon: Icons.inventory_2_outlined,
+                          iconBg: const Color(0xFFDCFCE7),
+                          iconColor: const Color(0xFF15803D),
                           height: cardHeight,
-                          route: '/pos/transaction-history',
+                          route: '/inventory/stocks',
+                          hotkey: 'F4',
                         ),
                       ),
                       const SizedBox(width: spacing),
                       Expanded(
                         child: _buildActionCard(
                           context,
-                          title: 'Inventory',
-                          icon: Icons.inventory_2_outlined,
+                          title: 'Maintenance',
+                          icon: Icons.build_outlined,
                           iconBg: const Color(0xFFE2E8F0),
                           iconColor: const Color(0xFF475569),
                           height: cardHeight,
-                          route: '/inventory/stocks',
+                          route: '/maintenance',
+                          hotkey: 'F6',
                         ),
                       ),
                     ],
@@ -659,26 +730,17 @@ class _PosDashboardPageState extends State<PosDashboardPage> {
                   Expanded(
                     child: _buildActionCard(
                       context,
-                      title: 'Maintenance',
-                      icon: Icons.build_outlined,
-                      iconBg: const Color(0xFFE2E8F0),
-                      iconColor: const Color(0xFF475569),
-                      height: cardHeight,
-                      route: '/maintenance',
-                    ),
-                  ),
-                  const SizedBox(width: spacing),
-                  Expanded(
-                    child: _buildActionCard(
-                      context,
                       title: 'Admin Panel',
                       icon: Icons.admin_panel_settings_outlined,
                       iconBg: const Color(0xFFFECACA),
                       iconColor: const Color(0xFFB91C1C),
                       height: cardHeight,
                       route: '/admin',
+                      hotkey: 'F7',
                     ),
                   ),
+                  const SizedBox(width: spacing),
+                  const Expanded(child: SizedBox()),
                 ],
               ),
             ),
@@ -693,6 +755,7 @@ class _PosDashboardPageState extends State<PosDashboardPage> {
   Widget _buildSalesEntryCard(BuildContext context, {required double height}) {
     return InkWell(
       onTap: () {
+        FeedbackService.tap();
         Navigator.of(context).pushNamed('/pos/sales-entry');
       },
       borderRadius: BorderRadius.circular(20),
@@ -713,13 +776,19 @@ class _PosDashboardPageState extends State<PosDashboardPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.15),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.point_of_sale_rounded, color: Colors.white, size: 32),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.15),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.point_of_sale_rounded, color: Colors.white, size: 32),
+                ),
+                const HotkeyBadge(label: 'F1', isLight: true, fontSize: 12),
+              ],
             ),
             const Spacer(),
             Text(
@@ -752,9 +821,11 @@ class _PosDashboardPageState extends State<PosDashboardPage> {
     required Color iconColor,
     required double height,
     String? route,
+    String? hotkey,
   }) {
     return InkWell(
       onTap: () {
+        FeedbackService.tap();
         if (route != null) {
           Navigator.of(context).pushNamed(route);
         }
@@ -774,24 +845,36 @@ class _PosDashboardPageState extends State<PosDashboardPage> {
             ),
           ],
         ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+        child: Stack(
           children: [
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: iconBg,
-                shape: BoxShape.circle,
+            if (hotkey != null)
+              Positioned(
+                top: 14,
+                right: 14,
+                child: HotkeyBadge(label: hotkey),
               ),
-              child: Icon(icon, color: iconColor, size: 28),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              title,
-              style: GoogleFonts.inter(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: const Color(0xFF1E293B),
+            Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: iconBg,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(icon, color: iconColor, size: 28),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    title,
+                    style: GoogleFonts.inter(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: const Color(0xFF1E293B),
+                    ),
+                  ),
+                ],
               ),
             ),
           ],

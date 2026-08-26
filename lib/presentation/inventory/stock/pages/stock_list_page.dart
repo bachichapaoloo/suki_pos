@@ -11,6 +11,7 @@ import 'package:suki_pos/presentation/inventory/stock/widgets/stock_record_dialo
 import 'package:suki_pos/presentation/maintenance/item/bloc/item_bloc.dart';
 import 'package:suki_pos/presentation/maintenance/item/bloc/item_event.dart';
 import 'package:suki_pos/presentation/maintenance/item/bloc/item_state.dart';
+import 'package:suki_pos/presentation/widgets/app_toast.dart';
 import 'package:suki_pos/presentation/widgets/responsive_data_page.dart';
 import 'package:suki_pos/presentation/widgets/stock_adjustment_dialog.dart';
 
@@ -57,8 +58,10 @@ class _StockListPageState extends State<StockListPage> {
     }
 
     if (items.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No catalog items found. Please create items first.')),
+      AppToast.showWarning(
+        context,
+        message: 'No catalog items found. Please create items first.',
+        title: 'No Catalog Items',
       );
       return;
     }
@@ -70,6 +73,7 @@ class _StockListPageState extends State<StockListPage> {
         availableItems: items,
         onSave: (stock) {
           context.read<StockCubit>().saveStock(stock);
+          AppToast.showSuccess(context, message: 'Stock record saved');
         },
       ),
     );
@@ -80,12 +84,7 @@ class _StockListPageState extends State<StockListPage> {
     return BlocConsumer<StockCubit, StockState>(
       listener: (context, state) {
         if (state is StockError) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(state.message),
-              backgroundColor: Theme.of(context).colorScheme.error,
-            ),
-          );
+          AppToast.showError(context, message: state.message);
         }
       },
       builder: (context, state) {
@@ -157,9 +156,7 @@ class _StockListPageState extends State<StockListPage> {
                     width: 36,
                     height: 36,
                     decoration: BoxDecoration(
-                      color: item.isLowStock
-                          ? const Color(0xFFFEE2E2)
-                          : const Color(0xFF355C8F).withOpacity(0.1),
+                      color: item.isLowStock ? const Color(0xFFFEE2E2) : const Color(0xFF355C8F).withOpacity(0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Icon(
@@ -320,7 +317,11 @@ class _StockListPageState extends State<StockListPage> {
                                 ),
                                 child: Text(
                                   'LOW STOCK',
-                                  style: GoogleFonts.inter(fontSize: 9, fontWeight: FontWeight.bold, color: const Color(0xFFDC2626)),
+                                  style: GoogleFonts.inter(
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.bold,
+                                    color: const Color(0xFFDC2626),
+                                  ),
                                 ),
                               ),
                             ],

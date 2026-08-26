@@ -6,6 +6,7 @@ import 'package:suki_pos/domain/entities/maintenance/department.dart';
 import 'package:suki_pos/presentation/maintenance/department/bloc/department_bloc.dart';
 import 'package:suki_pos/presentation/maintenance/department/widgets/department_form_dialog.dart';
 import 'package:suki_pos/presentation/pos/widgets/confirmation_dialog.dart';
+import 'package:suki_pos/presentation/widgets/app_toast.dart';
 import 'package:suki_pos/presentation/widgets/responsive_data_page.dart';
 
 /// Page displaying the responsive list of departments.
@@ -56,16 +57,9 @@ class _DepartmentListPageState extends State<DepartmentListPage> {
     return BlocConsumer<DepartmentBloc, DepartmentState>(
       listener: (context, state) {
         if (state is DepartmentSuccess) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(state.message)),
-          );
+          AppToast.showSuccess(context, message: state.message);
         } else if (state is DepartmentError) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(state.message),
-              backgroundColor: Theme.of(context).colorScheme.error,
-            ),
-          );
+          AppToast.showError(context, message: state.message);
         }
       },
       builder: (context, state) {

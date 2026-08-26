@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:suki_pos/presentation/widgets/app_toast.dart';
 import '../bloc/shift_state.dart';
 
 class ZReadingReportDialog extends StatelessWidget {
@@ -149,8 +150,10 @@ class ZReadingReportDialog extends StatelessWidget {
                   const SizedBox(width: 12),
                   ElevatedButton.icon(
                     onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Printing Z-Reading EOD report...')),
+                      AppToast.showInfo(
+                        context,
+                        message: 'Printing Z-Reading EOD report...',
+                        title: 'Printing Report',
                       );
                       Navigator.of(context).pop(true);
                     },

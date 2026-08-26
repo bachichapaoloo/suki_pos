@@ -17,6 +17,7 @@ import 'package:suki_pos/domain/use_cases/maintenance/get_departments.dart';
 import 'package:suki_pos/injection_container.dart';
 import 'package:suki_pos/presentation/maintenance/item/bloc/item_bloc.dart';
 import 'package:suki_pos/presentation/maintenance/item/bloc/item_event.dart';
+import 'package:suki_pos/presentation/widgets/app_toast.dart';
 import 'package:suki_pos/presentation/widgets/custom_form_dialog.dart';
 import 'package:suki_pos/presentation/widgets/custom_text_field.dart';
 
@@ -54,6 +55,7 @@ class _ItemFormDialogState extends State<ItemFormDialog> {
   // Image State
   /// The *stored* value (filename-only) kept in sync with SQLite.
   String? _displayImage;
+
   /// The resolved absolute path used only for UI preview.
   String? _resolvedImagePath;
 
@@ -172,14 +174,16 @@ class _ItemFormDialogState extends State<ItemFormDialog> {
         final resolvedPath = await ImageStorageService.resolveImagePath(fileName);
 
         setState(() {
-          _displayImage = fileName;         // persisted in SQLite
+          _displayImage = fileName; // persisted in SQLite
           _resolvedImagePath = resolvedPath; // used for UI preview
         });
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to pick image: $e')),
+        AppToast.showError(
+          context,
+          message: 'Failed to pick image: $e',
+          title: 'Image Error',
         );
       }
     }

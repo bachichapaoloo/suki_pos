@@ -8,6 +8,7 @@ import 'package:suki_pos/domain/entities/maintenance/option_group.dart';
 import 'package:suki_pos/domain/entities/maintenance/option_value.dart';
 import 'package:suki_pos/domain/entities/orders/cart_item.dart';
 import 'package:suki_pos/presentation/pos/widgets/confirmation_dialog.dart';
+import 'package:suki_pos/presentation/widgets/app_toast.dart';
 
 class ItemDetailModalDialog extends StatefulWidget {
   const ItemDetailModalDialog({
@@ -104,12 +105,10 @@ class _ItemDetailModalDialogState extends State<ItemDetailModalDialog> {
     for (final group in widget.optionGroups) {
       final selected = _selectedSelections[group.id!] ?? [];
       if (group.isRequired && selected.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Please select a required option for "${group.name}".'),
-            backgroundColor: Theme.of(context).colorScheme.error,
-            behavior: SnackBarBehavior.floating,
-          ),
+        AppToast.showWarning(
+          context,
+          message: 'Please select a required option for "${group.name}".',
+          title: 'Required Option',
         );
         return false;
       }

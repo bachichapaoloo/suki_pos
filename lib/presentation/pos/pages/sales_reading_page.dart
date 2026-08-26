@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:suki_pos/core/enums/enums.dart';
+import 'package:suki_pos/core/services/feedback_service.dart';
 import 'package:suki_pos/presentation/auth/bloc/auth_bloc.dart';
 import 'package:suki_pos/presentation/pos/bloc/shift_cubit.dart';
 import 'package:suki_pos/presentation/pos/bloc/shift_state.dart';
@@ -9,6 +11,9 @@ import 'package:suki_pos/presentation/pos/widgets/change_fund_dialog.dart';
 import 'package:suki_pos/presentation/pos/widgets/tender_declaration_dialog.dart';
 import 'package:suki_pos/presentation/pos/widgets/x_reading_report_dialog.dart';
 import 'package:suki_pos/presentation/pos/widgets/z_reading_report_dialog.dart';
+import 'package:suki_pos/presentation/widgets/app_toast.dart';
+import 'package:suki_pos/presentation/widgets/app_unified_header.dart';
+import 'package:suki_pos/presentation/widgets/hotkey_badge.dart';
 import 'package:suki_pos/presentation/widgets/main_layout.dart';
 
 class SalesReadingPage extends StatefulWidget {
@@ -43,90 +48,77 @@ class _SalesReadingPageState extends State<SalesReadingPage> {
 
   @override
   Widget build(BuildContext context) {
-    return MainLayout(
-      currentTab: MainTab.sales,
-      mobileAppBar: AppBar(
-        backgroundColor: bgGrey,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: primaryBlue),
-          onPressed: () => Navigator.of(context).pushReplacementNamed('/pos'),
-        ),
-        title: Text(
-          'Sales Reading & Shift',
-          style: GoogleFonts.inter(
-            color: textDark,
-            fontWeight: FontWeight.bold,
-            fontSize: 18,
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return CallbackShortcuts(
+      bindings: {
+        const SingleActivator(LogicalKeyboardKey.f5): () {
+          FeedbackService.tap();
+          _refreshShift();
+          AppToast.showInfo(context, message: 'Sales reading refreshed');
+        },
+        const SingleActivator(LogicalKeyboardKey.escape): () {
+          FeedbackService.tap();
+          Navigator.of(context).pushReplacementNamed('/pos');
+        },
+      },
+      child: Focus(
+        autofocus: true,
+        child: MainLayout(
+          currentTab: MainTab.sales,
+          mobileAppBar: AppUnifiedHeader(
+            title: 'Sales Reading & Shift',
+            parentHubTitle: 'POS Terminal',
+            parentHubRoute: '/pos',
+            actions: [
+              IconButton(
+                icon: Icon(Icons.refresh_rounded, color: colorScheme.primary),
+                tooltip: 'Refresh',
+                onPressed: () {
+                  FeedbackService.tap();
+                  _refreshShift();
+                  AppToast.showInfo(context, message: 'Sales reading refreshed');
+                },
+              ),
+            ],
           ),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh_rounded, color: primaryBlue),
-            onPressed: _refreshShift,
-          ),
-        ],
-      ),
-      desktopHeader: Container(
-        height: 72,
-        padding: const EdgeInsets.symmetric(horizontal: 32),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          border: Border(bottom: BorderSide(color: surfaceBorder)),
-        ),
-        child: Row(
-          children: [
-            InkWell(
-              onTap: () => Navigator.of(context).pushReplacementNamed('/pos'),
-              borderRadius: BorderRadius.circular(8),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                child: Row(
+          desktopHeader: AppUnifiedHeader(
+            title: 'Sales Reading & Shift Closeout',
+            subtitle: 'Mid-Day X-Reading and End-of-Day Z-Reading Shift Reports',
+            parentHubTitle: 'POS Terminal',
+            parentHubRoute: '/pos',
+            actions: [
+              OutlinedButton.icon(
+                onPressed: () {
+                  FeedbackService.tap();
+                  _refreshShift();
+                  AppToast.showInfo(context, message: 'Sales reading refreshed');
+                },
+                icon: Icon(Icons.refresh_rounded, size: 18, color: colorScheme.primary),
+                label: Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.arrow_back, size: 18, color: primaryBlue),
+                    Text('Refresh Reading', style: GoogleFonts.inter(fontWeight: FontWeight.w600, color: colorScheme.primary)),
                     const SizedBox(width: 8),
-                    Text(
-                      'POS Terminal',
-                      style: GoogleFonts.inter(
-                        fontSize: 14,
-                        color: primaryBlue,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
+                    const HotkeyBadge(label: 'F5'),
                   ],
                 ),
+                style: OutlinedButton.styleFrom(
+                  side: BorderSide(color: colorScheme.outlineVariant),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
               ),
-            ),
-            const SizedBox(width: 12),
-            Container(width: 1, height: 24, color: Colors.grey[300]),
-            const SizedBox(width: 16),
-            Text(
-              'Sales Reading & Shift Closeout',
-              style: GoogleFonts.inter(
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-                color: textDark,
-              ),
-            ),
-            const Spacer(),
-            OutlinedButton.icon(
-              onPressed: _refreshShift,
-              icon: const Icon(Icons.refresh_rounded, size: 18, color: primaryBlue),
-              label: Text('Refresh Reading', style: GoogleFonts.inter(fontWeight: FontWeight.w600, color: primaryBlue)),
-              style: OutlinedButton.styleFrom(
-                side: const BorderSide(color: Color(0xFFCBD5E1)),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              ),
-            ),
-          ],
+            ],
+          ),
+          desktopBody: BlocBuilder<ShiftCubit, ShiftState>(
+            builder: (context, state) => _buildDesktopContent(context, state),
+          ),
+          mobileBody: BlocBuilder<ShiftCubit, ShiftState>(
+            builder: (context, state) => _buildMobileContent(context, state),
+          ),
         ),
-      ),
-      desktopBody: BlocBuilder<ShiftCubit, ShiftState>(
-        builder: (context, state) => _buildDesktopContent(context, state),
-      ),
-      mobileBody: BlocBuilder<ShiftCubit, ShiftState>(
-        builder: (context, state) => _buildMobileContent(context, state),
       ),
     );
   }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:suki_pos/presentation/widgets/app_toast.dart';
 import '../../../../domain/entities/maintenance/item.dart';
 import '../../../../domain/entities/maintenance/option_group.dart';
 import '../../../../domain/entities/maintenance/option_value.dart';
@@ -21,7 +22,17 @@ class ItemModifierModalDialog extends StatefulWidget {
 
 class _ItemModifierModalDialogState extends State<ItemModifierModalDialog> {
   final Map<int, List<OptionValue>> _selectedSelections = {};
-  final _notesController = TextEditingController();
+  final TextEditingController _notesController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    for (var group in widget.optionGroups) {
+      if (group.isRequired && group.values.isNotEmpty && group.selectionType == 0) {
+        _selectedSelections[group.id!] = [group.values.first];
+      }
+    }
+  }
 
   @override
   void dispose() {
@@ -52,8 +63,10 @@ class _ItemModifierModalDialogState extends State<ItemModifierModalDialog> {
     for (final group in widget.optionGroups) {
       final selected = _selectedSelections[group.id!] ?? [];
       if (group.isRequired && selected.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Please select an option for ${group.name}')),
+        AppToast.showWarning(
+          context,
+          message: 'Please select an option for ${group.name}',
+          title: 'Selection Required',
         );
         return false;
       }

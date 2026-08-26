@@ -4,7 +4,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:suki_pos/core/services/feedback_service.dart';
 import 'package:suki_pos/presentation/auth/bloc/auth_bloc.dart';
+import 'package:suki_pos/presentation/widgets/app_toast.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -25,11 +27,10 @@ class _LoginPageState extends State<LoginPage> {
 
   void _onDigitPressed(String digit) {
     if (_pin.length < 6) {
-      unawaited(HapticFeedback.lightImpact());
+      FeedbackService.tap();
       setState(() {
         _pin += digit;
       });
-      // Auto-submit on 6th digit
       if (_pin.length == 6) {
         _onEnterPressed();
       }
@@ -38,7 +39,7 @@ class _LoginPageState extends State<LoginPage> {
 
   void _onDeletePressed() {
     if (_pin.isNotEmpty) {
-      unawaited(HapticFeedback.lightImpact());
+      FeedbackService.tap();
       setState(() {
         _pin = _pin.substring(0, _pin.length - 1);
       });
@@ -57,22 +58,25 @@ class _LoginPageState extends State<LoginPage> {
       listener: (context, state) async {
         if (state is AuthAuthenticated) {
           final navigator = Navigator.of(context);
-          unawaited(HapticFeedback.mediumImpact());
+          FeedbackService.success();
           setState(() {
             _isSuccess = true;
           });
-          await Future<void>.delayed(const Duration(milliseconds: 1500));
+          AppToast.showSuccess(
+            context,
+            message: 'Welcome back, ${state.user.name}!',
+            title: 'Authenticated',
+          );
+          await Future<void>.delayed(const Duration(milliseconds: 1000));
           if (mounted) {
             unawaited(navigator.pushReplacementNamed('/pos'));
           }
         } else if (state is AuthError) {
-          unawaited(HapticFeedback.vibrate());
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(state.message),
-              backgroundColor: Colors.redAccent,
-              behavior: SnackBarBehavior.floating,
-            ),
+          FeedbackService.error();
+          AppToast.showError(
+            context,
+            message: state.message,
+            title: 'Authentication Failed',
           );
           setState(() {
             _pin = '';

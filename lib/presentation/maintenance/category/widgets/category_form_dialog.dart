@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:suki_pos/domain/entities/maintenance/category.dart';
 import 'package:suki_pos/domain/entities/maintenance/department.dart';
 import 'package:suki_pos/presentation/maintenance/department/bloc/department_bloc.dart';
+import 'package:suki_pos/presentation/widgets/app_toast.dart';
 import 'package:suki_pos/presentation/widgets/custom_form_dialog.dart';
 import 'package:suki_pos/presentation/widgets/custom_text_field.dart';
 
@@ -70,8 +71,10 @@ class _CategoryFormDialogState extends State<CategoryFormDialog> {
           );
           Navigator.pop(context, category);
         } else if (_selectedDepartmentId == null) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Please select a department')),
+          AppToast.showWarning(
+            context,
+            message: 'Please select a department for this category',
+            title: 'Department Required',
           );
         }
       },

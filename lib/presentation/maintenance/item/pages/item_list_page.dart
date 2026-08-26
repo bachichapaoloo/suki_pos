@@ -10,6 +10,7 @@ import 'package:suki_pos/presentation/maintenance/item/bloc/item_event.dart';
 import 'package:suki_pos/presentation/maintenance/item/bloc/item_state.dart';
 import 'package:suki_pos/presentation/maintenance/item/widgets/item_form_dialog.dart';
 import 'package:suki_pos/presentation/widgets/app_snackbar.dart';
+import 'package:suki_pos/presentation/widgets/app_toast.dart';
 import 'package:suki_pos/presentation/widgets/main_layout.dart';
 
 class ItemListPage extends StatefulWidget {
@@ -456,9 +457,9 @@ class _ItemListPageState extends State<ItemListPage> {
 
   void _blocListener(BuildContext context, ItemState state) {
     if (state is ItemActionSuccess) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(state.message)));
+      AppToast.showSuccess(context, message: state.message);
     } else if (state is ItemError) {
-      AppSnackBar.showError(context, state.message);
+      AppToast.showError(context, message: state.message);
     }
   }
 
