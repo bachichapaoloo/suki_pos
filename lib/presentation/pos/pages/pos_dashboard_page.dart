@@ -175,8 +175,11 @@ class _PosDashboardPageState extends State<PosDashboardPage> {
             ),
             actions: [
               IconButton(
-                icon: Icon(Icons.refresh_rounded, color: colorScheme.primary, size: 22),
+                icon: Icon(Icons.refresh_rounded, color: colorScheme.primary, size: 20),
                 tooltip: 'Refresh (F5)',
+                visualDensity: VisualDensity.compact,
+                constraints: const BoxConstraints(minWidth: 34, minHeight: 34),
+                padding: EdgeInsets.zero,
                 onPressed: () {
                   FeedbackService.tap();
                   _loadDashboardMetrics();
@@ -185,8 +188,11 @@ class _PosDashboardPageState extends State<PosDashboardPage> {
                 },
               ),
               IconButton(
-                icon: Icon(Icons.logout_rounded, color: colorScheme.onSurfaceVariant, size: 22),
+                icon: Icon(Icons.logout_rounded, color: colorScheme.onSurfaceVariant, size: 20),
                 tooltip: 'Logout',
+                visualDensity: VisualDensity.compact,
+                constraints: const BoxConstraints(minWidth: 34, minHeight: 34),
+                padding: EdgeInsets.zero,
                 onPressed: () => Navigator.of(context).pushReplacementNamed('/'),
               ),
             ],

@@ -20,7 +20,7 @@ class AppUnifiedHeader extends StatelessWidget implements PreferredSizeWidget {
     this.badge,
     this.leading,
     this.bottom,
-    this.height = 70,
+    this.height = 68,
   });
 
   final String title;
@@ -64,37 +64,27 @@ class AppUnifiedHeader extends StatelessWidget implements PreferredSizeWidget {
     final colorScheme = theme.colorScheme;
 
     return Container(
-      decoration: BoxDecoration(
-        color: colorScheme.surface,
-        border: Border(
-          bottom: BorderSide(
-            color: colorScheme.outlineVariant.withOpacity(0.5),
-            width: 1,
-          ),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.015),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
+      color: colorScheme.surface,
       child: SafeArea(
         bottom: false,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             SizedBox(
-              height: height,
+              height: height - 1.0, // Deduct 1.0px to perfectly accommodate the 1.0px bottom border
               child: Padding(
-                padding: EdgeInsets.symmetric(horizontal: isDesktop ? 24 : 12),
+                padding: EdgeInsets.symmetric(horizontal: isDesktop ? 20 : 12),
                 child: isDesktop
                     ? _buildDesktopHeader(context, colorScheme)
                     : _buildMobileHeader(context, colorScheme),
               ),
             ),
             if (bottom != null) bottom!,
+            // Bottom 1px Divider within allocated bounds
+            Container(
+              height: 1.0,
+              color: colorScheme.outlineVariant.withOpacity(0.4),
+            ),
           ],
         ),
       ),
@@ -152,8 +142,7 @@ class AppUnifiedHeader extends StatelessWidget implements PreferredSizeWidget {
         ],
 
         // Title and Subtitle with flexible constraints to prevent right-edge overflow
-        Flexible(
-          flex: 3,
+        Expanded(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -165,7 +154,7 @@ class AppUnifiedHeader extends StatelessWidget implements PreferredSizeWidget {
                     child: Text(
                       title,
                       style: GoogleFonts.inter(
-                        fontSize: 19,
+                        fontSize: 18,
                         fontWeight: FontWeight.bold,
                         color: colorScheme.onSurface,
                         letterSpacing: -0.3,
@@ -197,26 +186,25 @@ class AppUnifiedHeader extends StatelessWidget implements PreferredSizeWidget {
           ),
         ),
 
-        const SizedBox(width: 16),
+        const SizedBox(width: 12),
 
         // Optional Search Widget
         if (searchWidget != null) ...[
           Flexible(
             flex: 2,
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 340),
+              constraints: const BoxConstraints(maxWidth: 320),
               child: searchWidget!,
             ),
           ),
           const SizedBox(width: 12),
-        ] else
-          const Spacer(),
+        ],
 
         // Actions slot wrapped with mainAxisSize.min to avoid expansion overflows
         if (actions.isNotEmpty)
           Row(
             mainAxisSize: MainAxisSize.min,
-            children: actions.map((act) => Padding(padding: const EdgeInsets.only(left: 8.0), child: act)).toList(),
+            children: actions.map((act) => Padding(padding: const EdgeInsets.only(left: 6.0), child: act)).toList(),
           ),
       ],
     );
@@ -232,14 +220,15 @@ class AppUnifiedHeader extends StatelessWidget implements PreferredSizeWidget {
           leading!
         else if (canGoBack)
           IconButton(
-            icon: Icon(Icons.arrow_back_rounded, color: colorScheme.primary),
+            icon: Icon(Icons.arrow_back_rounded, color: colorScheme.primary, size: 22),
             onPressed: () => _handleBack(context),
             tooltip: 'Back',
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+            visualDensity: VisualDensity.compact,
           )
         else
-          const SizedBox(width: 4),
+          const SizedBox(width: 2),
 
         const SizedBox(width: 4),
 
@@ -249,7 +238,6 @@ class AppUnifiedHeader extends StatelessWidget implements PreferredSizeWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
-                mainAxisSize: MainAxisSize.min,
                 children: [
                   Flexible(
                     child: Text(
@@ -257,7 +245,7 @@ class AppUnifiedHeader extends StatelessWidget implements PreferredSizeWidget {
                       style: GoogleFonts.inter(
                         color: colorScheme.onSurface,
                         fontWeight: FontWeight.bold,
-                        fontSize: 16,
+                        fontSize: 15.5,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -269,16 +257,19 @@ class AppUnifiedHeader extends StatelessWidget implements PreferredSizeWidget {
                   ],
                 ],
               ),
-              if (subtitle != null)
+              if (subtitle != null) ...[
+                const SizedBox(height: 1),
                 Text(
                   subtitle!,
                   style: GoogleFonts.inter(
-                    fontSize: 11,
+                    fontSize: 10.5,
                     color: colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w500,
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
+              ],
             ],
           ),
         ),
@@ -286,7 +277,7 @@ class AppUnifiedHeader extends StatelessWidget implements PreferredSizeWidget {
         if (actions.isNotEmpty)
           Row(
             mainAxisSize: MainAxisSize.min,
-            children: actions.map((act) => Padding(padding: const EdgeInsets.only(left: 4.0), child: act)).toList(),
+            children: actions.map((act) => Padding(padding: const EdgeInsets.only(left: 2.0), child: act)).toList(),
           ),
       ],
     );
