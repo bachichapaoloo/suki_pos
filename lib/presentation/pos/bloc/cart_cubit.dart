@@ -4,6 +4,7 @@ import 'package:suki_pos/domain/entities/maintenance/discount.dart';
 import 'package:suki_pos/domain/entities/maintenance/item.dart';
 import 'package:suki_pos/domain/entities/maintenance/option_value.dart';
 import 'package:suki_pos/domain/entities/orders/cart_item.dart';
+import 'package:suki_pos/domain/entities/orders/held_order.dart';
 import 'package:suki_pos/domain/entities/orders/sales_order.dart';
 import 'package:suki_pos/domain/entities/orders/transaction_detail.dart';
 import 'package:suki_pos/domain/use_cases/orders/process_checkout.dart';
@@ -23,7 +24,12 @@ class CartCubit extends Cubit<CartState> {
     String? notes,
   }) {
     final existingIndex = state.items.indexWhere(
-      (c) => c.item.id == item.id && _areOptionsEqual(c.selectedOptions, selectedOptions) && c.notes == notes && !c.hasItemDiscount && !c.isDiscountExempt,
+      (c) =>
+          c.item.id == item.id &&
+          _areOptionsEqual(c.selectedOptions, selectedOptions) &&
+          c.notes == notes &&
+          !c.hasItemDiscount &&
+          !c.isDiscountExempt,
     );
 
     if (existingIndex != -1) {
@@ -142,30 +148,31 @@ class CartCubit extends Cubit<CartState> {
   // ORDER-LEVEL DISCOUNTS & METADATA
   // -------------------------------------------------------------
 
-  void applyDiscount(Discount discount) {
-    if (discount.isPercentage) {
-      emit(
-        state.copyWith(
-          appliedDiscount: discount,
-          manualDiscountPercentage: discount.percentage ?? 0.0,
-          manualDiscountFixed: 0.0,
-        ),
-      );
-    } else {
-      emit(
-        state.copyWith(
-          appliedDiscount: discount,
-          manualDiscountFixed: discount.fixedAmount ?? 0.0,
-          manualDiscountPercentage: 0.0,
-        ),
-      );
-    }
+  void applyDiscount(
+    Discount discount, {
+    String? idNumber,
+    String? cardholderName,
+    int? guestCount,
+    int? eligibleCount,
+  }) {
+    emit(
+      state.copyWith(
+        appliedDiscount: discount,
+        manualDiscountPercentage: discount.isPercentage ? (discount.percentage ?? 0.0) : 0.0,
+        manualDiscountFixed: !discount.isPercentage ? (discount.fixedAmount ?? 0.0) : 0.0,
+        beneficiaryIdNo: idNumber,
+        beneficiaryName: cardholderName,
+        guestCount: guestCount ?? state.guestCount,
+        eligibleGuestCount: eligibleCount ?? state.eligibleGuestCount,
+      ),
+    );
   }
 
   void applyDiscountPercentage(double percent) {
     emit(
       state.copyWith(
         clearAppliedDiscount: true,
+        clearBeneficiary: true,
         manualDiscountPercentage: percent,
         manualDiscountFixed: 0.0,
       ),
@@ -176,6 +183,7 @@ class CartCubit extends Cubit<CartState> {
     emit(
       state.copyWith(
         clearAppliedDiscount: true,
+        clearBeneficiary: true,
         manualDiscountFixed: amount,
         manualDiscountPercentage: 0.0,
       ),
@@ -186,8 +194,28 @@ class CartCubit extends Cubit<CartState> {
     emit(
       state.copyWith(
         clearAppliedDiscount: true,
+        clearBeneficiary: true,
         manualDiscountPercentage: 0.0,
         manualDiscountFixed: 0.0,
+      ),
+    );
+  }
+
+  void setBeneficiary({required String name, required String idNumber}) {
+    emit(state.copyWith(beneficiaryName: name, beneficiaryIdNo: idNumber));
+  }
+
+  void setCustomerName(String? name) {
+    emit(state.copyWith(customerName: name, clearCustomerName: name == null || name.isEmpty));
+  }
+
+  void setTableName(String? tableName, {int? tableId}) {
+    emit(
+      state.copyWith(
+        tableName: tableName,
+        diningTableId: tableId,
+        clearTableName: tableName == null || tableName.isEmpty,
+        clearDiningTable: tableId == null,
       ),
     );
   }
@@ -202,13 +230,101 @@ class CartCubit extends Cubit<CartState> {
     emit(state.copyWith(surchargeAmount: amount, surchargePercent: percent));
   }
 
+  // -------------------------------------------------------------
+  // HOLD / SUSPEND & RECALL ORDER SYSTEM
+  // -------------------------------------------------------------
+
+  /// Holds the current cart as a parked/suspended order
+  String? holdCurrentOrder({String? label}) {
+    if (state.items.isEmpty) return null;
+
+    final heldId = _uuid.v4();
+    final defaultLabel =
+        label ??
+        (state.tableName != null && state.tableName!.isNotEmpty
+            ? state.tableName!
+            : (state.customerName != null && state.customerName!.isNotEmpty
+                  ? state.customerName!
+                  : 'Order #${state.heldOrders.length + 1}'));
+
+    final heldOrder = HeldOrder(
+      id: heldId,
+      orderLabel: defaultLabel,
+      items: state.items,
+      orderTypeId: state.orderTypeId,
+      diningTableId: state.diningTableId,
+      guestCount: state.guestCount,
+      eligibleGuestCount: state.eligibleGuestCount,
+      manualDiscountPercentage: state.manualDiscountPercentage,
+      manualDiscountFixed: state.manualDiscountFixed,
+      surchargeAmount: state.surchargeAmount,
+      surchargePercent: state.surchargePercent,
+      appliedDiscount: state.appliedDiscount,
+      beneficiaryName: state.beneficiaryName,
+      beneficiaryIdNo: state.beneficiaryIdNo,
+      remarks: state.remarks,
+      heldAt: DateTime.now(),
+    );
+
+    final updatedHeldList = [...state.heldOrders, heldOrder];
+
+    // Clear active cart while preserving held orders list
+    emit(
+      CartState(
+        orderTypeId: state.orderTypeId,
+        heldOrders: updatedHeldList,
+      ),
+    );
+
+    return heldId;
+  }
+
+  /// Recalls a held order and loads it into active cart
+  void recallHeldOrder(String heldOrderId) {
+    final matchIndex = state.heldOrders.indexWhere((h) => h.id == heldOrderId);
+    if (matchIndex == -1) return;
+
+    final held = state.heldOrders[matchIndex];
+    final updatedHeldList = List<HeldOrder>.from(state.heldOrders)..removeAt(matchIndex);
+
+    emit(
+      CartState(
+        items: held.items,
+        orderTypeId: held.orderTypeId,
+        diningTableId: held.diningTableId,
+        tableName: held.orderLabel.startsWith('Table') ? held.orderLabel : null,
+        customerName: !held.orderLabel.startsWith('Table') ? held.orderLabel : null,
+        guestCount: held.guestCount,
+        eligibleGuestCount: held.eligibleGuestCount,
+        manualDiscountPercentage: held.manualDiscountPercentage,
+        manualDiscountFixed: held.manualDiscountFixed,
+        surchargeAmount: held.surchargeAmount,
+        surchargePercent: held.surchargePercent,
+        appliedDiscount: held.appliedDiscount,
+        beneficiaryName: held.beneficiaryName,
+        beneficiaryIdNo: held.beneficiaryIdNo,
+        remarks: held.remarks,
+        heldOrders: updatedHeldList,
+      ),
+    );
+  }
+
+  /// Discards a held order
+  void deleteHeldOrder(String heldOrderId) {
+    final updatedHeldList = state.heldOrders.where((h) => h.id != heldOrderId).toList();
+    emit(state.copyWith(heldOrders: updatedHeldList));
+  }
+
   void clearCart() {
     emit(
       CartState(
         orderTypeId: state.orderTypeId,
         diningTableId: state.diningTableId,
+        tableName: state.tableName,
+        customerName: state.customerName,
         guestCount: state.guestCount,
         eligibleGuestCount: state.eligibleGuestCount,
+        heldOrders: state.heldOrders,
       ),
     );
   }
@@ -236,6 +352,9 @@ class CartCubit extends Cubit<CartState> {
       discFixedAmount: state.manualDiscountFixed,
       surchargeAmount: state.surchargeAmount,
       surchargePercent: state.surchargePercent,
+      beneficiaryName: state.beneficiaryName,
+      beneficiaryIdNo: state.beneficiaryIdNo,
+      beneficiaryDiscountTypeId: state.appliedDiscount?.discountTypeId,
       remarks: state.remarks,
       createdAt: DateTime.now(),
     );
@@ -273,6 +392,16 @@ class CartCubit extends Cubit<CartState> {
           cashierName: 'Admin',
           orderTypeName: state.orderTypeId == 1 ? 'Dine-In' : 'Take-Out',
           guestCount: state.guestCount,
+          eligibleGuestCount: state.eligibleGuestCount,
+          discountName: state.appliedDiscount?.name,
+          itemDiscountAmount: breakdown.itemDiscountAmount,
+          orderDiscountAmount: breakdown.manualDiscountAmount,
+          vatableSales: breakdown.vatableSales,
+          vatAmount: breakdown.vatAmount,
+          vatExemptSales: breakdown.vatExemptSales,
+          zeroRatedSales: breakdown.zeroRatedSales,
+          beneficiaryName: state.beneficiaryName,
+          beneficiaryIdNo: state.beneficiaryIdNo,
           transactionDate: DateTime.now(),
           lines: state.items
               .map(
@@ -283,6 +412,8 @@ class CartCubit extends Cubit<CartState> {
                   quantity: item.quantity,
                   unitPrice: item.effectiveUnitPrice,
                   amount: item.effectiveTotalPrice,
+                  lineDiscount: item.totalLineDiscount,
+                  isFreeItem: item.isFreeItem,
                   selectedOptions: item.selectedOptions.map((o) => o.alias ?? '').toList(),
                 ),
               )

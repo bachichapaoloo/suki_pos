@@ -15,6 +15,8 @@ class ShiftLoading extends ShiftState {}
 
 class ShiftInactive extends ShiftState {} // No open shift
 
+class ShiftClosed extends ShiftState {}
+
 class ShiftActive extends ShiftState {
   final ShiftEntity shift;
   final double theoreticalCashSales;
