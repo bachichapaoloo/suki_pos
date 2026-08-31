@@ -1,11 +1,15 @@
 import 'package:get_it/get_it.dart';
 import 'package:suki_pos/core/database/database_helper.dart';
+import 'package:suki_pos/data/dao/bank_dao.dart';
+import 'package:suki_pos/data/dao/charge_payment_dao.dart';
 import 'package:suki_pos/data/dao/department_dao.dart';
 import 'package:suki_pos/data/dao/discount_dao.dart';
 import 'package:suki_pos/data/dao/item_dao.dart';
 import 'package:suki_pos/data/dao/option_group_dao.dart';
 import 'package:suki_pos/data/dao/order_dao.dart';
 import 'package:suki_pos/data/dao/order_type_dao.dart';
+import 'package:suki_pos/data/dao/payment_method_dao.dart';
+import 'package:suki_pos/data/dao/service_charge_dao.dart';
 import 'package:suki_pos/data/dao/shift_dao.dart';
 import 'package:suki_pos/data/dao/stock_dao.dart';
 import 'package:suki_pos/data/dao/unit_dao.dart';
@@ -19,6 +23,8 @@ import 'package:suki_pos/data/repositories/maintenance/discount_repository_impl.
 import 'package:suki_pos/data/repositories/maintenance/item_repository_impl.dart';
 import 'package:suki_pos/data/repositories/maintenance/option_group_repository_impl.dart';
 import 'package:suki_pos/data/repositories/maintenance/order_type_repository_impl.dart';
+import 'package:suki_pos/data/repositories/maintenance/payment_maintenance_repository_impl.dart';
+import 'package:suki_pos/data/repositories/maintenance/service_charge_repository_impl.dart';
 import 'package:suki_pos/data/repositories/maintenance/unit_repository_impl.dart';
 import 'package:suki_pos/data/repositories/orders/order_repository_impl.dart';
 import 'package:suki_pos/domain/repositories/admin/role_repository.dart';
@@ -31,6 +37,8 @@ import 'package:suki_pos/domain/repositories/maintenance/discount_repository.dar
 import 'package:suki_pos/domain/repositories/maintenance/item_repository.dart';
 import 'package:suki_pos/domain/repositories/maintenance/option_group_repository.dart';
 import 'package:suki_pos/domain/repositories/maintenance/order_type_repository.dart';
+import 'package:suki_pos/domain/repositories/maintenance/payment_maintenance_repositories.dart';
+import 'package:suki_pos/domain/repositories/maintenance/service_charge_repository.dart';
 import 'package:suki_pos/domain/repositories/maintenance/unit_repository.dart' show UnitRepository;
 import 'package:suki_pos/domain/repositories/orders/order_repository.dart';
 import 'package:suki_pos/domain/use_cases/admin/role_use_cases.dart';
@@ -58,9 +66,7 @@ import 'package:suki_pos/presentation/maintenance/discount/bloc/discount_bloc.da
 import 'package:suki_pos/presentation/maintenance/item/bloc/item_bloc.dart';
 import 'package:suki_pos/presentation/maintenance/option_group/bloc/option_group_cubit.dart';
 import 'package:suki_pos/presentation/maintenance/order_type/bloc/order_type_cubit.dart';
-import 'package:suki_pos/data/dao/service_charge_dao.dart';
-import 'package:suki_pos/data/repositories/maintenance/service_charge_repository_impl.dart';
-import 'package:suki_pos/domain/repositories/maintenance/service_charge_repository.dart';
+import 'package:suki_pos/presentation/maintenance/payment_method/bloc/payment_maintenance_cubit.dart';
 import 'package:suki_pos/presentation/maintenance/service_charge/bloc/service_charge_cubit.dart';
 import 'package:suki_pos/presentation/pos/bloc/cart_cubit.dart';
 import 'package:suki_pos/presentation/pos/bloc/shift_cubit.dart';
@@ -158,6 +164,11 @@ Future<void> init() async {
         orderTypeRepository: sl(),
       ),
     )
+    ..registerFactory<PaymentMaintenanceCubit>(
+      () => PaymentMaintenanceCubit(
+        repository: sl(),
+      ),
+    )
     //! Domain - Use Cases
     ..registerLazySingleton(() => GetDepartments(sl()))
     ..registerLazySingleton(() => SaveDepartment(sl()))
@@ -231,6 +242,13 @@ Future<void> init() async {
     ..registerLazySingleton<ServiceChargeRepository>(
       () => ServiceChargeRepositoryImpl(serviceChargeDao: sl()),
     )
+    ..registerLazySingleton<PaymentMaintenanceRepositories>(
+      () => PaymentMaintenanceRepositoryImpl(
+        paymentMethodDao: sl(),
+        bankDao: sl(),
+        chargePaymentDao: sl(),
+      ),
+    )
     //! DAOs
     ..registerLazySingleton(() => DepartmentDao(sl()))
     ..registerLazySingleton(() => ItemDao(sl()))
@@ -241,7 +259,10 @@ Future<void> init() async {
     ..registerLazySingleton(() => OrderTypeDao(sl()))
     ..registerLazySingleton(() => ShiftDao(sl()))
     ..registerLazySingleton(() => DiscountDao(sl()))
-    ..registerLazySingleton(() => ServiceChargeDao(sl()));
+    ..registerLazySingleton(() => ServiceChargeDao(sl()))
+    ..registerLazySingleton(() => PaymentMethodDao(sl()))
+    ..registerLazySingleton(() => BankDao(sl()))
+    ..registerLazySingleton(() => ChargePaymentDao(sl()));
 
   //! Core
   final dbHelper = DatabaseHelper();

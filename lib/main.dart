@@ -27,6 +27,8 @@ import 'package:suki_pos/presentation/maintenance/item/pages/item_list_page.dart
 import 'package:suki_pos/presentation/maintenance/maintenance_page.dart';
 import 'package:suki_pos/presentation/maintenance/option_group/bloc/option_group_cubit.dart';
 import 'package:suki_pos/presentation/maintenance/order_type/bloc/order_type_cubit.dart';
+import 'package:suki_pos/presentation/maintenance/payment_method/bloc/payment_maintenance_cubit.dart';
+import 'package:suki_pos/presentation/maintenance/payment_method/pages/payment_method_list_page.dart';
 import 'package:suki_pos/presentation/maintenance/service_charge/bloc/service_charge_cubit.dart';
 import 'package:suki_pos/presentation/maintenance/service_charge/pages/service_charge_page.dart';
 import 'package:suki_pos/presentation/pos/bloc/cart_cubit.dart';
@@ -77,6 +79,7 @@ class MainApp extends StatelessWidget {
         BlocProvider(create: (_) => di.sl<StockCubit>()),
         BlocProvider(create: (_) => di.sl<TransactionHistoryCubit>()),
         BlocProvider(create: (_) => di.sl<ServiceChargeCubit>()..loadServiceChargeConfig()),
+        BlocProvider(create: (_) => di.sl<PaymentMaintenanceCubit>()),
       ],
       child: ToastificationWrapper(
         child: MaterialApp(
@@ -102,7 +105,7 @@ class MainApp extends StatelessWidget {
             '/maintenance/departments': (context) => const DepartmentListPage(),
             '/maintenance/categories': (context) => const CategoryListPage(),
             '/maintenance/items': (context) => const ItemListPage(),
-            '/maintenance/payment-methods': (context) => const Scaffold(),
+            '/maintenance/payment-methods': (context) => const PaymentMethodListPage(),
             '/maintenance/discounts': (context) => const DiscountListPage(),
             '/maintenance/service-charge': (context) => const ServiceChargePage(),
             '/admin': (context) => const AdminPage(),
