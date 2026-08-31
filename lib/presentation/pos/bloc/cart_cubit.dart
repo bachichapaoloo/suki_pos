@@ -355,6 +355,9 @@ class CartCubit extends Cubit<CartState> {
     required int cashierId,
     required int paymentMethodId,
     required double cashTendered,
+    int? bankId,
+    String? referenceNumber,
+    int? chargeAccountId,
   }) async {
     if (state.items.isEmpty) return null;
 
@@ -410,7 +413,7 @@ class CartCubit extends Cubit<CartState> {
           netAmount: breakdown.netTotal,
           cashTendered: cashTendered,
           changeGiven: changeGiven >= 0 ? changeGiven : 0.0,
-          paymentMethodName: paymentMethodId == 1 ? 'Cash' : (paymentMethodId == 2 ? 'Card' : 'E-Wallet'),
+          paymentMethodName: paymentMethodId == 1 ? 'Cash' : (paymentMethodId == 2 ? 'Card' : 'E-Wallet / Bank'),
           cashierName: 'Admin',
           orderTypeName: state.orderTypeId == 1 ? 'Dine-In' : 'Take-Out',
           guestCount: state.guestCount,

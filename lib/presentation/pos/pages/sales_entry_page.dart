@@ -293,36 +293,40 @@ class _SalesEntryPageState extends State<SalesEntryPage> {
       barrierDismissible: false,
       builder: (dialogCtx) => PaymentDialog(
         totalDue: breakdown.netTotal,
-        onComplete: (paymentMethodId, methodName, cashTendered, change) async {
-          final cashierId = _getActiveCashierId(context);
+        onComplete:
+            (paymentMethodId, methodName, cashTendered, change, {bankId, referenceNumber, chargeAccountId}) async {
+              final cashierId = _getActiveCashierId(context);
 
-          final completedTxn = await cartCubit.submitOrder(
-            cashierId: cashierId,
-            paymentMethodId: paymentMethodId,
-            cashTendered: cashTendered,
-          );
+              final completedTxn = await cartCubit.submitOrder(
+                cashierId: cashierId,
+                paymentMethodId: paymentMethodId,
+                cashTendered: cashTendered,
+                bankId: bankId,
+                referenceNumber: referenceNumber,
+                chargeAccountId: chargeAccountId,
+              );
 
-          if (!mounted) return;
+              if (!mounted) return;
 
-          if (completedTxn != null) {
-            // Realtime Stock sync
-            context.read<StockCubit>().loadStockList();
+              if (completedTxn != null) {
+                // Realtime Stock sync
+                context.read<StockCubit>().loadStockList();
 
-            AppToast.showSuccess(
-              context,
-              message: 'Sale Completed! Transaction #${completedTxn.transactionNo}',
-              title: 'Order Completed',
-            );
+                AppToast.showSuccess(
+                  context,
+                  message: 'Sale Completed! Transaction #${completedTxn.transactionNo}',
+                  title: 'Order Completed',
+                );
 
-            showDialog(
-              context: context,
-              builder: (_) => ReceiptPreviewDialog(transaction: completedTxn),
-            );
-          } else {
-            final errorMsg = cartCubit.state.errorMessage ?? 'Checkout failed. Please try again.';
-            AppToast.showError(context, message: errorMsg, title: 'Checkout Failed');
-          }
-        },
+                showDialog(
+                  context: context,
+                  builder: (_) => ReceiptPreviewDialog(transaction: completedTxn),
+                );
+              } else {
+                final errorMsg = cartCubit.state.errorMessage ?? 'Checkout failed. Please try again.';
+                AppToast.showError(context, message: errorMsg, title: 'Checkout Failed');
+              }
+            },
       ),
     );
   }
