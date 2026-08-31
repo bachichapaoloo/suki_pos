@@ -486,6 +486,27 @@ class _PaymentMethodListPageState extends State<PaymentMethodListPage> with Sing
               );
             },
           ),
+          Transform.scale(
+            scale: 0.85,
+            child: Switch(
+              value: bank.isActive,
+              activeColor: const Color(0xFF2563EB),
+              onChanged: (val) {
+                FeedbackService.tap();
+                final updated = Bank(
+                  id: bank.id,
+                  name: bank.name,
+                  cardType: bank.cardType,
+                  isActive: val,
+                );
+                context.read<PaymentMaintenanceCubit>().saveBank(updated);
+                AppToast.showSuccess(
+                  context,
+                  message: '${bank.name} is now ${val ? "active" : "disabled"} in checkout',
+                );
+              },
+            ),
+          ),
         ],
       ),
     );
@@ -657,6 +678,28 @@ class _PaymentMethodListPageState extends State<PaymentMethodListPage> with Sing
                 ),
               );
             },
+          ),
+          Transform.scale(
+            scale: 0.85,
+            child: Switch(
+              value: charge.isActive,
+              activeColor: const Color(0xFF2563EB),
+              onChanged: (val) {
+                FeedbackService.tap();
+                final updated = Charge(
+                  id: charge.id,
+                  code: charge.code,
+                  name: charge.name,
+                  chargeType: charge.chargeType,
+                  isActive: val,
+                );
+                context.read<PaymentMaintenanceCubit>().saveCharge(updated);
+                AppToast.showSuccess(
+                  context,
+                  message: '${charge.name} is now ${val ? "active" : "inactive"}',
+                );
+              },
+            ),
           ),
         ],
       ),

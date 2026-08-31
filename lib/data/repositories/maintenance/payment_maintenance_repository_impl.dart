@@ -83,7 +83,11 @@ class PaymentMaintenanceRepositoryImpl implements PaymentMaintenanceRepositories
   @override
   Future<Either<Failure, void>> saveBank(Bank bank) async {
     try {
-      await bankDao.insertBank(bank);
+      if (bank.id != null && bank.id! > 0) {
+        await bankDao.updateBank(bank);
+      } else {
+        await bankDao.insertBank(bank);
+      }
       return const Right(null);
     } catch (e) {
       return Left(DatabaseFailure(e.toString()));
@@ -93,7 +97,11 @@ class PaymentMaintenanceRepositoryImpl implements PaymentMaintenanceRepositories
   @override
   Future<Either<Failure, void>> saveCharge(Charge charge) async {
     try {
-      await chargePaymentDao.insertChargePayment(charge);
+      if (charge.id != null && charge.id! > 0) {
+        await chargePaymentDao.updateChargePayment(charge);
+      } else {
+        await chargePaymentDao.insertChargePayment(charge);
+      }
       return const Right(null);
     } catch (e) {
       return Left(DatabaseFailure(e.toString()));
@@ -103,7 +111,11 @@ class PaymentMaintenanceRepositoryImpl implements PaymentMaintenanceRepositories
   @override
   Future<Either<Failure, void>> savePaymentMethod(PaymentMethod method) async {
     try {
-      await paymentMethodDao.insertPaymentMethod(method);
+      if (method.id != null && method.id! > 0) {
+        await paymentMethodDao.updatePaymentMethod(method);
+      } else {
+        await paymentMethodDao.insertPaymentMethod(method);
+      }
       return const Right(null);
     } catch (e) {
       return Left(DatabaseFailure(e.toString()));
