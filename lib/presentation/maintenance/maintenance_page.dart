@@ -80,6 +80,16 @@ class MaintenancePage extends StatelessWidget {
                 const SizedBox(height: 12),
                 _buildMobileActionCard(
                   context,
+                  'Payment Method',
+                  'Manage payment methods',
+                  Icons.payment,
+                  const Color(0xFFF3E8FF),
+                  const Color(0xFF7E22CE),
+                  route: '/maintenance/payment-methods',
+                ),
+                const SizedBox(height: 12),
+                _buildMobileActionCard(
+                  context,
                   'Discounts',
                   'Manage promotions & discounts',
                   Icons.discount_outlined,
@@ -203,6 +213,15 @@ class MaintenancePage extends StatelessWidget {
                           iconBg: const Color(0xFFA5DDF1),
                           iconColor: const Color(0xFF0369A1),
                           route: '/maintenance/discounts',
+                        ),
+                        _buildDesktopActionCard(
+                          context,
+                          title: 'Payment Method',
+                          subtitle: 'Manage payment methods',
+                          icon: Icons.payment,
+                          iconBg: const Color(0xFFF3E8FF),
+                          iconColor: const Color(0xFF7E22CE),
+                          route: '/maintenance/payment-methods',
                         ),
                         _buildDesktopActionCard(
                           context,

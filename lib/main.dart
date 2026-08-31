@@ -5,7 +5,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
-import 'package:toastification/toastification.dart';
 import 'package:suki_pos/core/theme/app_theme.dart';
 import 'package:suki_pos/injection_container.dart' as di;
 import 'package:suki_pos/presentation/admin/admin_page.dart';
@@ -37,6 +36,7 @@ import 'package:suki_pos/presentation/pos/pages/pos_dashboard_page.dart';
 import 'package:suki_pos/presentation/pos/pages/sales_entry_page.dart';
 import 'package:suki_pos/presentation/pos/pages/sales_reading_page.dart';
 import 'package:suki_pos/presentation/pos/pages/transaction_history_page.dart';
+import 'package:toastification/toastification.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -102,6 +102,7 @@ class MainApp extends StatelessWidget {
             '/maintenance/departments': (context) => const DepartmentListPage(),
             '/maintenance/categories': (context) => const CategoryListPage(),
             '/maintenance/items': (context) => const ItemListPage(),
+            '/maintenance/payment-methods': (context) => const Scaffold(),
             '/maintenance/discounts': (context) => const DiscountListPage(),
             '/maintenance/service-charge': (context) => const ServiceChargePage(),
             '/admin': (context) => const AdminPage(),
