@@ -10,6 +10,7 @@ import 'package:suki_pos/core/utils/image_storage_service.dart';
 import 'package:suki_pos/domain/entities/maintenance/category.dart';
 import 'package:suki_pos/domain/entities/maintenance/department.dart';
 import 'package:suki_pos/domain/entities/maintenance/item.dart';
+import 'package:suki_pos/domain/entities/maintenance/option_group.dart';
 import 'package:suki_pos/domain/entities/orders/tax_discount_breakdown.dart';
 import 'package:suki_pos/presentation/auth/bloc/auth_bloc.dart';
 import 'package:suki_pos/presentation/inventory/stock_cubit.dart';
@@ -22,6 +23,7 @@ import 'package:suki_pos/presentation/maintenance/item/bloc/item_bloc.dart';
 import 'package:suki_pos/presentation/maintenance/item/bloc/item_event.dart';
 import 'package:suki_pos/presentation/maintenance/item/bloc/item_state.dart';
 import 'package:suki_pos/presentation/maintenance/option_group/bloc/option_group_cubit.dart';
+import 'package:suki_pos/presentation/maintenance/option_group/bloc/option_group_state.dart';
 import 'package:suki_pos/presentation/maintenance/order_type/bloc/order_type_cubit.dart';
 import 'package:suki_pos/presentation/maintenance/order_type/bloc/order_type_state.dart';
 import 'package:suki_pos/presentation/maintenance/service_charge/bloc/service_charge_cubit.dart';
@@ -1231,10 +1233,13 @@ class _SalesEntryPageState extends State<SalesEntryPage> {
                         return CartLineItemTile(
                           cartItem: cartItem,
                           onTap: () {
+                            final optState = context.read<OptionGroupCubit>().state;
+                            final groups = optState is OptionGroupLoaded ? optState.optionGroups : <OptionGroup>[];
+
                             LineItemActionDialog.show(
                               context,
                               cartItem: cartItem,
-                              optionGroups: const [],
+                              optionGroups: groups,
                               onSave: (updated) => context.read<CartCubit>().updateCartItem(cartItem.id, updated),
                               onRemove: () => context.read<CartCubit>().removeItem(cartItem.id),
                             );
