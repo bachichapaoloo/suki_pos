@@ -69,6 +69,22 @@ class PaymentMaintenanceCubit extends Cubit<PaymentMaintenanceState> {
     });
   }
 
+  Future<bool> savePaymentMethod(PaymentMethod method) async {
+    final result = await repository.savePaymentMethod(method);
+    return result.fold((failure) => false, (_) {
+      loadAll();
+      return true;
+    });
+  }
+
+  Future<bool> deletePaymentMethod(int id) async {
+    final result = await repository.deletePaymentMethod(id);
+    return result.fold((failure) => false, (_) {
+      loadAll();
+      return true;
+    });
+  }
+
   Future<bool> togglePaymentMethod(PaymentMethod method, bool isActive) async {
     final updated = method.copyWith(isActive: isActive);
     final result = await repository.savePaymentMethod(updated);

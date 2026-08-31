@@ -9,6 +9,7 @@ import 'package:suki_pos/presentation/maintenance/payment_method/bloc/payment_ma
 import 'package:suki_pos/presentation/maintenance/payment_method/bloc/payment_maintenance_state.dart';
 import 'package:suki_pos/presentation/maintenance/payment_method/widget/bank_form_dialog.dart';
 import 'package:suki_pos/presentation/maintenance/payment_method/widget/charge_form_dialog.dart';
+import 'package:suki_pos/presentation/maintenance/payment_method/widget/payment_method_form_dialog.dart';
 import 'package:suki_pos/presentation/pos/widgets/confirmation_dialog.dart';
 import 'package:suki_pos/presentation/widgets/app_toast.dart';
 import 'package:suki_pos/presentation/widgets/app_unified_header.dart';
@@ -44,6 +45,7 @@ class _PaymentMethodListPageState extends State<PaymentMethodListPage> with Sing
       case 'card':
         return Icons.credit_card_rounded;
       case 'atm':
+      case 'online':
         return Icons.account_balance_rounded;
       case 'charge':
         return Icons.receipt_long_rounded;
@@ -117,95 +119,209 @@ class _PaymentMethodListPageState extends State<PaymentMethodListPage> with Sing
   }
 
   // ===========================================================================
-  // TAB 1: PAYMENT METHODS (ACTIVE TOGGLES)
+  // TAB 1: PAYMENT METHODS (INTERACTIVE CRUD + TOGGLE)
   // ===========================================================================
 
   Widget _buildPaymentMethodsTab(List<PaymentMethod> methods) {
-    if (methods.isEmpty) {
-      return _buildEmptyState('No payment methods configured.');
-    }
-
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final isWide = constraints.maxWidth >= 700;
-        return GridView.builder(
-          padding: const EdgeInsets.all(16),
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: isWide ? 3 : 1,
-            mainAxisExtent: 95,
-            crossAxisSpacing: 12,
-            mainAxisSpacing: 12,
-          ),
-          itemCount: methods.length,
-          itemBuilder: (context, index) {
-            final method = methods[index];
-            return Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: method.isActive ? const Color(0xFFCBD5E1) : const Color(0xFFE2E8F0),
+    return Column(
+      children: [
+        // Action Bar
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                '${methods.length} Payment Methods Configured',
+                style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: const Color(0xFF475569)),
+              ),
+              FilledButton.icon(
+                style: FilledButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 ),
-                boxShadow: [
-                  BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 4, offset: const Offset(0, 2)),
-                ],
+                icon: const Icon(Icons.add_rounded, size: 18),
+                label: Text(
+                  'Add Payment Method',
+                  style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 12.5),
+                ),
+                onPressed: () {
+                  FeedbackService.tap();
+                  PaymentMethodFormDialog.show(
+                    context,
+                    onSave: (newMethod) {
+                      context.read<PaymentMaintenanceCubit>().savePaymentMethod(newMethod);
+                      AppToast.showSuccess(context, message: 'Payment method "${newMethod.name}" created');
+                    },
+                  );
+                },
               ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: method.isActive ? const Color(0xFFEFF6FF) : const Color(0xFFF1F5F9),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Icon(
-                      _getMethodIcon(method.code),
-                      color: method.isActive ? const Color(0xFF2563EB) : const Color(0xFF94A3B8),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          method.name,
-                          style: GoogleFonts.inter(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                            color: method.isActive ? const Color(0xFF1E293B) : const Color(0xFF94A3B8),
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          'Code: ${method.code}',
-                          style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF64748B)),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Transform.scale(
-                    scale: 0.85,
-                    child: Switch(
-                      value: method.isActive,
-                      activeColor: const Color(0xFF2563EB),
-                      onChanged: (val) {
-                        FeedbackService.tap();
-                        context.read<PaymentMaintenanceCubit>().togglePaymentMethod(method, val);
+            ],
+          ),
+        ),
+
+        // Grid/List
+        Expanded(
+          child: methods.isEmpty
+              ? _buildEmptyState('No payment methods configured.\nTap "Add Payment Method" to create one.')
+              : LayoutBuilder(
+                  builder: (context, constraints) {
+                    final isWide = constraints.maxWidth >= 800;
+                    return GridView.builder(
+                      padding: const EdgeInsets.all(16),
+                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: isWide ? 2 : 1,
+                        mainAxisExtent: 96,
+                        crossAxisSpacing: 12,
+                        mainAxisSpacing: 12,
+                      ),
+                      itemCount: methods.length,
+                      itemBuilder: (context, index) {
+                        final method = methods[index];
+                        return _buildPaymentMethodCard(method);
                       },
+                    );
+                  },
+                ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPaymentMethodCard(PaymentMethod method) {
+    final isCoreMethod = ['cash', 'card'].contains(method.code.toLowerCase());
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: method.isActive ? const Color(0xFFCBD5E1) : const Color(0xFFE2E8F0),
+        ),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 4, offset: const Offset(0, 2)),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: method.isActive ? const Color(0xFFEFF6FF) : const Color(0xFFF1F5F9),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(
+              _getMethodIcon(method.code),
+              color: method.isActive ? const Color(0xFF2563EB) : const Color(0xFF94A3B8),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        method.name,
+                        style: GoogleFonts.inter(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: method.isActive ? const Color(0xFF1E293B) : const Color(0xFF94A3B8),
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        method.code,
+                        style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.bold, color: const Color(0xFF64748B)),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  method.isActive ? 'Active in POS Checkout' : 'Hidden from Checkout',
+                  style: GoogleFonts.inter(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                    color: method.isActive ? const Color(0xFF059669) : const Color(0xFF94A3B8),
                   ),
-                ],
-              ),
-            );
-          },
-        );
-      },
+                ),
+              ],
+            ),
+          ),
+
+          // Actions: Edit button
+          IconButton(
+            icon: const Icon(Icons.edit_outlined, size: 18, color: Color(0xFF475569)),
+            tooltip: 'Edit Name/Code',
+            onPressed: () {
+              FeedbackService.tap();
+              PaymentMethodFormDialog.show(
+                context,
+                paymentMethod: method,
+                onSave: (updated) {
+                  context.read<PaymentMaintenanceCubit>().savePaymentMethod(updated);
+                  AppToast.showSuccess(context, message: 'Payment method "${updated.name}" updated');
+                },
+              );
+            },
+          ),
+
+          // Delete button (for custom methods)
+          if (!isCoreMethod)
+            IconButton(
+              icon: const Icon(Icons.delete_outline_rounded, size: 18, color: Color(0xFFDC2626)),
+              tooltip: 'Delete',
+              onPressed: () {
+                if (method.id == null) return;
+                showDialog(
+                  context: context,
+                  builder: (_) => ConfirmationDialog(
+                    title: 'Delete Payment Method',
+                    message: 'Are you sure you want to delete "${method.name}"?',
+                    confirmLabel: 'Delete',
+                    cancelLabel: 'Cancel',
+                    onConfirm: () {
+                      context.read<PaymentMaintenanceCubit>().deletePaymentMethod(method.id!);
+                      AppToast.showSuccess(context, message: 'Payment method "${method.name}" deleted');
+                    },
+                  ),
+                );
+              },
+            ),
+
+          // Active Switch
+          Transform.scale(
+            scale: 0.85,
+            child: Switch(
+              value: method.isActive,
+              activeColor: const Color(0xFF2563EB),
+              onChanged: (val) {
+                FeedbackService.tap();
+                context.read<PaymentMaintenanceCubit>().togglePaymentMethod(method, val);
+                AppToast.showSuccess(
+                  context,
+                  message: '${method.name} is now ${val ? "active" : "disabled"} in POS',
+                );
+              },
+            ),
+          ),
+        ],
+      ),
     );
   }
 
