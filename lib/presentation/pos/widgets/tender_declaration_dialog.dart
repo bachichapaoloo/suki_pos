@@ -4,22 +4,27 @@ import '../../../../domain/entities/shift/cash_denomination_count.dart';
 import '../../widgets/custom_form_dialog.dart';
 
 class TenderDeclarationDialog extends StatefulWidget {
-  final Function(List<CashDenominationCount> denominations, double totalCash) onConfirm;
+  final Function(List<CashDenominationCount> denominations, double totalCash)
+  onConfirm;
   final List<CashDenominationCount>? initialDenominations;
+  final Map<String, dynamic>? nonCashSummary;
 
   const TenderDeclarationDialog({
     super.key,
     required this.onConfirm,
     this.initialDenominations,
+    this.nonCashSummary,
   });
 
   @override
-  State<TenderDeclarationDialog> createState() => _TenderDeclarationDialogState();
+  State<TenderDeclarationDialog> createState() =>
+      _TenderDeclarationDialogState();
 }
 
 class _TenderDeclarationDialogState extends State<TenderDeclarationDialog> {
   final Map<double, TextEditingController> _controllers = {};
 
+  /// All 12 KwikPOS Lite denominations
   static const List<double> _denominations = [
     1000.0,
     500.0,
@@ -31,6 +36,8 @@ class _TenderDeclarationDialogState extends State<TenderDeclarationDialog> {
     5.0,
     1.0,
     0.25,
+    0.10,
+    0.05,
   ];
 
   static const Color primaryBlue = Color(0xFF355C8F);
@@ -59,7 +66,7 @@ class _TenderDeclarationDialogState extends State<TenderDeclarationDialog> {
     super.dispose();
   }
 
-  double get _totalAmount {
+  double get _totalCashAmount {
     double sum = 0.0;
     _controllers.forEach((denom, controller) {
       final count = int.tryParse(controller.text) ?? 0;
@@ -68,6 +75,9 @@ class _TenderDeclarationDialogState extends State<TenderDeclarationDialog> {
     return sum;
   }
 
+  double get _totalNonCashAmount =>
+      (widget.nonCashSummary?['totalNonCash'] as num? ?? 0.0).toDouble();
+
   void _submit() {
     final List<CashDenominationCount> list = [];
     _controllers.forEach((denom, controller) {
@@ -75,7 +85,7 @@ class _TenderDeclarationDialogState extends State<TenderDeclarationDialog> {
       list.add(CashDenominationCount(denomination: denom, count: count));
     });
 
-    widget.onConfirm(list, _totalAmount);
+    widget.onConfirm(list, _totalCashAmount);
     Navigator.of(context).pop();
   }
 
@@ -95,60 +105,85 @@ class _TenderDeclarationDialogState extends State<TenderDeclarationDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final nc = widget.nonCashSummary ?? const {};
+    final cardAmt = (nc['cardAmount'] as num? ?? 0.0).toDouble();
+    final cardCnt = (nc['cardCount'] as num? ?? 0).toInt();
+    final atmAmt = (nc['atmAmount'] as num? ?? 0.0).toDouble();
+    final atmCnt = (nc['atmCount'] as num? ?? 0).toInt();
+    final chkAmt = (nc['checkAmount'] as num? ?? 0.0).toDouble();
+    final chkCnt = (nc['checkCount'] as num? ?? 0).toInt();
+    final gcAmt = (nc['giftCheckAmount'] as num? ?? 0.0).toDouble();
+    final gcCnt = (nc['giftCheckCount'] as num? ?? 0).toInt();
+    final chgAmt = (nc['chargeAmount'] as num? ?? 0.0).toDouble();
+    final chgCnt = (nc['chargeCount'] as num? ?? 0).toInt();
+
     return CustomFormDialog(
-      title: 'Cash Drawer Count',
-      maxWidth: 620,
-      saveLabel: 'Save Declaration',
+      title: 'Tender Declaration & Physical Cash Count',
+      maxWidth: 660,
+      saveLabel: 'Save Tender Declaration',
       onSave: _submit,
       content: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // 1. Auto-Populated Shift Non-Cash Tender Summary (KwikPOS Lite Parity)
           Container(
-            padding: const EdgeInsets.all(14),
+            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: const Color(0xFFF1F5F9),
+              color: const Color(0xFFF8FAFC),
               borderRadius: BorderRadius.circular(10),
               border: Border.all(color: surfaceBorder),
             ),
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Icon(Icons.info_outline_rounded, color: primaryBlue, size: 20),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    'Count all physical bills and coins currently in the cash drawer.',
-                    style: GoogleFonts.inter(
-                      fontSize: 13,
-                      color: const Color(0xFF475569),
-                    ),
+                Text(
+                  'Shift Non-Cash Media (Auto-Calculated)',
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: primaryBlue,
                   ),
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 6,
+                  children: [
+                    _nonCashBadge('Card ($cardCnt)', cardAmt),
+                    _nonCashBadge('ATM/Online ($atmCnt)', atmAmt),
+                    _nonCashBadge('Bank Check ($chkCnt)', chkAmt),
+                    _nonCashBadge('Gift Check ($gcCnt)', gcAmt),
+                    _nonCashBadge('Charge ($chgCnt)', chgAmt),
+                  ],
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 16),
-          // Denominations List
+          const SizedBox(height: 14),
+          // 2. Physical Denominations List (12 Denominations)
           ListView.separated(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             itemCount: _denominations.length,
-            separatorBuilder: (_, __) => const Divider(height: 1, color: Color(0xFFF1F5F9)),
+            separatorBuilder: (_, __) =>
+                const Divider(height: 1, color: Color(0xFFF1F5F9)),
             itemBuilder: (context, index) {
               final denom = _denominations[index];
               final ctrl = _controllers[denom]!;
               final count = int.tryParse(ctrl.text) ?? 0;
               final subtotal = count * denom;
-
               final isBill = denom >= 20;
 
               return Padding(
-                padding: const EdgeInsets.symmetric(vertical: 6),
+                padding: const EdgeInsets.symmetric(vertical: 4),
                 child: Row(
                   children: [
-                    // Denomination badge
                     Container(
                       width: 90,
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 5,
+                      ),
                       decoration: BoxDecoration(
                         color: isBill
                             ? const Color(0xFFDCFCE7)
@@ -159,7 +194,7 @@ class _TenderDeclarationDialogState extends State<TenderDeclarationDialog> {
                         '₱${denom >= 1 ? denom.toInt() : denom.toStringAsFixed(2)}',
                         style: GoogleFonts.inter(
                           fontWeight: FontWeight.bold,
-                          fontSize: 14,
+                          fontSize: 13.5,
                           color: isBill
                               ? const Color(0xFF15803D)
                               : const Color(0xFFB45309),
@@ -168,53 +203,67 @@ class _TenderDeclarationDialogState extends State<TenderDeclarationDialog> {
                       ),
                     ),
                     const SizedBox(width: 12),
-                    // Quick Minus
                     IconButton(
-                      icon: const Icon(Icons.remove_circle_outline, size: 22, color: Color(0xFF94A3B8)),
+                      icon: const Icon(
+                        Icons.remove_circle_outline,
+                        size: 20,
+                        color: Color(0xFF94A3B8),
+                      ),
                       onPressed: () => _decrement(denom),
                       padding: EdgeInsets.zero,
                       constraints: const BoxConstraints(),
                     ),
                     const SizedBox(width: 8),
-                    // Count Input Field
                     SizedBox(
                       width: 70,
-                      height: 40,
+                      height: 36,
                       child: TextFormField(
                         controller: ctrl,
                         keyboardType: TextInputType.number,
                         textAlign: TextAlign.center,
-                        style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 14),
+                        style: GoogleFonts.inter(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13.5,
+                        ),
                         decoration: InputDecoration(
-                          contentPadding: const EdgeInsets.symmetric(vertical: 8),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                          contentPadding: const EdgeInsets.symmetric(
+                            vertical: 6,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
                           enabledBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(8),
                             borderSide: const BorderSide(color: surfaceBorder),
                           ),
                           focusedBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(8),
-                            borderSide: const BorderSide(color: primaryBlue, width: 2),
+                            borderSide: const BorderSide(
+                              color: primaryBlue,
+                              width: 2,
+                            ),
                           ),
                         ),
                         onChanged: (_) => setState(() {}),
                       ),
                     ),
                     const SizedBox(width: 8),
-                    // Quick Plus
                     IconButton(
-                      icon: const Icon(Icons.add_circle_outline, size: 22, color: primaryBlue),
+                      icon: const Icon(
+                        Icons.add_circle_outline,
+                        size: 20,
+                        color: primaryBlue,
+                      ),
                       onPressed: () => _increment(denom),
                       padding: EdgeInsets.zero,
                       constraints: const BoxConstraints(),
                     ),
                     const Spacer(),
-                    // Subtotal
                     Text(
                       '₱${subtotal.toStringAsFixed(2)}',
                       style: GoogleFonts.inter(
                         fontWeight: FontWeight.w700,
-                        fontSize: 14,
+                        fontSize: 13.5,
                         color: textDark,
                       ),
                     ),
@@ -223,38 +272,85 @@ class _TenderDeclarationDialogState extends State<TenderDeclarationDialog> {
               );
             },
           ),
-          const SizedBox(height: 16),
-          // Total Box
+          const SizedBox(height: 14),
+          // 3. Total Declared Cash & Total All Tenders Box
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
               color: primaryBlue.withOpacity(0.08),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: primaryBlue.withOpacity(0.2)),
             ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            child: Column(
               children: [
-                Text(
-                  'Total Declared Cash:',
-                  style: GoogleFonts.inter(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 15,
-                    color: textDark,
-                  ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Total Declared Physical Cash:',
+                      style: GoogleFonts.inter(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                        color: textDark,
+                      ),
+                    ),
+                    Text(
+                      '₱${_totalCashAmount.toStringAsFixed(2)}',
+                      style: GoogleFonts.inter(
+                        fontWeight: FontWeight.w900,
+                        fontSize: 18,
+                        color: primaryBlue,
+                      ),
+                    ),
+                  ],
                 ),
-                Text(
-                  '₱${_totalAmount.toStringAsFixed(2)}',
-                  style: GoogleFonts.inter(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 20,
-                    color: primaryBlue,
+                if (_totalNonCashAmount > 0) ...[
+                  const SizedBox(height: 4),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Total Declared (Cash + Non-Cash):',
+                        style: GoogleFonts.inter(
+                          fontWeight: FontWeight.w500,
+                          fontSize: 12,
+                          color: const Color(0xFF475569),
+                        ),
+                      ),
+                      Text(
+                        '₱${(_totalCashAmount + _totalNonCashAmount).toStringAsFixed(2)}',
+                        style: GoogleFonts.inter(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                          color: textDark,
+                        ),
+                      ),
+                    ],
                   ),
-                ),
+                ],
               ],
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _nonCashBadge(String label, double amount) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: surfaceBorder),
+      ),
+      child: Text(
+        '$label: ₱${amount.toStringAsFixed(2)}',
+        style: GoogleFonts.inter(
+          fontSize: 11.5,
+          fontWeight: FontWeight.w600,
+          color: textDark,
+        ),
       ),
     );
   }

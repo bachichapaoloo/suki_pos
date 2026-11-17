@@ -20,6 +20,7 @@ import 'package:suki_pos/presentation/widgets/app_toast.dart';
 import 'package:suki_pos/presentation/widgets/app_unified_header.dart';
 import 'package:suki_pos/presentation/widgets/hotkey_badge.dart';
 import 'package:suki_pos/presentation/widgets/main_layout.dart';
+import 'package:suki_pos/presentation/pos/widgets/held_orders_dialog.dart';
 
 class PosDashboardPage extends StatefulWidget {
   const PosDashboardPage({super.key});
@@ -54,7 +55,7 @@ class _PosDashboardPageState extends State<PosDashboardPage> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadDashboardMetrics();
       context.read<TransactionHistoryCubit>().loadHistory();
-      
+
       final authState = context.read<AuthBloc>().state;
       if (authState is AuthAuthenticated) {
         context.read<ShiftCubit>().checkActiveShift(authState.user.id);
@@ -67,7 +68,8 @@ class _PosDashboardPageState extends State<PosDashboardPage> {
       final metrics = await di.sl<OrderDao>().getDashboardMetrics();
       if (mounted) {
         setState(() {
-          _totalSalesToday = (metrics['total_sales'] as num?)?.toDouble() ?? 0.0;
+          _totalSalesToday =
+              (metrics['total_sales'] as num?)?.toDouble() ?? 0.0;
           _completedCountToday = (metrics['completed_count'] as int?) ?? 0;
           _activeOrdersCount = (metrics['active_count'] as int?) ?? 0;
           _totalOrdersToday = (metrics['total_orders_today'] as int?) ?? 0;
@@ -90,7 +92,62 @@ class _PosDashboardPageState extends State<PosDashboardPage> {
   }
 
   String get _formattedTime => DateFormat('h:mm:ss a').format(_currentTime);
-  String get _formattedDate => DateFormat('EEEE, MMMM d, yyyy').format(_currentTime);
+  String get _formattedDate =>
+      DateFormat('EEEE, MMMM d, yyyy').format(_currentTime);
+
+  bool _canAccessRoute(BuildContext context, String? route) {
+    if (route == null) return true;
+    final authState = context.read<AuthBloc>().state;
+    if (authState is! AuthAuthenticated) return true;
+    final user = authState.user;
+
+    switch (route) {
+      case '/pos/sales-entry':
+        return user.canSalesEntry;
+      case '/pos/sales-reading':
+        return user.canSalesReading;
+      case '/pos/transaction-history':
+        return user.canSalesInquiry;
+      case '/inventory/stocks':
+        return user.canInventory;
+      case '/maintenance':
+        return user.canFileMaintenance;
+      case '/admin':
+        return user.canAdminMode;
+      default:
+        return true;
+    }
+  }
+
+  void _navigateProtected(BuildContext context, String route) {
+    FeedbackService.tap();
+    if (!_canAccessRoute(context, route)) {
+      AppToast.showWarning(
+        context,
+        title: 'Access Restricted',
+        message: 'Your role does not have permission to access this module.',
+      );
+      return;
+    }
+    Navigator.of(context).pushNamed(route);
+  }
+
+  void _openHeldOrdersDialog(BuildContext context) {
+    FeedbackService.tap();
+    showDialog(
+      context: context,
+      builder: (_) => HeldOrdersDialog(
+        heldOrders: context.read<CartCubit>().state.heldOrders,
+        onRecall: (heldId) {
+          context.read<CartCubit>().recallHeldOrder(heldId);
+          Navigator.of(context).pushNamed('/pos/sales-entry');
+        },
+        onDelete: (heldId) {
+          context.read<CartCubit>().deleteHeldOrder(heldId);
+        },
+      ),
+    );
+  }
 
   String _formatShiftDuration(DateTime? start) {
     if (start == null) return '00:00:00';
@@ -109,20 +166,16 @@ class _PosDashboardPageState extends State<PosDashboardPage> {
     return CallbackShortcuts(
       bindings: {
         const SingleActivator(LogicalKeyboardKey.f1): () {
-          FeedbackService.tap();
-          Navigator.of(context).pushNamed('/pos/sales-entry');
+          _navigateProtected(context, '/pos/sales-entry');
         },
         const SingleActivator(LogicalKeyboardKey.f2): () {
-          FeedbackService.tap();
-          Navigator.of(context).pushNamed('/pos/sales-reading');
+          _navigateProtected(context, '/pos/sales-reading');
         },
         const SingleActivator(LogicalKeyboardKey.f3): () {
-          FeedbackService.tap();
-          Navigator.of(context).pushNamed('/pos/transaction-history');
+          _navigateProtected(context, '/pos/transaction-history');
         },
         const SingleActivator(LogicalKeyboardKey.f4): () {
-          FeedbackService.tap();
-          Navigator.of(context).pushNamed('/inventory/stocks');
+          _navigateProtected(context, '/inventory/stocks');
         },
         const SingleActivator(LogicalKeyboardKey.f5): () {
           FeedbackService.tap();
@@ -131,12 +184,10 @@ class _PosDashboardPageState extends State<PosDashboardPage> {
           AppToast.showInfo(context, message: 'Dashboard metrics refreshed');
         },
         const SingleActivator(LogicalKeyboardKey.f6): () {
-          FeedbackService.tap();
-          Navigator.of(context).pushNamed('/maintenance');
+          _navigateProtected(context, '/maintenance');
         },
         const SingleActivator(LogicalKeyboardKey.f7): () {
-          FeedbackService.tap();
-          Navigator.of(context).pushNamed('/admin');
+          _navigateProtected(context, '/admin');
         },
       },
       child: Focus(
@@ -149,7 +200,11 @@ class _PosDashboardPageState extends State<PosDashboardPage> {
             showBackButton: false,
             leading: Padding(
               padding: const EdgeInsets.only(left: 4, right: 8),
-              child: Icon(Icons.storefront_outlined, color: colorScheme.primary, size: 24),
+              child: Icon(
+                Icons.storefront_outlined,
+                color: colorScheme.primary,
+                size: 24,
+              ),
             ),
             badge: Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -160,7 +215,11 @@ class _PosDashboardPageState extends State<PosDashboardPage> {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.access_time_rounded, size: 14, color: colorScheme.onSurfaceVariant),
+                  Icon(
+                    Icons.access_time_rounded,
+                    size: 14,
+                    color: colorScheme.onSurfaceVariant,
+                  ),
                   const SizedBox(width: 4),
                   Text(
                     _formattedTime,
@@ -175,7 +234,11 @@ class _PosDashboardPageState extends State<PosDashboardPage> {
             ),
             actions: [
               IconButton(
-                icon: Icon(Icons.refresh_rounded, color: colorScheme.primary, size: 20),
+                icon: Icon(
+                  Icons.refresh_rounded,
+                  color: colorScheme.primary,
+                  size: 20,
+                ),
                 tooltip: 'Refresh (F5)',
                 visualDensity: VisualDensity.compact,
                 constraints: const BoxConstraints(minWidth: 34, minHeight: 34),
@@ -184,16 +247,24 @@ class _PosDashboardPageState extends State<PosDashboardPage> {
                   FeedbackService.tap();
                   _loadDashboardMetrics();
                   context.read<TransactionHistoryCubit>().loadHistory();
-                  AppToast.showInfo(context, message: 'Dashboard metrics refreshed');
+                  AppToast.showInfo(
+                    context,
+                    message: 'Dashboard metrics refreshed',
+                  );
                 },
               ),
               IconButton(
-                icon: Icon(Icons.logout_rounded, color: colorScheme.onSurfaceVariant, size: 20),
+                icon: Icon(
+                  Icons.logout_rounded,
+                  color: colorScheme.onSurfaceVariant,
+                  size: 20,
+                ),
                 tooltip: 'Logout',
                 visualDensity: VisualDensity.compact,
                 constraints: const BoxConstraints(minWidth: 34, minHeight: 34),
                 padding: EdgeInsets.zero,
-                onPressed: () => Navigator.of(context).pushReplacementNamed('/'),
+                onPressed: () =>
+                    Navigator.of(context).pushReplacementNamed('/'),
               ),
             ],
           ),
@@ -207,21 +278,34 @@ class _PosDashboardPageState extends State<PosDashboardPage> {
                 color: colorScheme.primary.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Icon(Icons.storefront_outlined, color: colorScheme.primary, size: 28),
+              child: Icon(
+                Icons.storefront_outlined,
+                color: colorScheme.primary,
+                size: 28,
+              ),
             ),
             badge: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
                   decoration: BoxDecoration(
                     color: colorScheme.surfaceContainerHighest.withOpacity(0.6),
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: colorScheme.outlineVariant.withOpacity(0.5)),
+                    border: Border.all(
+                      color: colorScheme.outlineVariant.withOpacity(0.5),
+                    ),
                   ),
                   child: Row(
                     children: [
-                      Icon(Icons.access_time_rounded, size: 16, color: colorScheme.onSurfaceVariant),
+                      Icon(
+                        Icons.access_time_rounded,
+                        size: 16,
+                        color: colorScheme.onSurfaceVariant,
+                      ),
                       const SizedBox(width: 6),
                       Text(
                         _formattedTime,
@@ -244,14 +328,21 @@ class _PosDashboardPageState extends State<PosDashboardPage> {
                   FeedbackService.tap();
                   _loadDashboardMetrics();
                   context.read<TransactionHistoryCubit>().loadHistory();
-                  AppToast.showInfo(context, message: 'Dashboard metrics refreshed');
+                  AppToast.showInfo(
+                    context,
+                    message: 'Dashboard metrics refreshed',
+                  );
                 },
               ),
               const SizedBox(width: 8),
               IconButton(
-                icon: Icon(Icons.logout_rounded, color: colorScheme.onSurfaceVariant),
+                icon: Icon(
+                  Icons.logout_rounded,
+                  color: colorScheme.onSurfaceVariant,
+                ),
                 tooltip: 'Logout',
-                onPressed: () => Navigator.of(context).pushReplacementNamed('/'),
+                onPressed: () =>
+                    Navigator.of(context).pushReplacementNamed('/'),
               ),
             ],
           ),
@@ -274,7 +365,10 @@ class _PosDashboardPageState extends State<PosDashboardPage> {
             ),
           ),
           desktopBody: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 48.0, vertical: 32.0),
+            padding: const EdgeInsets.symmetric(
+              horizontal: 48.0,
+              vertical: 32.0,
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -296,7 +390,9 @@ class _PosDashboardPageState extends State<PosDashboardPage> {
   Widget _buildDesktopWelcomeSection() {
     final colorScheme = Theme.of(context).colorScheme;
     final authState = context.watch<AuthBloc>().state;
-    final userName = authState is AuthAuthenticated ? authState.user.name : 'Cashier';
+    final userName = authState is AuthAuthenticated
+        ? authState.user.name
+        : 'Cashier';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -362,7 +458,9 @@ class _PosDashboardPageState extends State<PosDashboardPage> {
   Widget _buildMobileWelcomeSection() {
     final colorScheme = Theme.of(context).colorScheme;
     final authState = context.watch<AuthBloc>().state;
-    final userName = authState is AuthAuthenticated ? authState.user.name : 'Cashier';
+    final userName = authState is AuthAuthenticated
+        ? authState.user.name
+        : 'Cashier';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -403,8 +501,13 @@ class _PosDashboardPageState extends State<PosDashboardPage> {
   Widget _buildSummaryCards() {
     return BlocBuilder<ShiftCubit, ShiftState>(
       builder: (context, shiftState) {
-        final shiftStart = shiftState is ShiftActive ? shiftState.shift.startTime : null;
-        final formattedSales = NumberFormat.currency(symbol: '₱ ', decimalDigits: 2).format(_totalSalesToday);
+        final shiftStart = shiftState is ShiftActive
+            ? shiftState.shift.startTime
+            : null;
+        final formattedSales = NumberFormat.currency(
+          symbol: '₱ ',
+          decimalDigits: 2,
+        ).format(_totalSalesToday);
 
         return Row(
           children: [
@@ -429,13 +532,20 @@ class _PosDashboardPageState extends State<PosDashboardPage> {
                 title: 'Active Orders',
                 value: '$_totalOrdersToday',
                 badgeText: '$_activeOrdersCount pending',
-                badgeBg: _activeOrdersCount > 0 ? const Color(0xFFFEF3C7) : const Color(0xFFE2E8F0),
-                badgeColor: _activeOrdersCount > 0 ? const Color(0xFFB45309) : const Color(0xFF475569),
+                badgeBg: _activeOrdersCount > 0
+                    ? const Color(0xFFFEF3C7)
+                    : const Color(0xFFE2E8F0),
+                badgeColor: _activeOrdersCount > 0
+                    ? const Color(0xFFB45309)
+                    : const Color(0xFF475569),
               ),
             ),
             const SizedBox(width: 24),
             Expanded(
-              child: _buildShiftDurationCard(shiftStart: shiftStart, isActive: shiftState is ShiftActive),
+              child: _buildShiftDurationCard(
+                shiftStart: shiftStart,
+                isActive: shiftState is ShiftActive,
+              ),
             ),
           ],
         );
@@ -481,7 +591,10 @@ class _PosDashboardPageState extends State<PosDashboardPage> {
                 child: Icon(icon, color: iconColor),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
                   color: badgeBg,
                   borderRadius: BorderRadius.circular(16),
@@ -520,9 +633,16 @@ class _PosDashboardPageState extends State<PosDashboardPage> {
     );
   }
 
-  Widget _buildShiftDurationCard({DateTime? shiftStart, required bool isActive}) {
-    final durationStr = isActive ? _formatShiftDuration(shiftStart) : 'Shift Inactive';
-    final elapsedSeconds = shiftStart != null ? _currentTime.difference(shiftStart).inSeconds : 0;
+  Widget _buildShiftDurationCard({
+    DateTime? shiftStart,
+    required bool isActive,
+  }) {
+    final durationStr = isActive
+        ? _formatShiftDuration(shiftStart)
+        : 'Shift Inactive';
+    final elapsedSeconds = shiftStart != null
+        ? _currentTime.difference(shiftStart).inSeconds
+        : 0;
     // 8 hour target progress bar
     final progress = (elapsedSeconds / (8 * 3600)).clamp(0.0, 1.0);
 
@@ -551,12 +671,20 @@ class _PosDashboardPageState extends State<PosDashboardPage> {
                   color: const Color(0xFFE0F2FE),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Icon(Icons.timer_outlined, color: Color(0xFF0369A1)),
+                child: const Icon(
+                  Icons.timer_outlined,
+                  color: Color(0xFF0369A1),
+                ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
-                  color: isActive ? const Color(0xFFDCFCE7) : const Color(0xFFF1F5F9),
+                  color: isActive
+                      ? const Color(0xFFDCFCE7)
+                      : const Color(0xFFF1F5F9),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Row(
@@ -575,7 +703,9 @@ class _PosDashboardPageState extends State<PosDashboardPage> {
                       style: GoogleFonts.inter(
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
-                        color: isActive ? const Color(0xFF15803D) : Colors.grey[600],
+                        color: isActive
+                            ? const Color(0xFF15803D)
+                            : Colors.grey[600],
                       ),
                     ),
                   ],
@@ -657,7 +787,10 @@ class _PosDashboardPageState extends State<PosDashboardPage> {
         Row(
           children: [
             Expanded(
-              child: _buildSalesEntryCard(context, height: (cardHeight * 2) + spacing),
+              child: _buildSalesEntryCard(
+                context,
+                height: (cardHeight * 2) + spacing,
+              ),
             ),
             const SizedBox(width: spacing),
             Expanded(
@@ -746,7 +879,17 @@ class _PosDashboardPageState extends State<PosDashboardPage> {
                     ),
                   ),
                   const SizedBox(width: spacing),
-                  const Expanded(child: SizedBox()),
+                  Expanded(
+                    child: _buildActionCard(
+                      context,
+                      title: 'Held Orders',
+                      icon: Icons.pause_circle_outline_rounded,
+                      iconBg: const Color(0xFFFEF3C7),
+                      iconColor: const Color(0xFFB45309),
+                      height: cardHeight,
+                      onTapOverride: () => _openHeldOrdersDialog(context),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -760,10 +903,7 @@ class _PosDashboardPageState extends State<PosDashboardPage> {
 
   Widget _buildSalesEntryCard(BuildContext context, {required double height}) {
     return InkWell(
-      onTap: () {
-        FeedbackService.tap();
-        Navigator.of(context).pushNamed('/pos/sales-entry');
-      },
+      onTap: () => _navigateProtected(context, '/pos/sales-entry'),
       borderRadius: BorderRadius.circular(20),
       child: Container(
         height: height,
@@ -791,7 +931,11 @@ class _PosDashboardPageState extends State<PosDashboardPage> {
                     color: Colors.white.withOpacity(0.15),
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(Icons.point_of_sale_rounded, color: Colors.white, size: 32),
+                  child: const Icon(
+                    Icons.point_of_sale_rounded,
+                    color: Colors.white,
+                    size: 32,
+                  ),
                 ),
                 const HotkeyBadge(label: 'F1', isLight: true, fontSize: 12),
               ],
@@ -828,69 +972,91 @@ class _PosDashboardPageState extends State<PosDashboardPage> {
     required double height,
     String? route,
     String? hotkey,
+    VoidCallback? onTapOverride,
   }) {
+    final hasAccess = _canAccessRoute(context, route);
+
     return InkWell(
       onTap: () {
-        FeedbackService.tap();
+        if (onTapOverride != null) {
+          onTapOverride();
+          return;
+        }
         if (route != null) {
-          Navigator.of(context).pushNamed(route);
+          _navigateProtected(context, route);
         }
       },
       borderRadius: BorderRadius.circular(20),
-      child: Container(
-        height: height,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.grey[200]!),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.01),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Stack(
-          children: [
-            if (hotkey != null)
-              Positioned(
-                top: 14,
-                right: 14,
-                child: HotkeyBadge(label: hotkey),
+      child: Opacity(
+        opacity: hasAccess ? 1.0 : 0.65,
+        child: Container(
+          height: height,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: Colors.grey[200]!),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.01),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
               ),
-            Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: iconBg,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(icon, color: iconColor, size: 28),
+            ],
+          ),
+          child: Stack(
+            children: [
+              if (hotkey != null)
+                Positioned(
+                  top: 14,
+                  right: 14,
+                  child: HotkeyBadge(label: hotkey),
+                ),
+              if (!hasAccess)
+                Positioned(
+                  top: 14,
+                  left: 14,
+                  child: Icon(
+                    Icons.lock_outline_rounded,
+                    size: 16,
+                    color: Colors.grey[500],
                   ),
-                  const SizedBox(height: 16),
-                  Text(
-                    title,
-                    style: GoogleFonts.inter(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: const Color(0xFF1E293B),
+                ),
+              Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: iconBg,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(icon, color: iconColor, size: 28),
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 16),
+                    Text(
+                      title,
+                      style: GoogleFonts.inter(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: const Color(0xFF1E293B),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
 
   Widget _buildMobileSalesCard() {
-    final formattedSales = NumberFormat.currency(symbol: '₱ ', decimalDigits: 2).format(_totalSalesToday);
+    final formattedSales = NumberFormat.currency(
+      symbol: '₱ ',
+      decimalDigits: 2,
+    ).format(_totalSalesToday);
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -917,7 +1083,11 @@ class _PosDashboardPageState extends State<PosDashboardPage> {
                   color: Colors.white.withOpacity(0.2),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.trending_up, color: Colors.white, size: 16),
+                child: const Icon(
+                  Icons.trending_up,
+                  color: Colors.white,
+                  size: 16,
+                ),
               ),
             ],
           ),
@@ -933,7 +1103,11 @@ class _PosDashboardPageState extends State<PosDashboardPage> {
           const SizedBox(height: 16),
           Row(
             children: [
-              const Icon(Icons.check_circle_outline_rounded, color: Colors.white, size: 14),
+              const Icon(
+                Icons.check_circle_outline_rounded,
+                color: Colors.white,
+                size: 14,
+              ),
               const SizedBox(width: 4),
               Text(
                 '$_completedCountToday completed orders today',
@@ -952,8 +1126,12 @@ class _PosDashboardPageState extends State<PosDashboardPage> {
   Widget _buildMobileStatsRow() {
     return BlocBuilder<ShiftCubit, ShiftState>(
       builder: (context, shiftState) {
-        final shiftStart = shiftState is ShiftActive ? shiftState.shift.startTime : null;
-        final durationStr = shiftState is ShiftActive ? _formatShiftDuration(shiftStart) : 'Closed';
+        final shiftStart = shiftState is ShiftActive
+            ? shiftState.shift.startTime
+            : null;
+        final durationStr = shiftState is ShiftActive
+            ? _formatShiftDuration(shiftStart)
+            : 'Closed';
 
         return Row(
           children: [
@@ -976,7 +1154,11 @@ class _PosDashboardPageState extends State<PosDashboardPage> {
                             color: Color(0xFFBAE6FD),
                             shape: BoxShape.circle,
                           ),
-                          child: const Icon(Icons.shopping_bag_outlined, color: Color(0xFF0369A1), size: 18),
+                          child: const Icon(
+                            Icons.shopping_bag_outlined,
+                            color: Color(0xFF0369A1),
+                            size: 18,
+                          ),
                         ),
                         const SizedBox(width: 12),
                         Expanded(
@@ -997,7 +1179,9 @@ class _PosDashboardPageState extends State<PosDashboardPage> {
                       style: GoogleFonts.inter(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
-                        color: _activeOrdersCount > 0 ? const Color(0xFFB45309) : const Color(0xFF1E293B),
+                        color: _activeOrdersCount > 0
+                            ? const Color(0xFFB45309)
+                            : const Color(0xFF1E293B),
                       ),
                     ),
                   ],
@@ -1024,7 +1208,11 @@ class _PosDashboardPageState extends State<PosDashboardPage> {
                             color: Color(0xFF355C8F),
                             shape: BoxShape.circle,
                           ),
-                          child: const Icon(Icons.access_time, color: Colors.white, size: 18),
+                          child: const Icon(
+                            Icons.access_time,
+                            color: Colors.white,
+                            size: 18,
+                          ),
                         ),
                         const SizedBox(width: 12),
                         Expanded(
@@ -1070,6 +1258,8 @@ class _PosDashboardPageState extends State<PosDashboardPage> {
   }
 
   Widget _buildMobileOperationsGrid(BuildContext context) {
+    final canAdmin = _canAccessRoute(context, '/admin');
+
     return Column(
       children: [
         Row(
@@ -1088,11 +1278,11 @@ class _PosDashboardPageState extends State<PosDashboardPage> {
             Expanded(
               child: _buildMobileActionCard(
                 context,
-                'Sales Order',
-                Icons.list_alt_outlined,
-                const Color(0xFFA5DDF1),
-                const Color(0xFF0369A1),
-                route: '/orders',
+                'Held Orders',
+                Icons.pause_circle_outline_rounded,
+                const Color(0xFFFEF3C7),
+                const Color(0xFFB45309),
+                onTapOverride: () => _openHeldOrdersDialog(context),
               ),
             ),
           ],
@@ -1152,39 +1342,47 @@ class _PosDashboardPageState extends State<PosDashboardPage> {
         const SizedBox(height: 16),
         // Admin Panel Row
         InkWell(
-          onTap: () {
-            Navigator.of(context).pushNamed('/admin');
-          },
+          onTap: () => _navigateProtected(context, '/admin'),
           borderRadius: BorderRadius.circular(16),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.grey[200]!),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: const BoxDecoration(
-                    color: Color(0xFFFECACA),
-                    shape: BoxShape.circle,
+          child: Opacity(
+            opacity: canAdmin ? 1.0 : 0.65,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.grey[200]!),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFFECACA),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.admin_panel_settings_outlined,
+                      color: Color(0xFFB91C1C),
+                      size: 20,
+                    ),
                   ),
-                  child: const Icon(Icons.admin_panel_settings_outlined, color: Color(0xFFB91C1C), size: 20),
-                ),
-                const SizedBox(width: 16),
-                Text(
-                  'Admin Panel',
-                  style: GoogleFonts.inter(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w500,
-                    color: const Color(0xFF1E293B),
+                  const SizedBox(width: 16),
+                  Text(
+                    'Admin Panel',
+                    style: GoogleFonts.inter(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w500,
+                      color: const Color(0xFF1E293B),
+                    ),
                   ),
-                ),
-                const Spacer(),
-                const Icon(Icons.chevron_right, color: Colors.grey),
-              ],
+                  const Spacer(),
+                  Icon(
+                    canAdmin ? Icons.chevron_right : Icons.lock_outline_rounded,
+                    color: Colors.grey,
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -1199,42 +1397,68 @@ class _PosDashboardPageState extends State<PosDashboardPage> {
     Color iconBg,
     Color iconColor, {
     String? route,
+    VoidCallback? onTapOverride,
   }) {
+    final hasAccess = _canAccessRoute(context, route);
+
     return InkWell(
       onTap: () {
+        if (onTapOverride != null) {
+          onTapOverride();
+          return;
+        }
         if (route != null) {
-          Navigator.of(context).pushNamed(route);
+          _navigateProtected(context, route);
         }
       },
       borderRadius: BorderRadius.circular(16),
-      child: Container(
-        height: 120,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.grey[200]!),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: iconBg,
-                shape: BoxShape.circle,
+      child: Opacity(
+        opacity: hasAccess ? 1.0 : 0.65,
+        child: Container(
+          height: 120,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.grey[200]!),
+          ),
+          child: Stack(
+            children: [
+              if (!hasAccess)
+                Positioned(
+                  top: 10,
+                  right: 10,
+                  child: Icon(
+                    Icons.lock_outline_rounded,
+                    size: 15,
+                    color: Colors.grey[500],
+                  ),
+                ),
+              Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: iconBg,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(icon, color: iconColor, size: 24),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      title,
+                      style: GoogleFonts.inter(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                        color: const Color(0xFF1E293B),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              child: Icon(icon, color: iconColor, size: 24),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              title,
-              style: GoogleFonts.inter(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-                color: const Color(0xFF1E293B),
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

@@ -7,6 +7,7 @@ import 'package:suki_pos/domain/entities/orders/transaction_detail.dart';
 import 'package:suki_pos/presentation/auth/bloc/auth_bloc.dart';
 import 'package:suki_pos/presentation/pos/bloc/transaction_history_cubit.dart';
 import 'package:suki_pos/presentation/pos/bloc/transaction_history_state.dart';
+import 'package:suki_pos/presentation/pos/widgets/manager_auth_dialog.dart';
 import 'package:suki_pos/presentation/pos/widgets/receipt_preview_dialog.dart';
 import 'package:suki_pos/presentation/pos/widgets/void_order_dialog.dart';
 import 'package:suki_pos/presentation/widgets/app_toast.dart';
@@ -35,6 +36,38 @@ class _TransactionHistoryPageState extends State<TransactionHistoryPage> {
       return authState.user.id;
     }
     return 1;
+  }
+
+  Future<void> _handleVoidTransaction(
+    BuildContext context,
+    TransactionDetail txn,
+  ) async {
+    final authorized = await ManagerAuthDialog.verify(
+      context,
+      actionTitle: 'Supervisor Void Approval',
+      reasonMessage:
+          'Enter a 6-digit Manager / Admin PIN to void ${txn.transactionNo}.',
+    );
+    if (!authorized || !mounted) return;
+
+    showDialog(
+      context: context,
+      builder: (_) => VoidOrderDialog(
+        transactionNo: txn.transactionNo,
+        onConfirmVoid: (reason) {
+          final cashierId = _getActiveCashierId(context);
+          context.read<TransactionHistoryCubit>().voidTransaction(
+            transactionId: txn.transactionId,
+            cashierId: cashierId,
+            reason: reason,
+          );
+          AppToast.showSuccess(
+            context,
+            message: 'Transaction #${txn.transactionNo} voided',
+          );
+        },
+      ),
+    );
   }
 
   @override
@@ -75,7 +108,10 @@ class _TransactionHistoryPageState extends State<TransactionHistoryPage> {
           },
           onRefresh: () async {
             context.read<TransactionHistoryCubit>().loadHistory();
-            AppToast.showInfo(context, message: 'Transaction history refreshed');
+            AppToast.showInfo(
+              context,
+              message: 'Transaction history refreshed',
+            );
           },
           columns: [
             ResponsiveTableColumn<TransactionDetail>(
@@ -92,7 +128,11 @@ class _TransactionHistoryPageState extends State<TransactionHistoryPage> {
                           color: colorScheme.primary.withOpacity(0.1),
                           borderRadius: BorderRadius.circular(6),
                         ),
-                        child: Icon(Icons.receipt_long_rounded, size: 16, color: colorScheme.primary),
+                        child: Icon(
+                          Icons.receipt_long_rounded,
+                          size: 16,
+                          color: colorScheme.primary,
+                        ),
                       ),
                       const SizedBox(width: 8),
                       Text(
@@ -105,11 +145,15 @@ class _TransactionHistoryPageState extends State<TransactionHistoryPage> {
                       ),
                     ],
                   ),
-                  if (txn.beneficiaryName != null && txn.beneficiaryName!.isNotEmpty)
+                  if (txn.beneficiaryName != null &&
+                      txn.beneficiaryName!.isNotEmpty)
                     Padding(
                       padding: const EdgeInsets.only(top: 4, left: 30),
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
                         decoration: BoxDecoration(
                           color: const Color(0xFFECFDF5),
                           borderRadius: BorderRadius.circular(4),
@@ -117,7 +161,11 @@ class _TransactionHistoryPageState extends State<TransactionHistoryPage> {
                         ),
                         child: Text(
                           'SC/PWD: ${txn.beneficiaryName}',
-                          style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.bold, color: const Color(0xFF065F46)),
+                          style: GoogleFonts.inter(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: const Color(0xFF065F46),
+                          ),
                         ),
                       ),
                     ),
@@ -129,7 +177,10 @@ class _TransactionHistoryPageState extends State<TransactionHistoryPage> {
               flex: 2,
               cellBuilder: (txn) => Text(
                 _dateFormat.format(txn.transactionDate),
-                style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF475569)),
+                style: GoogleFonts.inter(
+                  fontSize: 13,
+                  color: const Color(0xFF475569),
+                ),
               ),
             ),
             ResponsiveTableColumn<TransactionDetail>(
@@ -143,7 +194,11 @@ class _TransactionHistoryPageState extends State<TransactionHistoryPage> {
                 ),
                 child: Text(
                   txn.orderTypeName,
-                  style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: const Color(0xFF475569)),
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: const Color(0xFF475569),
+                  ),
                 ),
               ),
             ),
@@ -152,7 +207,11 @@ class _TransactionHistoryPageState extends State<TransactionHistoryPage> {
               flex: 1,
               cellBuilder: (txn) => Text(
                 txn.cashierName,
-                style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w500, color: const Color(0xFF1E293B)),
+                style: GoogleFonts.inter(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  color: const Color(0xFF1E293B),
+                ),
               ),
             ),
             ResponsiveTableColumn<TransactionDetail>(
@@ -161,7 +220,11 @@ class _TransactionHistoryPageState extends State<TransactionHistoryPage> {
               numeric: true,
               cellBuilder: (txn) => Text(
                 '₱${txn.grossAmount.toStringAsFixed(2)}',
-                style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700, color: const Color(0xFF1E293B)),
+                style: GoogleFonts.inter(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: const Color(0xFF1E293B),
+                ),
               ),
             ),
             ResponsiveTableColumn<TransactionDetail>(
@@ -173,10 +236,21 @@ class _TransactionHistoryPageState extends State<TransactionHistoryPage> {
                 children: [
                   OutlinedButton.icon(
                     icon: const Icon(Icons.receipt_rounded, size: 16),
-                    label: Text('Receipt', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600)),
+                    label: Text(
+                      'Receipt',
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                     style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
                     ),
                     onPressed: () {
                       showDialog(
@@ -187,25 +261,13 @@ class _TransactionHistoryPageState extends State<TransactionHistoryPage> {
                   ),
                   const SizedBox(width: 8),
                   IconButton(
-                    icon: const Icon(Icons.cancel_outlined, color: Colors.redAccent, size: 20),
+                    icon: const Icon(
+                      Icons.cancel_outlined,
+                      color: Colors.redAccent,
+                      size: 20,
+                    ),
                     tooltip: 'Void Transaction',
-                    onPressed: () {
-                      showDialog(
-                        context: context,
-                        builder: (_) => VoidOrderDialog(
-                          transactionNo: txn.transactionNo,
-                          onConfirmVoid: (reason) {
-                            final cashierId = _getActiveCashierId(context);
-                            context.read<TransactionHistoryCubit>().voidTransaction(
-                              transactionId: txn.transactionId,
-                              cashierId: cashierId,
-                              reason: reason,
-                            );
-                            AppToast.showSuccess(context, message: 'Transaction #${txn.transactionNo} voided');
-                          },
-                        ),
-                      );
-                    },
+                    onPressed: () => _handleVoidTransaction(context, txn),
                   ),
                 ],
               ),
@@ -226,24 +288,39 @@ class _TransactionHistoryPageState extends State<TransactionHistoryPage> {
                   children: [
                     Row(
                       children: [
-                        Icon(Icons.receipt_long_rounded, color: colorScheme.primary, size: 20),
+                        Icon(
+                          Icons.receipt_long_rounded,
+                          color: colorScheme.primary,
+                          size: 20,
+                        ),
                         const SizedBox(width: 8),
                         Text(
                           txn.transactionNo,
-                          style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.bold, color: const Color(0xFF1E293B)),
+                          style: GoogleFonts.inter(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            color: const Color(0xFF1E293B),
+                          ),
                         ),
                       ],
                     ),
                     Text(
                       '₱${txn.grossAmount.toStringAsFixed(2)}',
-                      style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w800, color: colorScheme.primary),
+                      style: GoogleFonts.inter(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: colorScheme.primary,
+                      ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 8),
                 Text(
                   '${_dateFormat.format(txn.transactionDate)} • ${txn.orderTypeName} • Cashier: ${txn.cashierName}',
-                  style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    color: const Color(0xFF64748B),
+                  ),
                 ),
                 const SizedBox(height: 12),
                 Row(
@@ -251,35 +328,30 @@ class _TransactionHistoryPageState extends State<TransactionHistoryPage> {
                   children: [
                     OutlinedButton.icon(
                       icon: const Icon(Icons.receipt_rounded, size: 16),
-                      label: Text('View Receipt', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600)),
+                      label: Text(
+                        'View Receipt',
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                       onPressed: () {
                         showDialog(
                           context: context,
-                          builder: (_) => ReceiptPreviewDialog(transaction: txn),
+                          builder: (_) =>
+                              ReceiptPreviewDialog(transaction: txn),
                         );
                       },
                     ),
                     const SizedBox(width: 8),
                     IconButton(
-                      icon: const Icon(Icons.cancel_outlined, color: Colors.redAccent, size: 20),
+                      icon: const Icon(
+                        Icons.cancel_outlined,
+                        color: Colors.redAccent,
+                        size: 20,
+                      ),
                       tooltip: 'Void',
-                      onPressed: () {
-                        showDialog(
-                          context: context,
-                          builder: (_) => VoidOrderDialog(
-                            transactionNo: txn.transactionNo,
-                            onConfirmVoid: (reason) {
-                              final cashierId = _getActiveCashierId(context);
-                              context.read<TransactionHistoryCubit>().voidTransaction(
-                                transactionId: txn.transactionId,
-                                cashierId: cashierId,
-                                reason: reason,
-                              );
-                              AppToast.showSuccess(context, message: 'Transaction #${txn.transactionNo} voided');
-                            },
-                          ),
-                        );
-                      },
+                      onPressed: () => _handleVoidTransaction(context, txn),
                     ),
                   ],
                 ),
