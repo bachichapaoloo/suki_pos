@@ -10,30 +10,34 @@ dependencies:
   flutter:
     sdk: flutter
   blue_thermal_printer: ^1.1.3   # Bluetooth printer
-  dartz: ^0.10.1             # Either / Option for error handling
+  crypto: ^3.0.7                 # SHA-256 PIN hashing
+  dartz: ^0.10.1                 # Either / Option for error handling
   device_preview: ^1.3.1
-  equatable: ^2.0.5          # value equality on entities
+  equatable: ^2.0.5              # value equality on entities
   firebase_core: ^4.2.1
   firebase_crashlytics: ^5.1.0   # required for Play Store quality
   flex_color_scheme: ^8.3.1
   flutter_animate: ^4.5.2
-  flutter_bloc: ^9.1.1       # state management
+  flutter_bloc: ^9.1.1           # state management
   flutter_secure_storage: ^10.0.0  # PIN / password storage
-  get_it: ^9.2.1             # dependency injection
-  go_router: ^17.2.0         # Play Store-grade navigation
+  get_it: ^9.2.1                 # dependency injection
+  go_router: ^17.2.0             # Play Store-grade navigation
   google_fonts: ^8.0.2
-  intl: ^0.20.2              # currency / date formatting
-  path: ^1.9.0               # DB path helper
-  printing: ^5.13.2          # ESC/POS receipt printing
-  sqflite: ^2.3.3            # SQLite (your normalized schema)
-  supabase_flutter: ^2.5.6   # cloud sync backend
-  web_socket_channel: ^3.0.1 # KDS real-time channel
+  intl: ^0.20.2                  # currency / date formatting
+  path: ^1.9.0                   # DB path helper
+  pdf: ^3.13.0                   # Thermal PDF receipt & report builder
+  printing: ^5.13.2              # ESC/POS & PDF receipt printing
+  shared_preferences: ^2.5.5     # Store profile settings cache
+  sqflite: ^2.3.3                # SQLite (your normalized schema)
+  supabase_flutter: ^2.5.6       # cloud sync backend
+  web_socket_channel: ^3.0.1     # KDS real-time channel
   sqflite_common_ffi: ^2.3.7+1
   path_provider: ^2.1.5
   image_picker: ^1.1.2
   file_picker: ^8.0.0
   uuid: ^4.6.0
   toastification: ^3.2.0
+  pos_universal_printer: ^0.2.11
 
 dev_dependencies:
   flutter_test:
@@ -47,4 +51,3 @@ flutter:
   assets:
     - assets/images/
     - assets/migrations/
-
