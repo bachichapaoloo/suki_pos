@@ -1,5 +1,6 @@
 import 'package:get_it/get_it.dart';
 import 'package:suki_pos/core/database/database_helper.dart';
+import 'package:suki_pos/core/database/debug_seeder_service.dart';
 import 'package:suki_pos/data/dao/bank_dao.dart';
 import 'package:suki_pos/data/dao/charge_payment_dao.dart';
 import 'package:suki_pos/data/dao/department_dao.dart';
@@ -71,6 +72,7 @@ import 'package:suki_pos/presentation/maintenance/service_charge/bloc/service_ch
 import 'package:suki_pos/presentation/pos/bloc/cart_cubit.dart';
 import 'package:suki_pos/presentation/pos/bloc/shift_cubit.dart';
 import 'package:suki_pos/presentation/pos/bloc/transaction_history_cubit.dart';
+import 'package:suki_pos/services/store_settings_service.dart';
 
 final GetIt sl = GetIt.instance;
 
@@ -242,12 +244,15 @@ Future<void> init() async {
     ..registerLazySingleton<ServiceChargeRepository>(
       () => ServiceChargeRepositoryImpl(serviceChargeDao: sl()),
     )
-    ..registerLazySingleton<PaymentMaintenanceRepositories>(
+    ..registerLazySingleton<PaymentMaintenanceRepositoryImpl>(
       () => PaymentMaintenanceRepositoryImpl(
         paymentMethodDao: sl(),
         bankDao: sl(),
         chargePaymentDao: sl(),
       ),
+    )
+    ..registerLazySingleton<PaymentMaintenanceRepositories>(
+      () => sl<PaymentMaintenanceRepositoryImpl>(),
     )
     //! DAOs
     ..registerLazySingleton(() => DepartmentDao(sl()))
@@ -266,8 +271,13 @@ Future<void> init() async {
 
   //! Core
   final dbHelper = DatabaseHelper();
+  final debugSeeder = DebugSeederService(dbHelper);
   sl.registerLazySingleton(() => dbHelper);
+  sl.registerLazySingleton(() => debugSeeder);
+  sl.registerLazySingleton(() => StoreSettingsService.instance);
 
-  // Trigger eager database initialization
+  // Trigger eager database initialization, auto-seed if catalog is empty, and load store settings
   await dbHelper.database;
+  await debugSeeder.seedIfCatalogEmpty();
+  await StoreSettingsService.instance.loadFromDatabase();
 }

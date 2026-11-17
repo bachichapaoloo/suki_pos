@@ -35,7 +35,8 @@ class AdminPage extends StatelessWidget {
   static const List<_AdminModule> _modules = [
     _AdminModule(
       title: 'User Maintenance',
-      subtitle: 'Manage cashier and admin accounts, credentials and active status',
+      subtitle:
+          'Manage cashier and admin accounts, credentials and active status',
       icon: Icons.people_alt_rounded,
       iconBg: Color(0xFFE0F2FE),
       iconColor: Color(0xFF0284C7),
@@ -57,13 +58,19 @@ class AdminPage extends StatelessWidget {
       iconColor: Color(0xFF475569),
       route: '/pos/transaction-history',
     ),
+    _AdminModule(
+      title: 'Store & Backup Settings',
+      subtitle:
+          'Configure store identity, TIN, receipt header/footer, and database backups',
+      icon: Icons.settings_backup_restore_rounded,
+      iconBg: Color(0xFFDCFCE7),
+      iconColor: Color(0xFF15803D),
+      route: '/admin/settings',
+    ),
   ];
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
     return CallbackShortcuts(
       bindings: {
         const SingleActivator(LogicalKeyboardKey.escape): () {
@@ -105,17 +112,21 @@ class AdminPage extends StatelessWidget {
           ),
           desktopHeader: const AppUnifiedHeader(
             title: 'Admin Hub',
-            subtitle: 'User Accounts, Role Permissions, and Security Management',
+            subtitle:
+                'User Accounts, Role Permissions, Store Profile, and Backups',
             parentHubTitle: 'Maintenance Hub',
             parentHubRoute: '/maintenance',
           ),
           desktopBody: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 40.0, vertical: 32.0),
+            padding: const EdgeInsets.symmetric(
+              horizontal: 40.0,
+              vertical: 32.0,
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Security & User Management',
+                  'Security, Store Identity & System Administration',
                   style: GoogleFonts.inter(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
@@ -124,8 +135,11 @@ class AdminPage extends StatelessWidget {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  'Manage system users, define permission roles, and review audit records.',
-                  style: GoogleFonts.inter(fontSize: 14, color: const Color(0xFF64748B)),
+                  'Manage system users, define permission roles, customize receipts, and export database backups.',
+                  style: GoogleFonts.inter(
+                    fontSize: 14,
+                    color: const Color(0xFF64748B),
+                  ),
                 ),
                 const SizedBox(height: 24),
                 LayoutBuilder(
@@ -141,7 +155,8 @@ class AdminPage extends StatelessWidget {
                         childAspectRatio: 1.4,
                       ),
                       itemCount: _modules.length,
-                      itemBuilder: (context, index) => _buildDesktopCard(context, _modules[index]),
+                      itemBuilder: (context, index) =>
+                          _buildDesktopCard(context, _modules[index]),
                     );
                   },
                 ),
@@ -188,7 +203,11 @@ class AdminPage extends StatelessWidget {
                     ),
                     child: Icon(module.icon, color: module.iconColor, size: 24),
                   ),
-                  const Icon(Icons.arrow_forward_rounded, color: Color(0xFF94A3B8), size: 18),
+                  const Icon(
+                    Icons.arrow_forward_rounded,
+                    color: Color(0xFF94A3B8),
+                    size: 18,
+                  ),
                 ],
               ),
               Column(
@@ -258,7 +277,10 @@ class AdminPage extends StatelessWidget {
                   const SizedBox(height: 2),
                   Text(
                     module.subtitle,
-                    style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
+                      color: const Color(0xFF64748B),
+                    ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),

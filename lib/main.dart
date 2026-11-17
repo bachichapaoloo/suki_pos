@@ -10,6 +10,7 @@ import 'package:suki_pos/injection_container.dart' as di;
 import 'package:suki_pos/presentation/admin/admin_page.dart';
 import 'package:suki_pos/presentation/admin/role/bloc/role_bloc.dart';
 import 'package:suki_pos/presentation/admin/role/pages/role_list_page.dart';
+import 'package:suki_pos/presentation/admin/settings/pages/store_settings_page.dart';
 import 'package:suki_pos/presentation/admin/user/bloc/user_bloc.dart';
 import 'package:suki_pos/presentation/admin/user/pages/user_list_page.dart';
 import 'package:suki_pos/presentation/auth/bloc/auth_bloc.dart';
@@ -111,6 +112,7 @@ class MainApp extends StatelessWidget {
             '/admin': (context) => const AdminPage(),
             '/admin/users': (context) => const UserListPage(),
             '/admin/roles': (context) => const RoleListPage(),
+            '/admin/settings': (context) => const StoreSettingsPage(),
           },
         ),
       ),
