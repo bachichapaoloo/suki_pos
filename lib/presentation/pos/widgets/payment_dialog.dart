@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:suki_pos/core/database/database_helper.dart';
+import 'package:suki_pos/core/database/schema_constants.dart';
 import 'package:suki_pos/core/services/feedback_service.dart';
 import 'package:suki_pos/data/dao/bank_dao.dart';
 import 'package:suki_pos/data/dao/charge_payment_dao.dart';
@@ -8,10 +10,11 @@ import 'package:suki_pos/data/dao/payment_method_dao.dart';
 import 'package:suki_pos/domain/entities/maintenance/bank.dart';
 import 'package:suki_pos/domain/entities/maintenance/charge.dart';
 import 'package:suki_pos/domain/entities/maintenance/payment_method.dart';
+import 'package:suki_pos/domain/entities/pos/tender_payment_leg.dart';
 import 'package:suki_pos/injection_container.dart';
 import 'package:suki_pos/presentation/widgets/custom_form_dialog.dart';
 
-enum PaymentSegment { cash, card, ewallet, charge, voucher }
+enum PaymentSegment { cash, card, ewallet, bankCheck, voucher, charge }
 
 class PaymentDialog extends StatefulWidget {
   final double totalDue;
@@ -23,6 +26,7 @@ class PaymentDialog extends StatefulWidget {
     int? bankId,
     String? referenceNumber,
     int? chargeAccountId,
+    List<TenderPaymentLeg>? payments,
   })
   onComplete;
 
@@ -40,15 +44,31 @@ class _PaymentDialogState extends State<PaymentDialog> {
   List<PaymentMethod> _methods = [];
   List<Bank> _banks = [];
   List<Charge> _charges = [];
+  List<Map<String, dynamic>> _giftChecks = [];
+
+  final List<TenderPaymentLeg> _splitLegs = [];
 
   PaymentSegment _currentSegment = PaymentSegment.cash;
   int? _selectedBankId;
   int? _selectedChargeId;
-  final _refNoController = TextEditingController();
+  int? _selectedGiftCheckId;
+  int _selectedCardType = 2; // 1 = Debit, 2 = Credit
 
   int? _selectedMethodId;
+  String _selectedMethodCode = 'cash';
   String _selectedMethodName = 'Cash';
+
+  // Form controllers
   final _tenderController = TextEditingController();
+  final _applyAmountController = TextEditingController();
+  final _refNoController = TextEditingController();
+  final _cardNoController = TextEditingController();
+  final _cardExpiryController = TextEditingController();
+  final _approvalNoController = TextEditingController();
+  final _customerNameController = TextEditingController();
+  final _gcQtyController = TextEditingController(text: '1');
+  final _gcSerialsController = TextEditingController();
+
   final _focusNode = FocusNode();
   bool _loading = true;
 
@@ -56,17 +76,31 @@ class _PaymentDialogState extends State<PaymentDialog> {
   static const Color textDark = Color(0xFF1E293B);
   static const Color surfaceBorder = Color(0xFFE2E8F0);
 
+  double get _paidSoFar =>
+      _splitLegs.fold<double>(0.0, (sum, leg) => sum + leg.amount);
+
+  double get _remainingBalance =>
+      (widget.totalDue - _paidSoFar).clamp(0.0, double.infinity);
+
   @override
   void initState() {
     super.initState();
     _tenderController.text = widget.totalDue.toStringAsFixed(2);
+    _applyAmountController.text = widget.totalDue.toStringAsFixed(2);
     _loadData();
   }
 
   @override
   void dispose() {
     _tenderController.dispose();
+    _applyAmountController.dispose();
     _refNoController.dispose();
+    _cardNoController.dispose();
+    _cardExpiryController.dispose();
+    _approvalNoController.dispose();
+    _customerNameController.dispose();
+    _gcQtyController.dispose();
+    _gcSerialsController.dispose();
     _focusNode.dispose();
     super.dispose();
   }
@@ -75,14 +109,20 @@ class _PaymentDialogState extends State<PaymentDialog> {
     final methods = await sl<PaymentMethodDao>().getActivePaymentMethods();
     final banks = await sl<BankDao>().getActiveBanks();
     final charges = await sl<ChargePaymentDao>().getActiveChargePayments();
+    final db = await sl<DatabaseHelper>().database;
+    final giftChecks = await db.query(
+      SchemaConstants.giftCheck,
+      where: 'is_active = 1',
+      orderBy: 'id ASC',
+    );
 
     if (!mounted) return;
     setState(() {
       _methods = methods;
       _banks = banks;
       _charges = charges;
+      _giftChecks = giftChecks;
 
-      // Select initial cash method
       _selectSegment(PaymentSegment.cash);
       _loading = false;
     });
@@ -90,30 +130,41 @@ class _PaymentDialogState extends State<PaymentDialog> {
 
   void _selectSegment(PaymentSegment segment) {
     _currentSegment = segment;
+    final rem = _remainingBalance;
+    _applyAmountController.text = rem.toStringAsFixed(2);
+    _tenderController.text = rem.toStringAsFixed(2);
 
     PaymentMethod? matchedMethod;
     switch (segment) {
       case PaymentSegment.cash:
-        matchedMethod = _methods.where((m) => m.code.toLowerCase() == 'cash').firstOrNull ?? _methods.firstOrNull;
-        _tenderController.text = widget.totalDue.toStringAsFixed(2);
+        matchedMethod = _methods
+                .where((m) => m.code.toLowerCase() == 'cash')
+                .firstOrNull ??
+            _methods.firstOrNull;
         break;
       case PaymentSegment.card:
-        matchedMethod =
-            _methods.where((m) => m.code.toLowerCase() == 'card').firstOrNull ??
+        matchedMethod = _methods
+                .where((m) => m.code.toLowerCase() == 'card')
+                .firstOrNull ??
             _methods.where((m) => m.code.toLowerCase() == 'atm').firstOrNull;
-        _tenderController.text = widget.totalDue.toStringAsFixed(2);
-        // Default card terminal
-        final cardBanks = _banks.where((b) => b.cardType == 1 || b.cardType == 2).toList();
+        final cardBanks =
+            _banks.where((b) => b.cardType == 1 || b.cardType == 2).toList();
         if (cardBanks.isNotEmpty) {
           _selectedBankId = cardBanks.first.id;
+          _selectedCardType = cardBanks.first.cardType ?? 2;
+        } else if (_banks.isNotEmpty) {
+          _selectedBankId = _banks.first.id;
         }
         break;
       case PaymentSegment.ewallet:
-        matchedMethod =
-            _methods.where((m) => m.code.toLowerCase() == 'atm' || m.code.toLowerCase() == 'online').firstOrNull ??
+        matchedMethod = _methods
+                .where(
+                  (m) =>
+                      m.code.toLowerCase() == 'atm' ||
+                      m.code.toLowerCase() == 'online',
+                )
+                .firstOrNull ??
             _methods.where((m) => m.code.toLowerCase() == 'card').firstOrNull;
-        _tenderController.text = widget.totalDue.toStringAsFixed(2);
-        // Default e-wallet
         final walletBanks = _banks.where((b) => b.cardType == 3).toList();
         if (walletBanks.isNotEmpty) {
           _selectedBankId = walletBanks.first.id;
@@ -121,25 +172,90 @@ class _PaymentDialogState extends State<PaymentDialog> {
           _selectedBankId = _banks.first.id;
         }
         break;
-      case PaymentSegment.charge:
-        matchedMethod = _methods.where((m) => m.code.toLowerCase() == 'charge').firstOrNull;
-        _tenderController.text = widget.totalDue.toStringAsFixed(2);
-        if (_charges.isNotEmpty) {
-          _selectedChargeId = _charges.first.id;
+      case PaymentSegment.bankCheck:
+        matchedMethod = _methods
+            .where((m) => m.code.toLowerCase() == 'bank_check')
+            .firstOrNull;
+        if (_banks.isNotEmpty && _selectedBankId == null) {
+          _selectedBankId = _banks.first.id;
         }
         break;
       case PaymentSegment.voucher:
         matchedMethod = _methods
-            .where((m) => m.code.toLowerCase() == 'gift_check' || m.code.toLowerCase() == 'coupon')
+            .where(
+              (m) =>
+                  m.code.toLowerCase() == 'gift_check' ||
+                  m.code.toLowerCase() == 'coupon',
+            )
             .firstOrNull;
-        _tenderController.text = widget.totalDue.toStringAsFixed(2);
+        if (_giftChecks.isNotEmpty) {
+          _selectedGiftCheckId ??= _giftChecks.first['id'] as int;
+          _recalcGiftCheckAmount();
+        }
+        break;
+      case PaymentSegment.charge:
+        matchedMethod =
+            _methods.where((m) => m.code.toLowerCase() == 'charge').firstOrNull;
+        if (_charges.isNotEmpty) {
+          _selectedChargeId = _charges.first.id;
+        }
         break;
     }
 
     if (matchedMethod != null) {
       _selectedMethodId = matchedMethod.id;
+      _selectedMethodCode = matchedMethod.code.toLowerCase();
       _selectedMethodName = matchedMethod.name;
+    } else {
+      // Fallback standard IDs seeded in SchemaConstants
+      switch (segment) {
+        case PaymentSegment.cash:
+          _selectedMethodId = 1;
+          _selectedMethodCode = 'cash';
+          _selectedMethodName = 'Cash';
+          break;
+        case PaymentSegment.card:
+          _selectedMethodId = 2;
+          _selectedMethodCode = 'card';
+          _selectedMethodName = 'Credit/Debit Card';
+          break;
+        case PaymentSegment.ewallet:
+          _selectedMethodId = 3;
+          _selectedMethodCode = 'atm';
+          _selectedMethodName = 'ATM / Online Banking';
+          break;
+        case PaymentSegment.bankCheck:
+          _selectedMethodId = 4;
+          _selectedMethodCode = 'bank_check';
+          _selectedMethodName = 'Bank Check';
+          break;
+        case PaymentSegment.voucher:
+          _selectedMethodId = 5;
+          _selectedMethodCode = 'gift_check';
+          _selectedMethodName = 'Gift Check';
+          break;
+        case PaymentSegment.charge:
+          _selectedMethodId = 6;
+          _selectedMethodCode = 'charge';
+          _selectedMethodName = 'Charge Account';
+          break;
+      }
     }
+  }
+
+  void _recalcGiftCheckAmount() {
+    if (_selectedGiftCheckId == null || _giftChecks.isEmpty) return;
+    final gc = _giftChecks
+        .where((g) => g['id'] == _selectedGiftCheckId)
+        .firstOrNull;
+    if (gc == null) return;
+    final unitAmt = (gc['amount'] as num? ?? 0.0).toDouble();
+    final qty = int.tryParse(_gcQtyController.text) ?? 1;
+    final totalFace = unitAmt * (qty > 0 ? qty : 1);
+    _tenderController.text = totalFace.toStringAsFixed(2);
+    final rem = _remainingBalance;
+    _applyAmountController.text =
+        (totalFace < rem ? totalFace : rem).toStringAsFixed(2);
   }
 
   void _setTenderAmount(double amt) {
@@ -171,7 +287,7 @@ class _PaymentDialogState extends State<PaymentDialog> {
         _tenderController.text = text.isEmpty ? '0.' : '$text.';
       }
     } else {
-      if (text == '0' || text == widget.totalDue.toStringAsFixed(2)) {
+      if (text == '0' || text == _remainingBalance.toStringAsFixed(2)) {
         _tenderController.text = val;
       } else {
         _tenderController.text = text + val;
@@ -180,51 +296,185 @@ class _PaymentDialogState extends State<PaymentDialog> {
     setState(() {});
   }
 
-  void _submitPayment() {
+  TenderPaymentLeg? _buildCurrentLeg({required bool forFullRemainder}) {
+    if (_selectedMethodId == null) return null;
+    final rem = _remainingBalance;
+    if (rem <= 0.001) return null;
+
+    final rawApply = double.tryParse(_applyAmountController.text) ?? rem;
+    final appliedAmount = forFullRemainder
+        ? rem
+        : rawApply.clamp(0.01, rem);
+
     final isCash = _currentSegment == PaymentSegment.cash;
-    final tendered = isCash ? (double.tryParse(_tenderController.text) ?? 0.0) : widget.totalDue;
+    final isCheck = _currentSegment == PaymentSegment.bankCheck;
+    final isVoucher = _currentSegment == PaymentSegment.voucher;
 
-    if (isCash && tendered < widget.totalDue) return;
-    if (_selectedMethodId == null) return;
+    final rawTender =
+        double.tryParse(_tenderController.text) ?? appliedAmount;
+    final tendered = (isCash || isCheck || isVoucher)
+        ? rawTender
+        : appliedAmount;
 
-    final change = isCash ? (tendered - widget.totalDue) : 0.0;
-    FeedbackService.tap();
+    if (isCash && tendered < appliedAmount - 0.001) return null;
+    if ((isCheck || isVoucher) && tendered < appliedAmount - 0.001) return null;
 
-    widget.onComplete(
-      _selectedMethodId!,
-      _selectedMethodName,
-      tendered,
-      change,
-      bankId: (_currentSegment == PaymentSegment.card || _currentSegment == PaymentSegment.ewallet)
+    final change = isCash
+        ? (tendered - appliedAmount).clamp(0.0, double.infinity)
+        : 0.0;
+    final excess = (isCheck || isVoucher)
+        ? (tendered - appliedAmount).clamp(0.0, double.infinity)
+        : 0.0;
+
+    final bankName = _banks
+        .where((b) => b.id == _selectedBankId)
+        .map((b) => b.name)
+        .firstOrNull;
+
+    return TenderPaymentLeg(
+      paymentMethodId: _selectedMethodId!,
+      paymentMethodCode: _selectedMethodCode,
+      paymentMethodName: _selectedMethodName,
+      amount: appliedAmount,
+      cashTendered: tendered,
+      changeGiven: change,
+      excessAmount: excess,
+      cashlessAmount: isCash ? null : tendered,
+      bankId: (_currentSegment == PaymentSegment.card ||
+              _currentSegment == PaymentSegment.ewallet ||
+              _currentSegment == PaymentSegment.bankCheck)
           ? _selectedBankId
           : null,
-      referenceNumber:
-          (_currentSegment == PaymentSegment.card || _currentSegment == PaymentSegment.ewallet) &&
-              _refNoController.text.trim().isNotEmpty
-          ? _refNoController.text.trim()
+      bankName: bankName,
+      cardType: _currentSegment == PaymentSegment.card
+          ? _selectedCardType
+          : (_currentSegment == PaymentSegment.ewallet ? 3 : null),
+      cardNumber: _currentSegment == PaymentSegment.card &&
+              _cardNoController.text.trim().isNotEmpty
+          ? _cardNoController.text.trim()
           : null,
-      chargeAccountId: _currentSegment == PaymentSegment.charge ? _selectedChargeId : null,
+      cardExpiry: _currentSegment == PaymentSegment.card &&
+              _cardExpiryController.text.trim().isNotEmpty
+          ? _cardExpiryController.text.trim()
+          : null,
+      approvalNumber: _currentSegment == PaymentSegment.card &&
+              _approvalNoController.text.trim().isNotEmpty
+          ? _approvalNoController.text.trim()
+          : null,
+      referenceNumber: _refNoController.text.trim().isNotEmpty
+          ? _refNoController.text.trim()
+          : (_approvalNoController.text.trim().isNotEmpty
+                ? _approvalNoController.text.trim()
+                : null),
+      paymentChannel: _currentSegment == PaymentSegment.ewallet
+          ? bankName ?? 'E-Wallet'
+          : null,
+      merchantTerminal: _currentSegment == PaymentSegment.card
+          ? bankName
+          : null,
+      giftCheckId:
+          _currentSegment == PaymentSegment.voucher ? _selectedGiftCheckId : null,
+      giftCheckQty: _currentSegment == PaymentSegment.voucher
+          ? (int.tryParse(_gcQtyController.text) ?? 1)
+          : null,
+      serialNumbers: _currentSegment == PaymentSegment.voucher &&
+              _gcSerialsController.text.trim().isNotEmpty
+          ? _gcSerialsController.text.trim()
+          : null,
+      chargeAccountId:
+          _currentSegment == PaymentSegment.charge ? _selectedChargeId : null,
+      customerName: _customerNameController.text.trim().isNotEmpty
+          ? _customerNameController.text.trim()
+          : null,
+    );
+  }
+
+  void _addSplitLeg() {
+    final leg = _buildCurrentLeg(forFullRemainder: false);
+    if (leg == null) return;
+    FeedbackService.tap();
+    setState(() {
+      _splitLegs.add(leg);
+      _refNoController.clear();
+      _cardNoController.clear();
+      _cardExpiryController.clear();
+      _approvalNoController.clear();
+      _gcSerialsController.clear();
+      final rem = _remainingBalance;
+      _applyAmountController.text = rem.toStringAsFixed(2);
+      _tenderController.text = rem.toStringAsFixed(2);
+    });
+  }
+
+  void _removeSplitLeg(int index) {
+    FeedbackService.tap();
+    setState(() {
+      _splitLegs.removeAt(index);
+      final rem = _remainingBalance;
+      _applyAmountController.text = rem.toStringAsFixed(2);
+      _tenderController.text = rem.toStringAsFixed(2);
+    });
+  }
+
+  void _submitPayment() {
+    final List<TenderPaymentLeg> allLegs = List.from(_splitLegs);
+    if (_remainingBalance > 0.009) {
+      final finalLeg = _buildCurrentLeg(forFullRemainder: true);
+      if (finalLeg == null) return;
+      allLegs.add(finalLeg);
+    }
+
+    if (allLegs.isEmpty) return;
+    FeedbackService.tap();
+
+    final primaryLeg = allLegs.first;
+    final totalTendered =
+        allLegs.fold<double>(0.0, (sum, l) => sum + l.cashTendered);
+    final totalChange =
+        allLegs.fold<double>(0.0, (sum, l) => sum + l.changeGiven);
+    final combinedMethodName =
+        allLegs.map((l) => l.paymentMethodName).toSet().join(' + ');
+
+    widget.onComplete(
+      primaryLeg.paymentMethodId,
+      combinedMethodName,
+      totalTendered,
+      totalChange,
+      bankId: primaryLeg.bankId,
+      referenceNumber: primaryLeg.referenceNumber ?? primaryLeg.approvalNumber,
+      chargeAccountId: primaryLeg.chargeAccountId,
+      payments: allLegs,
     );
     Navigator.of(context).pop();
   }
 
   double get _nextHundredAmount {
-    final due = widget.totalDue;
+    final due = _remainingBalance;
     final remainder = due % 100;
     if (remainder == 0) return due + 100;
     return (due + (100 - remainder));
   }
 
+  bool get _canSubmitCurrent {
+    if (_remainingBalance <= 0.009 && _splitLegs.isNotEmpty) return true;
+    return _buildCurrentLeg(forFullRemainder: true) != null;
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return const AlertDialog(content: Center(child: CircularProgressIndicator()));
+      return const AlertDialog(
+        content: Center(child: CircularProgressIndicator()),
+      );
     }
 
     final isCash = _currentSegment == PaymentSegment.cash;
-    final tendered = isCash ? (double.tryParse(_tenderController.text) ?? 0.0) : widget.totalDue;
-    final change = tendered >= widget.totalDue ? tendered - widget.totalDue : 0.0;
-    final isValid = isCash ? (tendered >= widget.totalDue && _selectedMethodId != null) : (_selectedMethodId != null);
+    final rem = _remainingBalance;
+    final tendered = isCash
+        ? (double.tryParse(_tenderController.text) ?? 0.0)
+        : (double.tryParse(_tenderController.text) ?? rem);
+    final change = isCash && tendered >= rem ? tendered - rem : 0.0;
+    final isValid = _canSubmitCurrent;
 
     return CallbackShortcuts(
       bindings: {
@@ -234,14 +484,15 @@ class _PaymentDialogState extends State<PaymentDialog> {
       },
       child: CustomFormDialog(
         title: 'Tender Payment & Settle Bill',
-        maxWidth: isCash ? 680 : 590,
-        saveLabel: 'Complete Sale (₱${widget.totalDue.toStringAsFixed(2)})',
+        maxWidth: 720,
+        saveLabel:
+            'Complete Sale (₱${widget.totalDue.toStringAsFixed(2)})',
         onSave: isValid ? _submitPayment : () {},
         content: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            // 1. Total Due Banner
+            // 1. Total Due & Remaining Balance Banner
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
@@ -259,7 +510,9 @@ class _PaymentDialogState extends State<PaymentDialog> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'TOTAL DUE',
+                        _splitLegs.isEmpty
+                            ? 'TOTAL DUE'
+                            : 'REMAINING BALANCE (SPLIT PAYMENT)',
                         style: GoogleFonts.inter(
                           fontSize: 11,
                           fontWeight: FontWeight.w700,
@@ -268,11 +521,19 @@ class _PaymentDialogState extends State<PaymentDialog> {
                         ),
                       ),
                       const SizedBox(height: 2),
-                      Text('Net payable balance', style: GoogleFonts.inter(fontSize: 11, color: Colors.white70)),
+                      Text(
+                        _splitLegs.isEmpty
+                            ? 'Net payable balance'
+                            : 'Total Bill: ₱${widget.totalDue.toStringAsFixed(2)} • Paid: ₱${_paidSoFar.toStringAsFixed(2)}',
+                        style: GoogleFonts.inter(
+                          fontSize: 11,
+                          color: Colors.white70,
+                        ),
+                      ),
                     ],
                   ),
                   Text(
-                    '₱${widget.totalDue.toStringAsFixed(2)}',
+                    '₱${rem.toStringAsFixed(2)}',
                     style: GoogleFonts.inter(
                       fontSize: 24,
                       fontWeight: FontWeight.w900,
@@ -282,12 +543,77 @@ class _PaymentDialogState extends State<PaymentDialog> {
                 ],
               ),
             ),
+
+            // 1B. Added Split Payment Legs
+            if (_splitLegs.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF0FDF4),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFFBBF7D0)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Applied Payment Legs (${_splitLegs.length})',
+                      style: GoogleFonts.inter(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.bold,
+                        color: const Color(0xFF166534),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    ...List.generate(_splitLegs.length, (i) {
+                      final leg = _splitLegs[i];
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 2),
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.check_circle_rounded,
+                              size: 15,
+                              color: Color(0xFF16A34A),
+                            ),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                '${leg.paymentMethodName}: ₱${leg.amount.toStringAsFixed(2)}${leg.excessAmount > 0 ? " (Excess: ₱${leg.excessAmount.toStringAsFixed(2)})" : ""}',
+                                style: GoogleFonts.inter(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: textDark,
+                                ),
+                              ),
+                            ),
+                            InkWell(
+                              onTap: () => _removeSplitLeg(i),
+                              child: const Icon(
+                                Icons.close_rounded,
+                                size: 16,
+                                color: Color(0xFFDC2626),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }),
+                  ],
+                ),
+              ),
+            ],
             const SizedBox(height: 12),
 
-            // 2. Segmented Payment Method Selector
+            // 2. 6-Segment Payment Method Selector (KwikPOS Lite Parity)
             Text(
-              'Payment Mode',
-              style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: const Color(0xFF64748B)),
+              'Payment Mode (6 Tenders)',
+              style: GoogleFonts.inter(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: const Color(0xFF64748B),
+              ),
             ),
             const SizedBox(height: 6),
             Container(
@@ -299,31 +625,125 @@ class _PaymentDialogState extends State<PaymentDialog> {
               ),
               child: Row(
                 children: [
-                  _buildSegmentButton('Cash', Icons.payments_rounded, PaymentSegment.cash),
-                  _buildSegmentButton('Card', Icons.credit_card_rounded, PaymentSegment.card),
-                  _buildSegmentButton('E-Wallet', Icons.qr_code_rounded, PaymentSegment.ewallet),
-                  _buildSegmentButton('Charge', Icons.receipt_long_rounded, PaymentSegment.charge),
+                  _buildSegmentButton(
+                    'Cash',
+                    Icons.payments_rounded,
+                    PaymentSegment.cash,
+                  ),
+                  _buildSegmentButton(
+                    'Card',
+                    Icons.credit_card_rounded,
+                    PaymentSegment.card,
+                  ),
+                  _buildSegmentButton(
+                    'ATM/QR',
+                    Icons.qr_code_rounded,
+                    PaymentSegment.ewallet,
+                  ),
+                  _buildSegmentButton(
+                    'Check',
+                    Icons.account_balance_rounded,
+                    PaymentSegment.bankCheck,
+                  ),
+                  _buildSegmentButton(
+                    'Gift Check',
+                    Icons.card_giftcard_rounded,
+                    PaymentSegment.voucher,
+                  ),
+                  _buildSegmentButton(
+                    'Charge',
+                    Icons.receipt_long_rounded,
+                    PaymentSegment.charge,
+                  ),
                 ],
               ),
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 12),
 
-            // 3. Dynamic Form per Segment
+            // 3. Split Payment Partial Amount Bar
+            if (rem > 0.01) ...[
+              Row(
+                children: [
+                  Expanded(
+                    child: SizedBox(
+                      height: 40,
+                      child: TextField(
+                        controller: _applyAmountController,
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        style: GoogleFonts.inter(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: textDark,
+                        ),
+                        decoration: InputDecoration(
+                          labelText: 'Amount to Apply for this Tender',
+                          prefixText: '₱ ',
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        onChanged: (_) => setState(() {}),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  OutlinedButton.icon(
+                    onPressed: _addSplitLeg,
+                    icon: const Icon(Icons.call_split_rounded, size: 16),
+                    label: Text(
+                      'Add Split Leg',
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: primaryBlue,
+                      side: const BorderSide(color: primaryBlue),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 10,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+            ],
+
+            // 4. Dynamic Form per Segment
             if (isCash)
-              _buildCashPaymentForm(tendered, change)
+              _buildCashPaymentForm(tendered, change, rem)
             else if (_currentSegment == PaymentSegment.card)
-              _buildCardPaymentForm()
+              _buildCardPaymentForm(rem)
             else if (_currentSegment == PaymentSegment.ewallet)
-              _buildEWalletPaymentForm()
+              _buildEWalletPaymentForm(rem)
+            else if (_currentSegment == PaymentSegment.bankCheck)
+              _buildBankCheckPaymentForm(rem)
+            else if (_currentSegment == PaymentSegment.voucher)
+              _buildGiftCheckPaymentForm(rem)
             else if (_currentSegment == PaymentSegment.charge)
-              _buildChargePaymentForm(),
+              _buildChargePaymentForm(rem),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildSegmentButton(String label, IconData icon, PaymentSegment segment) {
+  Widget _buildSegmentButton(
+    String label,
+    IconData icon,
+    PaymentSegment segment,
+  ) {
     final isSelected = _currentSegment == segment;
     return Expanded(
       child: InkWell(
@@ -340,7 +760,11 @@ class _PaymentDialogState extends State<PaymentDialog> {
             borderRadius: BorderRadius.circular(8),
             boxShadow: isSelected
                 ? [
-                    BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 4, offset: const Offset(0, 2)),
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.06),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    ),
                   ]
                 : null,
           ),
@@ -349,16 +773,19 @@ class _PaymentDialogState extends State<PaymentDialog> {
             children: [
               Icon(
                 icon,
-                size: 16,
+                size: 15,
                 color: isSelected ? primaryBlue : const Color(0xFF64748B),
               ),
-              const SizedBox(width: 5),
-              Text(
-                label,
-                style: GoogleFonts.inter(
-                  fontSize: 12,
-                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
-                  color: isSelected ? primaryBlue : const Color(0xFF64748B),
+              const SizedBox(width: 4),
+              Flexible(
+                child: Text(
+                  label,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.inter(
+                    fontSize: 11.5,
+                    fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                    color: isSelected ? primaryBlue : const Color(0xFF64748B),
+                  ),
                 ),
               ),
             ],
@@ -369,10 +796,14 @@ class _PaymentDialogState extends State<PaymentDialog> {
   }
 
   // ===========================================================================
-  // CASH FORM (NUMPAD + CHIPS + CHANGE DUE)
+  // 1. CASH FORM (NUMPAD + CHIPS + CHANGE DUE)
   // ===========================================================================
 
-  Widget _buildCashPaymentForm(double tendered, double change) {
+  Widget _buildCashPaymentForm(
+    double tendered,
+    double change,
+    double remainingDue,
+  ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -385,28 +816,50 @@ class _PaymentDialogState extends State<PaymentDialog> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Amount Tendered',
-                    style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: textDark),
+                    'Cash Tendered',
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: textDark,
+                    ),
                   ),
                   const SizedBox(height: 6),
                   TextField(
                     controller: _tenderController,
                     focusNode: _focusNode,
                     autofocus: true,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    style: GoogleFonts.inter(fontSize: 19, fontWeight: FontWeight.w800, color: textDark),
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    style: GoogleFonts.inter(
+                      fontSize: 19,
+                      fontWeight: FontWeight.w800,
+                      color: textDark,
+                    ),
                     decoration: InputDecoration(
                       prefixText: '₱ ',
-                      prefixStyle: GoogleFonts.inter(fontSize: 19, fontWeight: FontWeight.w800, color: primaryBlue),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                      prefixStyle: GoogleFonts.inter(
+                        fontSize: 19,
+                        fontWeight: FontWeight.w800,
+                        color: primaryBlue,
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 10,
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10),
                         borderSide: const BorderSide(color: surfaceBorder),
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10),
-                        borderSide: const BorderSide(color: primaryBlue, width: 2),
+                        borderSide: const BorderSide(
+                          color: primaryBlue,
+                          width: 2,
+                        ),
                       ),
                       filled: true,
                       fillColor: const Color(0xFFF8FAFC),
@@ -414,21 +867,36 @@ class _PaymentDialogState extends State<PaymentDialog> {
                     onChanged: (_) => setState(() {}),
                   ),
                   const SizedBox(height: 8),
-
                   Wrap(
                     spacing: 8,
                     runSpacing: 8,
                     children: [
-                      _buildQuickTenderChip('Exact', () => _setTenderAmount(widget.totalDue), isPrimary: true),
-                      if (_nextHundredAmount > widget.totalDue)
+                      _buildQuickTenderChip(
+                        'Exact',
+                        () => _setTenderAmount(remainingDue),
+                        isPrimary: true,
+                      ),
+                      if (_nextHundredAmount > remainingDue)
                         _buildQuickTenderChip(
                           '₱${_nextHundredAmount.toStringAsFixed(0)}',
                           () => _setTenderAmount(_nextHundredAmount),
                         ),
-                      _buildQuickTenderChip('₱100', () => _setTenderAmount(100)),
-                      _buildQuickTenderChip('₱200', () => _setTenderAmount(200)),
-                      _buildQuickTenderChip('₱500', () => _setTenderAmount(500)),
-                      _buildQuickTenderChip('₱1,000', () => _setTenderAmount(1000)),
+                      _buildQuickTenderChip(
+                        '₱100',
+                        () => _setTenderAmount(100),
+                      ),
+                      _buildQuickTenderChip(
+                        '₱200',
+                        () => _setTenderAmount(200),
+                      ),
+                      _buildQuickTenderChip(
+                        '₱500',
+                        () => _setTenderAmount(500),
+                      ),
+                      _buildQuickTenderChip(
+                        '₱1,000',
+                        () => _setTenderAmount(1000),
+                      ),
                       _buildQuickTenderChip('+₱50', () => _addToTender(50)),
                       _buildQuickTenderChip('+₱100', () => _addToTender(100)),
                     ],
@@ -436,9 +904,7 @@ class _PaymentDialogState extends State<PaymentDialog> {
                 ],
               ),
             ),
-
             const SizedBox(width: 10),
-
             Expanded(
               flex: 2,
               child: Container(
@@ -487,15 +953,17 @@ class _PaymentDialogState extends State<PaymentDialog> {
           ],
         ),
         const SizedBox(height: 10),
-
-        // Live Change Box
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           decoration: BoxDecoration(
-            color: tendered >= widget.totalDue ? const Color(0xFFECFDF5) : const Color(0xFFFEF2F2),
+            color: tendered >= remainingDue
+                ? const Color(0xFFECFDF5)
+                : const Color(0xFFFEF2F2),
             borderRadius: BorderRadius.circular(10),
             border: Border.all(
-              color: tendered >= widget.totalDue ? const Color(0xFFA7F3D0) : const Color(0xFFFECACA),
+              color: tendered >= remainingDue
+                  ? const Color(0xFFA7F3D0)
+                  : const Color(0xFFFECACA),
             ),
           ),
           child: Row(
@@ -504,17 +972,25 @@ class _PaymentDialogState extends State<PaymentDialog> {
               Row(
                 children: [
                   Icon(
-                    tendered >= widget.totalDue ? Icons.check_circle_rounded : Icons.info_outline_rounded,
+                    tendered >= remainingDue
+                        ? Icons.check_circle_rounded
+                        : Icons.info_outline_rounded,
                     size: 16,
-                    color: tendered >= widget.totalDue ? const Color(0xFF059669) : const Color(0xFFDC2626),
+                    color: tendered >= remainingDue
+                        ? const Color(0xFF059669)
+                        : const Color(0xFFDC2626),
                   ),
                   const SizedBox(width: 6),
                   Text(
-                    tendered >= widget.totalDue ? 'Change Due:' : 'Insufficient Tender:',
+                    tendered >= remainingDue
+                        ? 'Change Due:'
+                        : 'Insufficient Tender:',
                     style: GoogleFonts.inter(
                       fontSize: 12.5,
                       fontWeight: FontWeight.bold,
-                      color: tendered >= widget.totalDue ? const Color(0xFF065F46) : const Color(0xFF991B1B),
+                      color: tendered >= remainingDue
+                          ? const Color(0xFF065F46)
+                          : const Color(0xFF991B1B),
                     ),
                   ),
                 ],
@@ -524,7 +1000,9 @@ class _PaymentDialogState extends State<PaymentDialog> {
                 style: GoogleFonts.inter(
                   fontSize: 18,
                   fontWeight: FontWeight.w900,
-                  color: tendered >= widget.totalDue ? const Color(0xFF059669) : const Color(0xFFDC2626),
+                  color: tendered >= remainingDue
+                      ? const Color(0xFF059669)
+                      : const Color(0xFFDC2626),
                 ),
               ),
             ],
@@ -535,100 +1013,167 @@ class _PaymentDialogState extends State<PaymentDialog> {
   }
 
   // ===========================================================================
-  // CREDIT / DEBIT CARD FORM
+  // 2. CREDIT / DEBIT CARD FORM (card_trans parity)
   // ===========================================================================
 
-  Widget _buildCardPaymentForm() {
-    final cardBanks = _banks.where((b) => b.cardType == 1 || b.cardType == 2).toList();
+  Widget _buildCardPaymentForm(double remainingDue) {
+    final cardBanks =
+        _banks.where((b) => b.cardType == 1 || b.cardType == 2).toList();
     final banksList = cardBanks.isNotEmpty ? cardBanks : _banks;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Card Terminal / Bank Provider',
-          style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: textDark),
-        ),
-        const SizedBox(height: 6),
-        if (banksList.isEmpty)
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF1F5F9),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Text(
-              'No bank terminals registered. Add terminals in Maintenance > Payment Methods.',
-              style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF64748B)),
-            ),
-          )
-        else
-          DropdownButtonFormField<int>(
-            value: _selectedBankId,
-            decoration: InputDecoration(
-              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-              filled: true,
-              fillColor: const Color(0xFFF8FAFC),
-            ),
-            items: banksList.map((b) {
-              final isCredit = b.cardType == 2;
-              return DropdownMenuItem(
-                value: b.id,
-                child: Row(
-                  children: [
-                    Icon(
-                      isCredit ? Icons.credit_score_rounded : Icons.credit_card_rounded,
-                      size: 18,
-                      color: isCredit ? const Color(0xFF7C3AED) : const Color(0xFF2563EB),
+        Row(
+          children: [
+            Expanded(
+              flex: 2,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Bank / Card Terminal',
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: textDark,
                     ),
-                    const SizedBox(width: 8),
-                    Text('${b.name} (${isCredit ? 'Credit Card' : 'Debit Card'})'),
-                  ],
-                ),
-              );
-            }).toList(),
-            onChanged: (val) => setState(() => _selectedBankId = val),
-          ),
-        const SizedBox(height: 12),
-
-        Text(
-          'Card Approval / Trace ID (Optional)',
-          style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: textDark),
+                  ),
+                  const SizedBox(height: 6),
+                  if (banksList.isEmpty)
+                    const Text('No banks configured')
+                  else
+                    DropdownButtonFormField<int>(
+                      value: _selectedBankId,
+                      decoration: InputDecoration(
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 10,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        filled: true,
+                        fillColor: const Color(0xFFF8FAFC),
+                      ),
+                      items: banksList
+                          .map(
+                            (b) => DropdownMenuItem(
+                              value: b.id,
+                              child: Text(b.name),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: (val) => setState(() => _selectedBankId = val),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Card Type',
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: textDark,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  DropdownButtonFormField<int>(
+                    value: _selectedCardType,
+                    decoration: InputDecoration(
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 10,
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      filled: true,
+                      fillColor: const Color(0xFFF8FAFC),
+                    ),
+                    items: const [
+                      DropdownMenuItem(value: 2, child: Text('Credit Card')),
+                      DropdownMenuItem(value: 1, child: Text('Debit Card')),
+                    ],
+                    onChanged: (val) =>
+                        setState(() => _selectedCardType = val ?? 2),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
-        const SizedBox(height: 6),
-        TextField(
-          controller: _refNoController,
-          decoration: InputDecoration(
-            hintText: 'e.g. POS Trace No. / Approval Code',
-            hintStyle: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF94A3B8)),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-            filled: true,
-            fillColor: const Color(0xFFF8FAFC),
-          ),
-        ),
-        const SizedBox(height: 14),
-
-        // Charge summary banner
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: const Color(0xFFEFF6FF),
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: const Color(0xFFBFDBFE)),
-          ),
-          child: Row(
-            children: [
-              const Icon(Icons.check_circle_outline_rounded, color: Color(0xFF2563EB), size: 20),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'Charge ₱${widget.totalDue.toStringAsFixed(2)} directly to customer card terminal.',
-                  style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: const Color(0xFF1E40AF)),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _cardNoController,
+                decoration: InputDecoration(
+                  labelText: 'Card Number (Last 4 / Masked)',
+                  hintText: 'e.g. **** 1234',
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                 ),
               ),
-            ],
+            ),
+            const SizedBox(width: 10),
+            SizedBox(
+              width: 120,
+              child: TextField(
+                controller: _cardExpiryController,
+                decoration: InputDecoration(
+                  labelText: 'Expiry (MM/YY)',
+                  hintText: '12/28',
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: TextField(
+                controller: _approvalNoController,
+                decoration: InputDecoration(
+                  labelText: 'Approval / Trace No.',
+                  hintText: 'e.g. APP-9012',
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        TextField(
+          controller: _customerNameController,
+          decoration: InputDecoration(
+            labelText: 'Cardholder / Customer Name (Optional)',
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 10,
+            ),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
           ),
         ),
       ],
@@ -636,10 +1181,10 @@ class _PaymentDialogState extends State<PaymentDialog> {
   }
 
   // ===========================================================================
-  // E-WALLET / QR FORM (GCASH, MAYA)
+  // 3. ATM / E-WALLET / ONLINE FORM (atm_trans parity)
   // ===========================================================================
 
-  Widget _buildEWalletPaymentForm() {
+  Widget _buildEWalletPaymentForm(double remainingDue) {
     final walletBanks = _banks.where((b) => b.cardType == 3).toList();
     final walletsList = walletBanks.isNotEmpty ? walletBanks : _banks;
 
@@ -647,81 +1192,207 @@ class _PaymentDialogState extends State<PaymentDialog> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'E-Wallet Merchant Channel',
-          style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: textDark),
+          'ATM / E-Wallet / Online Channel',
+          style: GoogleFonts.inter(
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            color: textDark,
+          ),
         ),
         const SizedBox(height: 6),
-        if (walletsList.isEmpty)
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF1F5F9),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Text(
-              'No E-Wallets registered. Add GCash or Maya in Maintenance > Payment Methods.',
-              style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF64748B)),
-            ),
-          )
-        else
+        if (walletsList.isNotEmpty)
           DropdownButtonFormField<int>(
             value: _selectedBankId,
             decoration: InputDecoration(
-              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 14,
+                vertical: 10,
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
               filled: true,
               fillColor: const Color(0xFFF8FAFC),
             ),
-            items: walletsList.map((b) {
-              return DropdownMenuItem(
-                value: b.id,
-                child: Row(
-                  children: [
-                    const Icon(Icons.qr_code_rounded, size: 18, color: Color(0xFF059669)),
-                    const SizedBox(width: 8),
-                    Text('${b.name} (E-Wallet)'),
-                  ],
-                ),
-              );
-            }).toList(),
+            items: walletsList
+                .map(
+                  (b) => DropdownMenuItem(
+                    value: b.id,
+                    child: Text(b.name),
+                  ),
+                )
+                .toList(),
             onChanged: (val) => setState(() => _selectedBankId = val),
           ),
-        const SizedBox(height: 12),
-
-        Text(
-          'Customer Reference / GCash Reference No.',
-          style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: textDark),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _refNoController,
+                decoration: InputDecoration(
+                  labelText: 'Reference / ATM Account No.',
+                  hintText: 'e.g. 1029 3847 2910',
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: TextField(
+                controller: _customerNameController,
+                decoration: InputDecoration(
+                  labelText: 'Sender / Customer Name',
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
-        const SizedBox(height: 6),
-        TextField(
-          controller: _refNoController,
-          decoration: InputDecoration(
-            hintText: 'e.g. 1029 3847 2910',
-            hintStyle: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF94A3B8)),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-            filled: true,
-            fillColor: const Color(0xFFF8FAFC),
-          ),
-        ),
-        const SizedBox(height: 14),
+      ],
+    );
+  }
 
-        // E-wallet confirmation box
+  // ===========================================================================
+  // 4. BANK CHECK FORM (bank_check_trans parity with Excess calculation)
+  // ===========================================================================
+
+  Widget _buildBankCheckPaymentForm(double remainingDue) {
+    final checkAmount =
+        double.tryParse(_tenderController.text) ?? remainingDue;
+    final applied =
+        (double.tryParse(_applyAmountController.text) ?? remainingDue)
+            .clamp(0.0, remainingDue);
+    final excess = (checkAmount - applied).clamp(0.0, double.infinity);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: _banks.isEmpty
+                  ? const Text('No banks configured')
+                  : DropdownButtonFormField<int>(
+                      value: _selectedBankId,
+                      decoration: InputDecoration(
+                        labelText: 'Issuing Bank',
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 10,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                      items: _banks
+                          .map(
+                            (b) => DropdownMenuItem(
+                              value: b.id,
+                              child: Text(b.name),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: (val) => setState(() => _selectedBankId = val),
+                    ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: TextField(
+                controller: _refNoController,
+                decoration: InputDecoration(
+                  labelText: 'Check Number *',
+                  hintText: 'e.g. CHK-004921',
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _tenderController,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                decoration: InputDecoration(
+                  labelText: 'Check Face Amount',
+                  prefixText: '₱ ',
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                onChanged: (_) => setState(() {}),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: TextField(
+                controller: _customerNameController,
+                decoration: InputDecoration(
+                  labelText: 'Payor / Customer Name',
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
         Container(
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           decoration: BoxDecoration(
-            color: const Color(0xFFECFDF5),
+            color: const Color(0xFFFFFBEB),
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: const Color(0xFFA7F3D0)),
+            border: Border.all(color: const Color(0xFFFDE68A)),
           ),
           child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Icon(Icons.verified_rounded, color: Color(0xFF059669), size: 20),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'Received ₱${widget.totalDue.toStringAsFixed(2)} via digital QR payment.',
-                  style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: const Color(0xFF065F46)),
+              Text(
+                'Check Excess (Non-Refundable):',
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: const Color(0xFF92400E),
+                ),
+              ),
+              Text(
+                '₱${excess.toStringAsFixed(2)}',
+                style: GoogleFonts.inter(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                  color: const Color(0xFFB45309),
                 ),
               ),
             ],
@@ -732,93 +1403,265 @@ class _PaymentDialogState extends State<PaymentDialog> {
   }
 
   // ===========================================================================
-  // CHARGE ACCOUNT FORM
+  // 5. GIFT CHECK / VOUCHER FORM (gift_check_trans parity + serials + excess)
   // ===========================================================================
 
-  Widget _buildChargePaymentForm() {
+  Widget _buildGiftCheckPaymentForm(double remainingDue) {
+    final gcFaceAmount =
+        double.tryParse(_tenderController.text) ?? remainingDue;
+    final applied =
+        (double.tryParse(_applyAmountController.text) ?? remainingDue)
+            .clamp(0.0, remainingDue);
+    final excess = (gcFaceAmount - applied).clamp(0.0, double.infinity);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              flex: 2,
+              child: _giftChecks.isEmpty
+                  ? TextField(
+                      controller: _tenderController,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                      decoration: InputDecoration(
+                        labelText: 'Gift Check Face Amount',
+                        prefixText: '₱ ',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                      onChanged: (_) => setState(() {}),
+                    )
+                  : DropdownButtonFormField<int>(
+                      value: _selectedGiftCheckId,
+                      decoration: InputDecoration(
+                        labelText: 'Gift Check / Voucher Type',
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 10,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                      items: _giftChecks
+                          .map(
+                            (gc) => DropdownMenuItem<int>(
+                              value: gc['id'] as int,
+                              child: Text(
+                                '${gc['name']} (₱${(gc['amount'] as num).toStringAsFixed(2)})',
+                              ),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: (val) {
+                        setState(() {
+                          _selectedGiftCheckId = val;
+                          _recalcGiftCheckAmount();
+                        });
+                      },
+                    ),
+            ),
+            const SizedBox(width: 10),
+            SizedBox(
+              width: 90,
+              child: TextField(
+                controller: _gcQtyController,
+                keyboardType: TextInputType.number,
+                decoration: InputDecoration(
+                  labelText: 'Qty',
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                onChanged: (_) => setState(() => _recalcGiftCheckAmount()),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: TextField(
+                controller: _tenderController,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                decoration: InputDecoration(
+                  labelText: 'Total GC Value',
+                  prefixText: '₱ ',
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                onChanged: (_) => setState(() {}),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        TextField(
+          controller: _gcSerialsController,
+          decoration: InputDecoration(
+            labelText: 'Gift Check Serial Number(s) (comma-separated)',
+            hintText: 'e.g. GC-1001, GC-1002',
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 10,
+            ),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+        ),
+        const SizedBox(height: 10),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: const Color(0xFFFFFBEB),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: const Color(0xFFFDE68A)),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Gift Check Excess (Forfeited):',
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: const Color(0xFF92400E),
+                ),
+              ),
+              Text(
+                '₱${excess.toStringAsFixed(2)}',
+                style: GoogleFonts.inter(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                  color: const Color(0xFFB45309),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ===========================================================================
+  // 6. CHARGE ACCOUNT FORM (charge_trans parity)
+  // ===========================================================================
+
+  Widget _buildChargePaymentForm(double remainingDue) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           'Charge Account Client / Company',
-          style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: textDark),
+          style: GoogleFonts.inter(
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            color: textDark,
+          ),
         ),
         const SizedBox(height: 6),
         if (_charges.isEmpty)
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF1F5F9),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Text(
-              'No charge accounts registered. Add accounts in Maintenance > Payment Methods.',
-              style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF64748B)),
-            ),
-          )
+          const Text('No charge accounts registered.')
         else
           DropdownButtonFormField<int>(
             value: _selectedChargeId,
             decoration: InputDecoration(
-              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 14,
+                vertical: 10,
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
               filled: true,
               fillColor: const Color(0xFFF8FAFC),
             ),
-            items: _charges.map((c) {
-              return DropdownMenuItem(
-                value: c.id,
-                child: Text('${c.code} - ${c.name}'),
-              );
-            }).toList(),
+            items: _charges
+                .map(
+                  (c) => DropdownMenuItem(
+                    value: c.id,
+                    child: Text('${c.code} - ${c.name}'),
+                  ),
+                )
+                .toList(),
             onChanged: (val) => setState(() => _selectedChargeId = val),
           ),
-        const SizedBox(height: 14),
-
-        // Charge confirmation box
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: const Color(0xFFF3E8FF),
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: const Color(0xFFDDD6FE)),
-          ),
-          child: Row(
-            children: [
-              const Icon(Icons.receipt_long_rounded, color: Color(0xFF7C3AED), size: 20),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'Bill ₱${widget.totalDue.toStringAsFixed(2)} to account receivables.',
-                  style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: const Color(0xFF5B21B6)),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _refNoController,
+                decoration: InputDecoration(
+                  labelText: 'Charge Reference / PO No.',
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                 ),
               ),
-            ],
-          ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: TextField(
+                controller: _customerNameController,
+                decoration: InputDecoration(
+                  labelText: 'Authorized Signatory / Customer',
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ],
     );
   }
 
-  Widget _buildQuickTenderChip(String label, VoidCallback onTap, {bool isPrimary = false}) {
+  Widget _buildQuickTenderChip(
+    String label,
+    VoidCallback onTap, {
+    bool isPrimary = false,
+  }) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(6),
+      borderRadius: BorderRadius.circular(8),
       child: Container(
-        height: 26,
-        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
-          color: isPrimary ? primaryBlue.withOpacity(0.12) : const Color(0xFFF1F5F9),
-          borderRadius: BorderRadius.circular(6),
+          color: isPrimary
+              ? primaryBlue.withOpacity(0.1)
+              : const Color(0xFFF1F5F9),
+          borderRadius: BorderRadius.circular(8),
           border: Border.all(
-            color: isPrimary ? primaryBlue : surfaceBorder,
+            color: isPrimary ? primaryBlue.withOpacity(0.3) : surfaceBorder,
           ),
         ),
         child: Text(
           label,
           style: GoogleFonts.inter(
-            fontSize: 11,
-            fontWeight: FontWeight.bold,
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
             color: isPrimary ? primaryBlue : const Color(0xFF334155),
           ),
         ),
@@ -828,27 +1671,28 @@ class _PaymentDialogState extends State<PaymentDialog> {
 
   Widget _buildNumpadRow(List<String> keys) {
     return Row(
-      children: keys.map((k) {
+      children: keys.map((key) {
         return Expanded(
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 1.5),
             child: InkWell(
-              onTap: () => _onNumpadPress(k),
+              onTap: () => _onNumpadPress(key),
               borderRadius: BorderRadius.circular(6),
               child: Container(
-                height: 28,
+                height: 34,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(6),
                   border: Border.all(color: surfaceBorder),
-                  boxShadow: [
-                    BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 2, offset: const Offset(0, 1)),
-                  ],
                 ),
                 child: Text(
-                  k,
-                  style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: textDark),
+                  key,
+                  style: GoogleFonts.inter(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    color: textDark,
+                  ),
                 ),
               ),
             ),

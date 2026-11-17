@@ -1,6 +1,7 @@
 import 'package:dartz/dartz.dart';
 import 'package:suki_pos/core/error/failures.dart';
 import 'package:suki_pos/domain/entities/orders/sales_order.dart';
+import 'package:suki_pos/domain/entities/pos/tender_payment_leg.dart';
 import 'package:suki_pos/domain/repositories/orders/order_repository.dart';
 
 class ProcessCheckout {
@@ -15,6 +16,10 @@ class ProcessCheckout {
     required double changeGiven,
     double manualDiscountPercentage = 0.0,
     double manualDiscountFixed = 0.0,
+    int? bankId,
+    String? referenceNumber,
+    int? chargeAccountId,
+    List<TenderPaymentLeg>? payments,
   }) async {
     return await repository.processCheckout(
       order: order,
@@ -23,6 +28,10 @@ class ProcessCheckout {
       changeGiven: changeGiven,
       manualDiscountPercentage: manualDiscountPercentage,
       manualDiscountFixed: manualDiscountFixed,
+      bankId: bankId,
+      referenceNumber: referenceNumber,
+      chargeAccountId: chargeAccountId,
+      payments: payments,
     );
   }
 }

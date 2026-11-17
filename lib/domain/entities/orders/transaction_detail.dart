@@ -53,12 +53,15 @@ class TransactionDetail extends Equatable {
   final String? discountName;
   final double itemDiscountAmount;
   final double orderDiscountAmount;
+  final double surchargeAmount;
   final double vatableSales;
   final double vatAmount;
   final double vatExemptSales;
   final double zeroRatedSales;
   final String? beneficiaryName;
   final String? beneficiaryIdNo;
+  final String? referenceNumber;
+  final String? bankName;
   final DateTime transactionDate;
   final List<TransactionLineDetail> lines;
 
@@ -78,12 +81,15 @@ class TransactionDetail extends Equatable {
     this.discountName,
     this.itemDiscountAmount = 0.0,
     this.orderDiscountAmount = 0.0,
+    this.surchargeAmount = 0.0,
     this.vatableSales = 0.0,
     this.vatAmount = 0.0,
     this.vatExemptSales = 0.0,
     this.zeroRatedSales = 0.0,
     this.beneficiaryName,
     this.beneficiaryIdNo,
+    this.referenceNumber,
+    this.bankName,
     required this.transactionDate,
     required this.lines,
   });
@@ -105,12 +111,15 @@ class TransactionDetail extends Equatable {
     discountName,
     itemDiscountAmount,
     orderDiscountAmount,
+    surchargeAmount,
     vatableSales,
     vatAmount,
     vatExemptSales,
     zeroRatedSales,
     beneficiaryName,
     beneficiaryIdNo,
+    referenceNumber,
+    bankName,
     transactionDate,
     lines,
   ];

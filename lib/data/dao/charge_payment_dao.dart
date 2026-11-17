@@ -30,13 +30,13 @@ class ChargePaymentDao {
   }
 
   Future<List<Charge>> getChargePaymentsByChargeId(
-    int chargeId,
+    int chargeType,
   ) async {
     final db = await _databaseHelper.database;
     final results = await db.query(
       SchemaConstants.chargePayment,
-      where: 'charge_id = ?',
-      whereArgs: [chargeId],
+      where: 'charge_type = ?',
+      whereArgs: [chargeType],
       orderBy: 'id ASC',
     );
 
