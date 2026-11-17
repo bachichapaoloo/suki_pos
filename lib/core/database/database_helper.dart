@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'dart:developer' as developer;
+import 'dart:io';
+import 'package:intl/intl.dart';
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:suki_pos/core/database/schema_constants.dart';
@@ -19,6 +21,60 @@ class DatabaseHelper {
     if (_database != null && _database!.isOpen) return _database!;
     _database = await _initDatabase();
     return _database!;
+  }
+
+  /// Returns the absolute file path of the active SQLite database.
+  Future<String> getDatabaseFilePath() async {
+    final dbPath = await getDatabasesPath();
+    return join(dbPath, _newDatabaseName);
+  }
+
+  /// Exports a consistent snapshot of the SQLite database to [destinationFilePath]
+  /// (or to a timestamped file in a `backups` folder if not provided).
+  Future<String> exportDatabaseBackup({String? destinationFilePath}) async {
+    final db = await database;
+    // Flush WAL to main database file before copying
+    try {
+      await db.rawQuery('PRAGMA wal_checkpoint(FULL);');
+    } catch (_) {}
+
+    final sourcePath = await getDatabaseFilePath();
+    final sourceFile = File(sourcePath);
+
+    String targetPath;
+    if (destinationFilePath != null && destinationFilePath.trim().isNotEmpty) {
+      targetPath = destinationFilePath.trim();
+    } else {
+      final timestamp = DateFormat('yyyyMMdd_HHmmss').format(DateTime.now());
+      final backupDir = Directory(join(Directory.current.path, 'backups'));
+      if (!await backupDir.exists()) {
+        await backupDir.create(recursive: true);
+      }
+      targetPath = join(backupDir.path, 'suki_pos_backup_$timestamp.db');
+    }
+
+    await sourceFile.copy(targetPath);
+    return targetPath;
+  }
+
+  /// Restores the SQLite database from [sourceFilePath] and re-opens the connection.
+  Future<void> restoreDatabaseBackup(String sourceFilePath) async {
+    final backupFile = File(sourceFilePath);
+    if (!await backupFile.exists()) {
+      throw Exception('Selected backup file does not exist.');
+    }
+
+    final targetPath = await getDatabaseFilePath();
+    await close();
+
+    // Remove WAL/SHM sidecars if present before overwriting
+    final walFile = File('$targetPath-wal');
+    final shmFile = File('$targetPath-shm');
+    if (await walFile.exists()) await walFile.delete();
+    if (await shmFile.exists()) await shmFile.delete();
+
+    await backupFile.copy(targetPath);
+    _database = await _initDatabase();
   }
 
   Future<Database> _initDatabase() async {
@@ -111,5 +167,20 @@ class DatabaseHelper {
       await db.close();
       _database = null;
     }
+  }
+
+  /// Opens a fresh in-memory database for unit/integration testing.
+  Future<Database> initInMemoryTestDatabase() async {
+    await close();
+    _database = await openDatabase(
+      inMemoryDatabasePath,
+      version: _databaseVersion,
+      onConfigure: (db) async {
+        await db.execute('PRAGMA foreign_keys = ON;');
+      },
+      onCreate: _onCreate,
+      onOpen: _onOpen,
+    );
+    return _database!;
   }
 }
