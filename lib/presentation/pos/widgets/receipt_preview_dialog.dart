@@ -3,6 +3,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:suki_pos/domain/entities/orders/transaction_detail.dart';
 import 'package:suki_pos/presentation/widgets/app_toast.dart';
+import 'package:suki_pos/services/printer_service.dart';
+import 'package:suki_pos/services/store_settings_service.dart';
 
 class ReceiptPreviewDialog extends StatelessWidget {
   final TransactionDetail transaction;
@@ -17,7 +19,9 @@ class ReceiptPreviewDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final dateFormat = DateFormat('yyyy-MM-dd hh:mm a');
-    final hasStatutory = transaction.beneficiaryName != null && transaction.beneficiaryName!.isNotEmpty;
+    final settings = StoreSettingsService.instance;
+    final hasStatutory = transaction.beneficiaryName != null &&
+        transaction.beneficiaryName!.isNotEmpty;
 
     return AlertDialog(
       backgroundColor: const Color(0xFFF1F5F9),
@@ -48,31 +52,73 @@ class ReceiptPreviewDialog extends StatelessWidget {
                   child: const Text(
                     '*** VOIDED TRANSACTION ***',
                     textAlign: TextAlign.center,
-                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                    ),
                   ),
                 ),
               if (isVoided) const SizedBox(height: 12),
 
-              // HEADER
-              Text('SUKIPOS STORE', style: GoogleFonts.robotoMono(fontSize: 18, fontWeight: FontWeight.bold)),
-              Text('Official POS Terminal Receipt', style: GoogleFonts.robotoMono(fontSize: 11, color: Colors.grey[700])),
-              Text('Main Branch, Quezon City', style: GoogleFonts.robotoMono(fontSize: 11, color: Colors.grey[700])),
-              Text('TIN: 000-123-456-00000 VAT', style: GoogleFonts.robotoMono(fontSize: 11, color: Colors.grey[700])),
+              // DYNAMIC STORE HEADER
+              Text(
+                settings.storeName.toUpperCase(),
+                textAlign: TextAlign.center,
+                style: GoogleFonts.robotoMono(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              Text(
+                settings.receiptHeader,
+                textAlign: TextAlign.center,
+                style: GoogleFonts.robotoMono(
+                  fontSize: 11,
+                  color: Colors.grey[700],
+                ),
+              ),
+              Text(
+                '${settings.branchName} • ${settings.address}',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.robotoMono(
+                  fontSize: 11,
+                  color: Colors.grey[700],
+                ),
+              ),
+              Text(
+                'TIN: ${settings.taxId}',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.robotoMono(
+                  fontSize: 11,
+                  color: Colors.grey[700],
+                ),
+              ),
               const SizedBox(height: 8),
               const Text('------------------------------------------'),
               const SizedBox(height: 8),
 
               // TRANSACTION METADATA
               _buildMetaRow('Txn No:', transaction.transactionNo, isBold: true),
-              _buildMetaRow('Date/Time:', dateFormat.format(transaction.transactionDate)),
+              _buildMetaRow(
+                'Date/Time:',
+                dateFormat.format(transaction.transactionDate),
+              ),
               _buildMetaRow('Cashier:', transaction.cashierName),
               _buildMetaRow('Order Type:', transaction.orderTypeName),
-              _buildMetaRow('Guests / SC:', '${transaction.guestCount} / ${transaction.eligibleGuestCount}'),
+              _buildMetaRow(
+                'Guests / SC:',
+                '${transaction.guestCount} / ${transaction.eligibleGuestCount}',
+              ),
 
               // STATUTORY BENEFICIARY INFO
               if (hasStatutory) ...[
                 const SizedBox(height: 4),
-                _buildMetaRow('Discount:', transaction.discountName ?? 'Statutory (SC/PWD)', isBold: true),
+                _buildMetaRow(
+                  'Discount:',
+                  transaction.discountName ?? 'Statutory (SC/PWD)',
+                  isBold: true,
+                ),
                 _buildMetaRow('Cardholder:', transaction.beneficiaryName ?? 'N/A'),
                 _buildMetaRow('ID / OSCA No:', transaction.beneficiaryIdNo ?? 'N/A'),
               ],
@@ -94,15 +140,22 @@ class ReceiptPreviewDialog extends StatelessWidget {
                           Expanded(
                             child: Text(
                               line.itemName,
-                              style: GoogleFonts.robotoMono(fontSize: 12, fontWeight: FontWeight.bold),
+                              style: GoogleFonts.robotoMono(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ),
                           Text(
-                            line.isFreeItem ? 'FREE' : '₱${line.amount.toStringAsFixed(2)}',
+                            line.isFreeItem
+                                ? 'FREE'
+                                : '₱${line.amount.toStringAsFixed(2)}',
                             style: GoogleFonts.robotoMono(
                               fontSize: 12,
                               fontWeight: FontWeight.bold,
-                              color: line.isFreeItem ? Colors.green.shade700 : Colors.black,
+                              color: line.isFreeItem
+                                  ? Colors.green.shade700
+                                  : Colors.black,
                             ),
                           ),
                         ],
@@ -112,12 +165,18 @@ class ReceiptPreviewDialog extends StatelessWidget {
                         children: [
                           Text(
                             '  ${line.quantity} x ₱${line.unitPrice.toStringAsFixed(2)}',
-                            style: GoogleFonts.robotoMono(fontSize: 11, color: Colors.grey[700]),
+                            style: GoogleFonts.robotoMono(
+                              fontSize: 11,
+                              color: Colors.grey[700],
+                            ),
                           ),
                           if (line.lineDiscount > 0)
                             Text(
                               '-₱${line.lineDiscount.toStringAsFixed(2)}',
-                              style: GoogleFonts.robotoMono(fontSize: 11, color: Colors.red.shade700),
+                              style: GoogleFonts.robotoMono(
+                                fontSize: 11,
+                                color: Colors.red.shade700,
+                              ),
                             ),
                         ],
                       ),
@@ -126,7 +185,10 @@ class ReceiptPreviewDialog extends StatelessWidget {
                           padding: const EdgeInsets.only(left: 12.0),
                           child: Text(
                             '+ ${line.selectedOptions.join(', ')}',
-                            style: GoogleFonts.robotoMono(fontSize: 10, color: Colors.grey[600]),
+                            style: GoogleFonts.robotoMono(
+                              fontSize: 10,
+                              color: Colors.grey[600],
+                            ),
                           ),
                         ),
                     ],
@@ -141,33 +203,75 @@ class ReceiptPreviewDialog extends StatelessWidget {
               // FINANCIAL TOTALS
               _buildAmountRow('GROSS SUBTOTAL:', transaction.grossAmount),
               if (transaction.itemDiscountAmount > 0)
-                _buildAmountRow('LESS ITEM DISCOUNTS:', -transaction.itemDiscountAmount, isDiscount: true),
+                _buildAmountRow(
+                  'LESS ITEM DISCOUNTS:',
+                  -transaction.itemDiscountAmount,
+                  isDiscount: true,
+                ),
               if (transaction.orderDiscountAmount > 0)
-                _buildAmountRow('LESS ORDER DISCOUNT:', -transaction.orderDiscountAmount, isDiscount: true),
+                _buildAmountRow(
+                  'LESS ORDER DISCOUNT:',
+                  -transaction.orderDiscountAmount,
+                  isDiscount: true,
+                ),
+              if (transaction.surchargeAmount > 0)
+                _buildAmountRow(
+                  'SERVICE CHARGE / SURCHARGE:',
+                  transaction.surchargeAmount,
+                ),
 
               const SizedBox(height: 4),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('NET TOTAL DUE:', style: GoogleFonts.robotoMono(fontSize: 15, fontWeight: FontWeight.bold)),
+                  Text(
+                    'NET TOTAL DUE:',
+                    style: GoogleFonts.robotoMono(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                   Text(
                     '₱${transaction.netAmount.toStringAsFixed(2)}',
-                    style: GoogleFonts.robotoMono(fontSize: 16, fontWeight: FontWeight.bold),
+                    style: GoogleFonts.robotoMono(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ],
               ),
               const SizedBox(height: 6),
 
               // PAYMENT BREAKDOWN
-              _buildMetaRow('${transaction.paymentMethodName} Tendered:', '₱${transaction.cashTendered.toStringAsFixed(2)}'),
-              _buildMetaRow('Change Given:', '₱${transaction.changeGiven.toStringAsFixed(2)}', isBold: true),
+              _buildMetaRow(
+                '${transaction.paymentMethodName} Tendered:',
+                '₱${transaction.cashTendered.toStringAsFixed(2)}',
+              ),
+              if (transaction.bankName != null &&
+                  transaction.bankName!.isNotEmpty)
+                _buildMetaRow('Bank:', transaction.bankName!),
+              if (transaction.referenceNumber != null &&
+                  transaction.referenceNumber!.isNotEmpty)
+                _buildMetaRow('Ref / Auth No:', transaction.referenceNumber!, isBold: true),
+              _buildMetaRow(
+                'Change Given:',
+                '₱${transaction.changeGiven.toStringAsFixed(2)}',
+                isBold: true,
+              ),
 
               const SizedBox(height: 8),
               const Text('------------------------------------------'),
               const SizedBox(height: 8),
 
               // BIR TAX & EXEMPTION BREAKDOWN
-              Text('TAX BREAKDOWN (12% VAT)', style: GoogleFonts.robotoMono(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.grey[700])),
+              Text(
+                'TAX BREAKDOWN (12% VAT)',
+                style: GoogleFonts.robotoMono(
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey[700],
+                ),
+              ),
               const SizedBox(height: 4),
               _buildTaxRow('VATable Sales (12%):', transaction.vatableSales),
               _buildTaxRow('VAT Amount (12%):', transaction.vatAmount),
@@ -176,8 +280,13 @@ class ReceiptPreviewDialog extends StatelessWidget {
 
               const SizedBox(height: 16),
               Text(
-                isVoided ? '*** TRANSACTION CANCELLED / VOIDED ***' : '*** THANK YOU & PLEASE COME AGAIN ***',
-                style: GoogleFonts.robotoMono(fontSize: 10, fontWeight: FontWeight.bold),
+                isVoided
+                    ? '*** TRANSACTION CANCELLED / VOIDED ***'
+                    : settings.receiptFooter,
+                style: GoogleFonts.robotoMono(
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                ),
                 textAlign: TextAlign.center,
               ),
             ],
@@ -192,13 +301,29 @@ class ReceiptPreviewDialog extends StatelessWidget {
         FilledButton.icon(
           icon: const Icon(Icons.print),
           label: const Text('Print Thermal Receipt'),
-          onPressed: () {
-            AppToast.showInfo(
-              context,
-              message: 'Thermal receipt sent to 80mm ESC/POS printer',
-              title: 'Receipt Printed',
-            );
-            Navigator.of(context).pop();
+          onPressed: () async {
+            try {
+              await PrinterService.printThermalReceipt(
+                transaction,
+                isVoided: isVoided,
+              );
+              if (context.mounted) {
+                AppToast.showSuccess(
+                  context,
+                  message: 'Thermal receipt dispatched to printer.',
+                  title: 'Receipt Ready',
+                );
+                Navigator.of(context).pop();
+              }
+            } catch (e) {
+              if (context.mounted) {
+                AppToast.showError(
+                  context,
+                  message: 'Unable to open printer dialog: $e',
+                  title: 'Print Error',
+                );
+              }
+            }
           },
         ),
       ],
@@ -211,12 +336,18 @@ class ReceiptPreviewDialog extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: GoogleFonts.robotoMono(fontSize: 11, color: Colors.grey[800])),
           Text(
-            value,
-            style: GoogleFonts.robotoMono(
-              fontSize: 11,
-              fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
+            label,
+            style: GoogleFonts.robotoMono(fontSize: 11, color: Colors.grey[800]),
+          ),
+          Flexible(
+            child: Text(
+              value,
+              textAlign: TextAlign.right,
+              style: GoogleFonts.robotoMono(
+                fontSize: 11,
+                fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
+              ),
             ),
           ),
         ],
@@ -224,13 +355,23 @@ class ReceiptPreviewDialog extends StatelessWidget {
     );
   }
 
-  Widget _buildAmountRow(String label, double amount, {bool isDiscount = false}) {
+  Widget _buildAmountRow(
+    String label,
+    double amount, {
+    bool isDiscount = false,
+  }) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 2.0),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: GoogleFonts.robotoMono(fontSize: 12, fontWeight: FontWeight.w600)),
+          Text(
+            label,
+            style: GoogleFonts.robotoMono(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
           Text(
             '${amount < 0 ? "-" : ""}₱${amount.abs().toStringAsFixed(2)}',
             style: GoogleFonts.robotoMono(
@@ -250,8 +391,14 @@ class ReceiptPreviewDialog extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: GoogleFonts.robotoMono(fontSize: 10, color: Colors.grey[700])),
-          Text('₱${amount.toStringAsFixed(2)}', style: GoogleFonts.robotoMono(fontSize: 10, color: Colors.grey[900])),
+          Text(
+            label,
+            style: GoogleFonts.robotoMono(fontSize: 10, color: Colors.grey[700]),
+          ),
+          Text(
+            '₱${amount.toStringAsFixed(2)}',
+            style: GoogleFonts.robotoMono(fontSize: 10, color: Colors.grey[900]),
+          ),
         ],
       ),
     );
