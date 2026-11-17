@@ -10,7 +10,10 @@ class DiscountDao {
 
   Future<List<DiscountType>> getDiscountTypes() async {
     final db = await _databaseHelper.database;
-    final list = await db.query(SchemaConstants.discountType, orderBy: 'code ASC');
+    final list = await db.query(
+      SchemaConstants.discountType,
+      orderBy: 'code ASC',
+    );
     return list.map(DiscountType.fromMap).toList();
   }
 
@@ -23,7 +26,7 @@ class DiscountDao {
         dt.name AS discount_type_name
       FROM ${SchemaConstants.discount} d
       JOIN ${SchemaConstants.discountType} dt ON d.discount_type_id = dt.id
-      ${onlyActive ? 'WHERE d.active = 1' : ''}
+      ${onlyActive ? 'WHERE d.is_active = 1' : ''}
       ORDER BY d.name ASC
     ''');
 
@@ -57,12 +60,21 @@ class DiscountDao {
 
   Future<int> updateDiscount(int id, Map<String, dynamic> discountMap) async {
     final db = await _databaseHelper.database;
-    return db.update(SchemaConstants.discount, discountMap, where: 'id = ?', whereArgs: [id]);
+    return db.update(
+      SchemaConstants.discount,
+      discountMap,
+      where: 'id = ?',
+      whereArgs: [id],
+    );
   }
 
   Future<int> deleteDiscount(int id) async {
     final db = await _databaseHelper.database;
-    return db.delete(SchemaConstants.discount, where: 'id = ?', whereArgs: [id]);
+    return db.delete(
+      SchemaConstants.discount,
+      where: 'id = ?',
+      whereArgs: [id],
+    );
   }
 
   Future<bool> toggleDiscountStatus(int id, bool isActive) async {

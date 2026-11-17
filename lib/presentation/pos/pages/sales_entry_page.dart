@@ -35,14 +35,18 @@ import 'package:suki_pos/presentation/pos/bloc/shift_state.dart';
 import 'package:suki_pos/presentation/pos/widgets/add_to_cart_modal.dart';
 import 'package:suki_pos/presentation/pos/widgets/assign_table_customer_dialog.dart';
 import 'package:suki_pos/presentation/pos/widgets/cart_line_item_tile.dart';
+import 'package:suki_pos/presentation/pos/widgets/cash_fund_operations_dialog.dart';
 import 'package:suki_pos/presentation/pos/widgets/change_fund_dialog.dart';
 import 'package:suki_pos/presentation/pos/widgets/confirmation_dialog.dart';
 import 'package:suki_pos/presentation/pos/widgets/discount_selection_dialog.dart';
 import 'package:suki_pos/presentation/pos/widgets/held_orders_dialog.dart';
 import 'package:suki_pos/presentation/pos/widgets/line_item_action_dialog.dart';
+import 'package:suki_pos/presentation/pos/widgets/manager_auth_dialog.dart';
 import 'package:suki_pos/presentation/pos/widgets/order_notes_dialog.dart';
 import 'package:suki_pos/presentation/pos/widgets/payment_dialog.dart';
+import 'package:suki_pos/presentation/pos/widgets/post_void_si_dialog.dart';
 import 'package:suki_pos/presentation/pos/widgets/receipt_preview_dialog.dart';
+import 'package:suki_pos/presentation/pos/widgets/reprint_si_dialog.dart';
 import 'package:suki_pos/presentation/pos/widgets/surcharge_dialog.dart';
 import 'package:suki_pos/presentation/widgets/app_toast.dart';
 import 'package:suki_pos/presentation/widgets/app_unified_header.dart';
@@ -109,9 +113,43 @@ class _SalesEntryPageState extends State<SalesEntryPage> {
     return 1;
   }
 
-  void _verifyShiftStatus() {
+  String _getActiveCashierName(BuildContext context) {
+    final authState = context.read<AuthBloc>().state;
+    if (authState is AuthAuthenticated) {
+      return authState.user.name;
+    }
+    return 'Cashier';
+  }
+
+  Future<void> _verifyShiftStatus() async {
     final cashierId = _getActiveCashierId(context);
-    context.read<ShiftCubit>().checkActiveShift(cashierId);
+    final shiftCubit = context.read<ShiftCubit>();
+    final guard = await shiftCubit.evaluateSalesEntryGuards(cashierId);
+    if (!mounted) return;
+
+    if (!guard.canProceed) {
+      await ConfirmationDialog.show(
+        context,
+        title: guard.blockTitle ?? 'Sales Entry Restricted',
+        message:
+            guard.blockMessage ??
+            'Please complete the pending shift reading requirements first.',
+        variant: DialogVariant.warning,
+        confirmLabel: guard.redirectToSalesReading
+            ? 'Go to Sales Reading'
+            : 'Return to POS Hub',
+        showCancel: false,
+        contentAlignment: TextAlign.center,
+      );
+      if (mounted) {
+        Navigator.of(context).pushReplacementNamed(
+          guard.redirectToSalesReading ? '/pos/reading' : '/pos',
+        );
+      }
+      return;
+    }
+
+    await shiftCubit.checkActiveShift(cashierId);
   }
 
   // ---------------------------------------------------------------------
@@ -294,27 +332,32 @@ class _SalesEntryPageState extends State<SalesEntryPage> {
       builder: (dialogCtx) => PaymentDialog(
         totalDue: breakdown.netTotal,
         onComplete:
-            (paymentMethodId, methodName, cashTendered, change, {bankId, referenceNumber, chargeAccountId}) async {
+            (paymentMethodId, methodName, cashTendered, change, {bankId, referenceNumber, chargeAccountId, payments}) async {
               final cashierId = _getActiveCashierId(context);
+              final cashierName = _getActiveCashierName(context);
 
               final completedTxn = await cartCubit.submitOrder(
                 cashierId: cashierId,
+                cashierName: cashierName,
                 paymentMethodId: paymentMethodId,
+                paymentMethodName: methodName,
                 cashTendered: cashTendered,
                 bankId: bankId,
                 referenceNumber: referenceNumber,
                 chargeAccountId: chargeAccountId,
+                payments: payments,
               );
 
               if (!mounted) return;
 
               if (completedTxn != null) {
-                // Realtime Stock sync
+                // Realtime Stock & Shift Reading sync
                 context.read<StockCubit>().loadStockList();
+                context.read<ShiftCubit>().refreshSalesReading();
 
                 AppToast.showSuccess(
                   context,
-                  message: 'Sale Completed! Transaction #${completedTxn.transactionNo}',
+                  message: 'Sale Completed! Invoice #${completedTxn.transactionNo}',
                   title: 'Order Completed',
                 );
 
@@ -520,6 +563,80 @@ class _SalesEntryPageState extends State<SalesEntryPage> {
                 },
               ),
               actions: [
+                if (!isMobile) ...[
+                  OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      side: const BorderSide(color: Color(0xFFCBD5E1)),
+                    ),
+                    icon: const Icon(Icons.currency_exchange_rounded, size: 15, color: Color(0xFF0284C7)),
+                    label: Text(
+                      'Cash In/Out',
+                      style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: const Color(0xFF334155)),
+                    ),
+                    onPressed: () {
+                      showDialog(
+                        context: context,
+                        builder: (_) => CashFundOperationsDialog(
+                          cashierId: _getActiveCashierId(context),
+                          cashierName: _getActiveCashierName(context),
+                        ),
+                      );
+                    },
+                  ),
+                  const SizedBox(width: 6),
+                  OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      side: const BorderSide(color: Color(0xFFFECACA)),
+                      backgroundColor: const Color(0xFFFEF2F2),
+                    ),
+                    icon: const Icon(Icons.block_rounded, size: 15, color: Color(0xFFDC2626)),
+                    label: Text(
+                      'Post-Void',
+                      style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: const Color(0xFF991B1B)),
+                    ),
+                    onPressed: () async {
+                      final authorized = await ManagerAuthDialog.verify(
+                        context,
+                        actionTitle: 'Authorize Post-Void Transaction',
+                      );
+                      if (!authorized || !mounted) return;
+                      showDialog(
+                        context: context,
+                        builder: (_) => PostVoidSiDialog(
+                          cashierId: _getActiveCashierId(context),
+                          onVoidSuccess: () {
+                            context.read<StockCubit>().loadStockList();
+                            context.read<ShiftCubit>().refreshSalesReading();
+                          },
+                        ),
+                      );
+                    },
+                  ),
+                  const SizedBox(width: 6),
+                  OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      side: const BorderSide(color: Color(0xFFCBD5E1)),
+                    ),
+                    icon: const Icon(Icons.print_outlined, size: 15, color: Color(0xFF475569)),
+                    label: Text(
+                      'Reprint SI#',
+                      style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: const Color(0xFF334155)),
+                    ),
+                    onPressed: () {
+                      showDialog(
+                        context: context,
+                        builder: (_) => const ReprintSiDialog(),
+                      );
+                    },
+                  ),
+                  const SizedBox(width: 6),
+                ],
                 // Held Orders Counter Button
                 BlocBuilder<CartCubit, CartState>(
                   builder: (context, cartState) {

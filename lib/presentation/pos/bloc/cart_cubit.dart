@@ -7,6 +7,7 @@ import 'package:suki_pos/domain/entities/orders/cart_item.dart';
 import 'package:suki_pos/domain/entities/orders/held_order.dart';
 import 'package:suki_pos/domain/entities/orders/sales_order.dart';
 import 'package:suki_pos/domain/entities/orders/transaction_detail.dart';
+import 'package:suki_pos/domain/entities/pos/tender_payment_leg.dart';
 import 'package:suki_pos/domain/use_cases/orders/process_checkout.dart';
 import 'package:suki_pos/presentation/pos/bloc/cart_state.dart';
 import 'package:uuid/uuid.dart';
@@ -35,7 +36,9 @@ class CartCubit extends Cubit<CartState> {
     if (existingIndex != -1) {
       final updatedList = List<CartItem>.from(state.items);
       final existing = updatedList[existingIndex];
-      updatedList[existingIndex] = existing.copyWith(quantity: existing.quantity + quantity);
+      updatedList[existingIndex] = existing.copyWith(
+        quantity: existing.quantity + quantity,
+      );
       emit(state.copyWith(items: updatedList));
     } else {
       final newItem = CartItem(
@@ -75,7 +78,9 @@ class CartCubit extends Cubit<CartState> {
   }
 
   void removeItem(String cartItemId) {
-    final updatedList = state.items.where((item) => item.id != cartItemId).toList();
+    final updatedList = state.items
+        .where((item) => item.id != cartItemId)
+        .toList();
     emit(state.copyWith(items: updatedList));
   }
 
@@ -113,7 +118,11 @@ class CartCubit extends Cubit<CartState> {
   }
 
   /// Applies a line-level percentage or fixed amount discount to a specific cart line
-  void applyLineItemDiscount(String cartItemId, {double? percent, double? fixedAmount}) {
+  void applyLineItemDiscount(
+    String cartItemId, {
+    double? percent,
+    double? fixedAmount,
+  }) {
     final updatedList = state.items.map((item) {
       if (item.id == cartItemId) {
         return item.copyWith(
@@ -158,8 +167,12 @@ class CartCubit extends Cubit<CartState> {
     emit(
       state.copyWith(
         appliedDiscount: discount,
-        manualDiscountPercentage: discount.isPercentage ? (discount.percentage ?? 0.0) : 0.0,
-        manualDiscountFixed: !discount.isPercentage ? (discount.fixedAmount ?? 0.0) : 0.0,
+        manualDiscountPercentage: discount.isPercentage
+            ? (discount.percentage ?? 0.0)
+            : 0.0,
+        manualDiscountFixed: !discount.isPercentage
+            ? (discount.fixedAmount ?? 0.0)
+            : 0.0,
         beneficiaryIdNo: idNumber,
         beneficiaryName: cardholderName,
         guestCount: guestCount ?? state.guestCount,
@@ -206,7 +219,12 @@ class CartCubit extends Cubit<CartState> {
   }
 
   void setCustomerName(String? name) {
-    emit(state.copyWith(customerName: name, clearCustomerName: name == null || name.isEmpty));
+    emit(
+      state.copyWith(
+        customerName: name,
+        clearCustomerName: name == null || name.isEmpty,
+      ),
+    );
   }
 
   void setTableName(String? tableName, {int? tableId}) {
@@ -221,9 +239,12 @@ class CartCubit extends Cubit<CartState> {
   }
 
   void setOrderType(int typeId) => emit(state.copyWith(orderTypeId: typeId));
-  void setDiningTable(int? tableId) => emit(state.copyWith(diningTableId: tableId, clearDiningTable: tableId == null));
+  void setDiningTable(int? tableId) => emit(
+    state.copyWith(diningTableId: tableId, clearDiningTable: tableId == null),
+  );
   void setGuestCount(int count) => emit(state.copyWith(guestCount: count));
-  void setEligibleGuestCount(int count) => emit(state.copyWith(eligibleGuestCount: count));
+  void setEligibleGuestCount(int count) =>
+      emit(state.copyWith(eligibleGuestCount: count));
   void setRemarks(String remarks) => emit(state.copyWith(remarks: remarks));
 
   void setSurcharge({required double amount, double percent = 0.0}) {
@@ -295,6 +316,10 @@ class CartCubit extends Cubit<CartState> {
       CartState(
         orderTypeId: state.orderTypeId,
         heldOrders: updatedHeldList,
+        serviceChargeRate: state.serviceChargeRate,
+        isServiceChargeActive: state.isServiceChargeActive,
+        computeServiceChargeBeforeDiscount:
+            state.computeServiceChargeBeforeDiscount,
       ),
     );
 
@@ -307,7 +332,8 @@ class CartCubit extends Cubit<CartState> {
     if (matchIndex == -1) return;
 
     final held = state.heldOrders[matchIndex];
-    final updatedHeldList = List<HeldOrder>.from(state.heldOrders)..removeAt(matchIndex);
+    final updatedHeldList = List<HeldOrder>.from(state.heldOrders)
+      ..removeAt(matchIndex);
 
     emit(
       CartState(
@@ -315,7 +341,9 @@ class CartCubit extends Cubit<CartState> {
         orderTypeId: held.orderTypeId,
         diningTableId: held.diningTableId,
         tableName: held.orderLabel.startsWith('Table') ? held.orderLabel : null,
-        customerName: !held.orderLabel.startsWith('Table') ? held.orderLabel : null,
+        customerName: !held.orderLabel.startsWith('Table')
+            ? held.orderLabel
+            : null,
         guestCount: held.guestCount,
         eligibleGuestCount: held.eligibleGuestCount,
         manualDiscountPercentage: held.manualDiscountPercentage,
@@ -327,13 +355,19 @@ class CartCubit extends Cubit<CartState> {
         beneficiaryIdNo: held.beneficiaryIdNo,
         remarks: held.remarks,
         heldOrders: updatedHeldList,
+        serviceChargeRate: state.serviceChargeRate,
+        isServiceChargeActive: state.isServiceChargeActive,
+        computeServiceChargeBeforeDiscount:
+            state.computeServiceChargeBeforeDiscount,
       ),
     );
   }
 
   /// Discards a held order
   void deleteHeldOrder(String heldOrderId) {
-    final updatedHeldList = state.heldOrders.where((h) => h.id != heldOrderId).toList();
+    final updatedHeldList = state.heldOrders
+        .where((h) => h.id != heldOrderId)
+        .toList();
     emit(state.copyWith(heldOrders: updatedHeldList));
   }
 
@@ -347,6 +381,10 @@ class CartCubit extends Cubit<CartState> {
         guestCount: state.guestCount,
         eligibleGuestCount: state.eligibleGuestCount,
         heldOrders: state.heldOrders,
+        serviceChargeRate: state.serviceChargeRate,
+        isServiceChargeActive: state.isServiceChargeActive,
+        computeServiceChargeBeforeDiscount:
+            state.computeServiceChargeBeforeDiscount,
       ),
     );
   }
@@ -355,9 +393,12 @@ class CartCubit extends Cubit<CartState> {
     required int cashierId,
     required int paymentMethodId,
     required double cashTendered,
+    String? paymentMethodName,
+    String? cashierName,
     int? bankId,
     String? referenceNumber,
     int? chargeAccountId,
+    List<TenderPaymentLeg>? payments,
   }) async {
     if (state.items.isEmpty) return null;
 
@@ -375,7 +416,7 @@ class CartCubit extends Cubit<CartState> {
       discountId: state.appliedDiscount?.id,
       discPercentage: state.manualDiscountPercentage,
       discFixedAmount: state.manualDiscountFixed,
-      surchargeAmount: state.surchargeAmount,
+      surchargeAmount: breakdown.surchargeAmount,
       surchargePercent: state.surchargePercent,
       beneficiaryName: state.beneficiaryName,
       beneficiaryIdNo: state.beneficiaryIdNo,
@@ -385,48 +426,80 @@ class CartCubit extends Cubit<CartState> {
     );
 
     final totalAmount = breakdown.netTotal;
-    final changeGiven = cashTendered - totalAmount;
+    final totalTendered = (payments != null && payments.isNotEmpty)
+        ? payments.fold<double>(0.0, (sum, p) => sum + p.cashTendered)
+        : cashTendered;
+    final changeGiven = (payments != null && payments.isNotEmpty)
+        ? payments.fold<double>(0.0, (sum, p) => sum + p.changeGiven)
+        : (cashTendered - totalAmount);
 
     final result = await processCheckout(
       order: order,
       paymentMethodId: paymentMethodId,
-      cashTendered: cashTendered,
+      cashTendered: totalTendered,
       changeGiven: changeGiven >= 0 ? changeGiven : 0.0,
       manualDiscountPercentage: state.manualDiscountPercentage,
       manualDiscountFixed: state.manualDiscountFixed,
+      bankId: bankId,
+      referenceNumber: referenceNumber,
+      chargeAccountId: chargeAccountId,
+      payments: payments,
     );
 
     return result.fold(
       (failure) {
-        final errorMsg = failure is DatabaseFailure && failure.message.isNotEmpty
+        final errorMsg =
+            failure is DatabaseFailure && failure.message.isNotEmpty
             ? failure.message
             : 'Failed to process checkout';
         emit(state.copyWith(isSubmitting: false, errorMessage: errorMsg));
         return null;
       },
       (txnId) {
+        final resolvedMethodName = (payments != null && payments.isNotEmpty)
+            ? payments.map((p) => p.paymentMethodName).toSet().join(' + ')
+            : (paymentMethodName ??
+                (paymentMethodId == 1
+                    ? 'Cash'
+                    : (paymentMethodId == 2 ? 'Card' : 'E-Wallet / Bank')));
+        final resolvedRefNo = (payments != null && payments.isNotEmpty)
+            ? payments
+                .map((p) => p.referenceNumber ?? p.approvalNumber)
+                .whereType<String>()
+                .where((s) => s.trim().isNotEmpty)
+                .join(', ')
+            : ((referenceNumber != null && referenceNumber.trim().isNotEmpty)
+                ? referenceNumber.trim()
+                : null);
         final completedDetail = TransactionDetail(
           transactionId: txnId,
           salesOrderId: 0,
-          transactionNo: 'TXN-${txnId.toString().padLeft(6, '0')}',
+          transactionNo: 'SI-${txnId.toString().padLeft(6, '0')}',
           grossAmount: breakdown.grossSubtotal,
           netAmount: breakdown.netTotal,
-          cashTendered: cashTendered,
+          cashTendered: totalTendered,
           changeGiven: changeGiven >= 0 ? changeGiven : 0.0,
-          paymentMethodName: paymentMethodId == 1 ? 'Cash' : (paymentMethodId == 2 ? 'Card' : 'E-Wallet / Bank'),
-          cashierName: 'Admin',
-          orderTypeName: state.orderTypeId == 1 ? 'Dine-In' : 'Take-Out',
+          paymentMethodName: resolvedMethodName,
+          cashierName: cashierName ?? 'Admin',
+          orderTypeName: state.orderTypeId == 1
+              ? 'Dine-In'
+              : (state.orderTypeId == 2 ? 'Take-Out' : 'Delivery'),
           guestCount: state.guestCount,
           eligibleGuestCount: state.eligibleGuestCount,
           discountName: state.appliedDiscount?.name,
           itemDiscountAmount: breakdown.itemDiscountAmount,
           orderDiscountAmount: breakdown.manualDiscountAmount,
+          surchargeAmount: breakdown.surchargeAmount,
           vatableSales: breakdown.vatableSales,
           vatAmount: breakdown.vatAmount,
           vatExemptSales: breakdown.vatExemptSales,
           zeroRatedSales: breakdown.zeroRatedSales,
           beneficiaryName: state.beneficiaryName,
           beneficiaryIdNo: state.beneficiaryIdNo,
+          referenceNumber:
+              (resolvedRefNo != null && resolvedRefNo.isNotEmpty)
+              ? resolvedRefNo
+              : null,
           transactionDate: DateTime.now(),
           lines: state.items
               .map(
@@ -439,7 +512,9 @@ class CartCubit extends Cubit<CartState> {
                   amount: item.effectiveTotalPrice,
                   lineDiscount: item.totalLineDiscount,
                   isFreeItem: item.isFreeItem,
-                  selectedOptions: item.selectedOptions.map((o) => o.alias ?? '').toList(),
+                  selectedOptions: item.selectedOptions
+                      .map((o) => o.alias ?? '')
+                      .toList(),
                 ),
               )
               .toList(),

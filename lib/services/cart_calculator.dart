@@ -76,9 +76,9 @@ class CartCalculator {
       // Compute discount on net of VAT
       orderDiscountAmount = netOfVatGross * (percentage / 100);
 
-      // Check cap if configured
-      if (appliedDiscount?.capAmount != null && orderDiscountAmount > appliedDiscount!.capAmount!) {
-        orderDiscountAmount = appliedDiscount!.capAmount!;
+      // Check cap if configured (> 0)
+      if ((appliedDiscount?.capAmount ?? 0) > 0 && orderDiscountAmount > appliedDiscount!.capAmount!) {
+        orderDiscountAmount = appliedDiscount.capAmount!;
       }
 
       // Compute Service Charge
@@ -120,9 +120,9 @@ class CartCalculator {
         orderDiscountAmount = discountableGross;
       }
 
-      // Check cap if configured
-      if (appliedDiscount?.capAmount != null && orderDiscountAmount > appliedDiscount!.capAmount!) {
-        orderDiscountAmount = appliedDiscount!.capAmount!;
+      // Check cap if configured (> 0)
+      if ((appliedDiscount?.capAmount ?? 0) > 0 && orderDiscountAmount > appliedDiscount!.capAmount!) {
+        orderDiscountAmount = appliedDiscount.capAmount!;
       }
 
       // Compute Service Charge
