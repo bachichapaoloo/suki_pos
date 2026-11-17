@@ -11,6 +11,13 @@ class UserModel extends User {
     super.createdAt,
     super.updatedAt,
     super.roleName,
+    super.canSalesEntry,
+    super.canSalesOrder,
+    super.canSalesReading,
+    super.canSalesInquiry,
+    super.canFileMaintenance,
+    super.canAdminMode,
+    super.canInventory,
   });
 
   factory UserModel.fromMap(Map<String, dynamic> map) {
@@ -26,7 +33,14 @@ class UserModel extends User {
       updatedAt: map['updated_at'] != null
           ? DateTime.parse(map['updated_at'] as String)
           : null,
-      roleName: map['role_name'] as String?, // From JOIN if available
+      roleName: map['role_name'] as String?,
+      canSalesEntry: (map['can_sales_entry'] as int? ?? 1) == 1,
+      canSalesOrder: (map['can_sales_order'] as int? ?? 1) == 1,
+      canSalesReading: (map['can_sales_reading'] as int? ?? 1) == 1,
+      canSalesInquiry: (map['can_sales_inquiry'] as int? ?? 1) == 1,
+      canFileMaintenance: (map['can_file_maintenance'] as int? ?? 1) == 1,
+      canAdminMode: (map['can_admin_mode'] as int? ?? 1) == 1,
+      canInventory: (map['can_inventory'] as int? ?? 1) == 1,
     );
   }
 
@@ -40,6 +54,13 @@ class UserModel extends User {
       createdAt: entity.createdAt,
       updatedAt: entity.updatedAt,
       roleName: entity.roleName,
+      canSalesEntry: entity.canSalesEntry,
+      canSalesOrder: entity.canSalesOrder,
+      canSalesReading: entity.canSalesReading,
+      canSalesInquiry: entity.canSalesInquiry,
+      canFileMaintenance: entity.canFileMaintenance,
+      canAdminMode: entity.canAdminMode,
+      canInventory: entity.canInventory,
     );
   }
 

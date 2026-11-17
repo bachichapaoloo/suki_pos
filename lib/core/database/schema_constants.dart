@@ -51,7 +51,8 @@ class SchemaConstants {
   static const String paymentDeposit = 'payment_deposit';
   static const String voidTransaction = 'void_transaction';
   static const String cashDeclaration = 'cash_declaration';
-  static const String cashDeclarationDenomination = 'cash_declaration_denomination';
+  static const String cashDeclarationDenomination =
+      'cash_declaration_denomination';
   static const String cashFundLog = 'cash_fund_log';
   static const String deposit = 'deposit';
   static const String shortOver = 'short_over';
@@ -1412,6 +1413,7 @@ class SchemaConstants {
         ('vip',         'VIP Discount'),
         ('solo_parent', 'Solo Parent'),
         ('athlete',     'National Athlete'),
+        ('diplomat',     'Diplomat (Zero-Rated)'),
         ('custom',      'Custom Discount');
     ''',
     '''
@@ -1426,11 +1428,11 @@ class SchemaConstants {
     ''',
     '''
     INSERT OR IGNORE INTO role (id, name, can_sales_entry, can_sales_order, can_sales_reading, can_sales_inquiry, can_file_maintenance, can_admin_mode, can_dtr_menu, can_kiosk, can_inventory, is_active)
-    VALUES (1, 'Superuser', 1, 1, 1, 1, 1, 1, 1, 1, 1, 1);
+    VALUES (1, 'Superuser', 1, 1, 1, 1, 1, 1, 1, 1, 1, 1), (2, 'Cashier', 1, 1, 1, 1, 0, 0, 1, 0, 0, 1);
     ''',
     '''
     INSERT OR IGNORE INTO app_user (id, role_id, name, password_hash, is_active)
-    VALUES (1, 1, 'Superuser', '050724', 1);
+    VALUES (1, 1, 'Superuser', 'b20ffa13826016dbed1458d16511c7bc35243c5dd451c3f26e57ce7d84d77dd2', 1);
     ''',
   ];
 }

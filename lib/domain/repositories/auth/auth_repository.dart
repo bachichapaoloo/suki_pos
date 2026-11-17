@@ -7,4 +7,7 @@ import 'package:suki_pos/domain/entities/admin/user.dart';
 abstract class AuthRepository {
   /// Verifies the user's PIN against the database.
   Future<Either<Failure, User>> login(String pin);
+
+  /// Verifies whether the given PIN belongs to an active Manager/Admin user.
+  Future<Either<Failure, User>> verifyManagerPin(String pin);
 }

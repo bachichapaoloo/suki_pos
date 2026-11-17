@@ -1,6 +1,7 @@
 import 'package:dartz/dartz.dart';
 import 'package:suki_pos/core/database/database_helper.dart';
 import 'package:suki_pos/core/error/failures.dart';
+import 'package:suki_pos/core/utils/crypto_utils.dart';
 import 'package:suki_pos/data/models/admin/user_model.dart';
 import 'package:suki_pos/domain/entities/admin/user.dart';
 import 'package:suki_pos/domain/repositories/admin/user_repository.dart';
@@ -15,9 +16,18 @@ class UserRepositoryImpl implements UserRepository {
   Future<Either<Failure, List<User>>> getUsers() async {
     try {
       final db = await databaseHelper.database;
-      // Fetch users with their role name using a JOIN.
+      // Fetch users with their role name and permissions using a JOIN.
       final List<Map<String, dynamic>> maps = await db.rawQuery('''
-        SELECT u.*, r.name as role_name 
+        SELECT 
+          u.*, 
+          r.name AS role_name,
+          r.can_sales_entry,
+          r.can_sales_order,
+          r.can_sales_reading,
+          r.can_sales_inquiry,
+          r.can_file_maintenance,
+          r.can_admin_mode,
+          r.can_inventory
         FROM app_user u
         JOIN role r ON u.role_id = r.id
         ORDER BY u.name ASC
@@ -32,7 +42,10 @@ class UserRepositoryImpl implements UserRepository {
   Future<Either<Failure, User>> saveUser(User user) async {
     try {
       final db = await databaseHelper.database;
-      final model = UserModel.fromEntity(user);
+      final hashedUser = user.copyWith(
+        passwordHash: CryptoUtils.hashPin(user.passwordHash),
+      );
+      final model = UserModel.fromEntity(hashedUser);
 
       if (model.id == 0) {
         final id = await db.insert('app_user', model.toMap());
